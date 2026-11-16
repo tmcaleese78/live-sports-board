@@ -73,7 +73,7 @@
   <button class="f-btn" data-f="hit" onclick="setFilter('hit')">Cashed</button>
   <button class="f-btn" data-f="miss" onclick="setFilter('miss')">Missed</button>
 </div>
-<div id="app">Loading live stats...</div>
+<div id="app">Connecting to live feed...</div>
 <script>
 let curFilter = 'all', lastData = null;
 if (localStorage.getItem('osp_theme') === 'light') { document.body.classList.add('light'); document.getElementById('theme-btn').textContent = 'Dark Mode'; }
@@ -87,41 +87,46 @@ function setFilter(f) {
   document.querySelectorAll('.f-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
   if (lastData) renderAll(lastData);
 }
-const money = v => '$' + (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+function money(v) {
+  const n = Number(v) || 0;
+  return '$' + (Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+}
 function calcPct(p) {
   if (p.hit) return 100;
   const g = parseFloat(p.gained);
-  const t = parseFloat(String(p.stat).trim().split(/\s+/)[0]);
+  const t = parseFloat(p.stat);
   return (t > 0 && !isNaN(g)) ? Math.max(0, Math.min(100, (g / t) * 100)) : 0;
 }
 function renderBlock(b) {
   const st = b.all_hit ? 'hit' : (b.any_miss ? 'miss' : '');
-  const rows = b.players.map(p => {
+  const players = Array.isArray(b.players) ? b.players : [];
+  const rows = players.map(p => {
     const pct = calcPct(p), barClr = p.hit ? '#22c55e' : (p.miss ? '#ef4444' : (p.bg || '#38bdf8'));
     return `<div class="p-wrap ${p.hit?'hit':(p.miss?'miss':'')}">
-      <div class="p-main"><div class="logo-cell" style="background:${p.bg}">${p.logo?`<img src="${p.logo}">`:''}</div>
-      <div>${p.name}</div><div>${p.stat}</div><div>${p.gained}</div><div>${p.needed}</div></div>
+      <div class="p-main"><div class="logo-cell" style="background:${p.bg||'#1e293b'}">${p.logo?`<img src="${p.logo}">`:''}</div>
+      <div>${p.name||''}</div><div>${p.stat||''}</div><div>${p.gained||'0'}</div><div>${p.needed||''}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${barClr}"></div></div></div>`;
   }).join('');
-  return `<div class="card ${st}"><div class="card-banner ${st}"><div>Cost: ${b.cost}</div><div>Payout: ${b.payout}</div></div>
+  return `<div class="card ${st}"><div class="card-banner ${st}"><div>Cost: ${b.cost||'—'}</div><div>Payout: ${b.payout||'—'}</div></div>
     <div class="hdr-row"><div></div><div>Name</div><div>Stat</div><div>Gained</div><div>Needed</div></div>${rows}</div>`;
 }
 function filterBlocks(list) {
-  if (curFilter === 'alive') return list.filter(b => !b.any_miss && !b.all_hit);
-  if (curFilter === 'hit') return list.filter(b => b.all_hit);
-  if (curFilter === 'miss') return list.filter(b => b.any_miss);
-  return list;
+  const arr = Array.isArray(list) ? list : [];
+  if (curFilter === 'alive') return arr.filter(b => !b.any_miss && !b.all_hit);
+  if (curFilter === 'hit') return arr.filter(b => b.all_hit);
+  if (curFilter === 'miss') return arr.filter(b => b.any_miss);
+  return arr;
 }
 function renderAll(d) {
-  let html = `<h2>Player Cards Summary</h2><div class="grid"><div class="card ${d.summary.paid>0?'hit':''}">
-    <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(d.summary.cost)}</div></div>
-    <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(d.summary.live)}</div></div>
-    <div class="sum-row ${d.summary.paid>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(d.summary.paid)}</div></div></div></div>`;
+  const s = d.summary || {};
+  let html = `<h2>Player Cards Summary</h2><div class="grid"><div class="card ${(s.paid||0)>0?'hit':''}">
+    <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(s.cost)}</div></div>
+    <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(s.live)}</div></div>
+    <div class="sum-row ${(s.paid||0)>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(s.paid)}</div></div></div></div>`;
   const nfl = (curFilter === 'nba' || curFilter === 'cfb') ? [] : filterBlocks(d.nfl);
   const nba = (curFilter === 'nfl' || curFilter === 'cfb') ? [] : filterBlocks(d.nba);
-  const cfb = ['all', 'cfb'].includes(curFilter) ? d.cfb : [];
+  const cfb = (curFilter === 'all' || curFilter === 'cfb') ? (Array.isArray(d.cfb) ? d.cfb : []) : [];
   if (nfl.length) html += `<h2>NFL Players & Targets</h2><div class="grid">${nfl.map(renderBlock).join('')}</div>`;
   if (nba.length) html += `<h2>NBA Players & Targets</h2><div class="grid">${nba.map(renderBlock).join('')}</div>`;
   if (cfb.length) html += `<h2>College Football Games</h2><div class="grid">${cfb.map(g => `<div class="cfb-card"><div>
     <div class="team-line" style="background:${g.bg0};color:${g.fg0}"><div class="team-left">${g.lg0?`<img src="${g.lg0}">`:''}<span>${g.away}</span></div><span>${g.ascore}</span></div>
-    <div class="team-line" style="background:${g.bg1};color:${g.fg1};border-top:1px solid rgba(255,255,255,0.2)"><div class="team-left">${g.lg1?`<img src="${g.lg1}">`:''}<span>${g.home}</span></div><span>${g.hscore}</span></div></div>
