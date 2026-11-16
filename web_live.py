@@ -25,7 +25,7 @@ def clean_hex(val, fallback):
     return f"#{s}" if len(s) == 6 else fallback
 
 def get_roster(sport_path, tid):
-    key = (sport_path, tid)
+    key = f"{sport_path}:{tid}"
     if key in _ROSTER_CACHE:
         return _ROSTER_CACHE[key]
     data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/teams/{tid}/roster", timeout=5)
@@ -34,7 +34,7 @@ def get_roster(sport_path, tid):
         items = grp.get("items", list()) if isinstance(grp, dict) else [grp]
         for a in items:
             if isinstance(a, dict) and a.get("displayName"):
-                out.append((a["displayName"], a.get("position", {}).get("abbreviation", "")))
+                out.append({"name": a["displayName"], "pos": a.get("position", {}).get("abbreviation", "")})
     if out:
         _ROSTER_CACHE[key] = out
     return out
@@ -92,15 +92,16 @@ def parse_scoreboard(sport_path, lg_code):
         for c in comps:
             t = c.get("team", {})
             ab = t.get("abbreviation", "")
-            meta = (clean_hex(t.get("color"), "#1e293b"), t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), t.get("id", ""))
+            meta = {"bg": clean_hex(t.get("color"), "#1e293b"), "logo": t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), "tid": t.get("id", "")}
             team_meta[ab] = meta
-            roster_tasks.append((ab, meta, status, state))
+            roster_tasks.append({"ab": ab, "meta": meta, "status": status, "state": state})
         if state != "pre":
-            box_tasks.append((eid, team_meta, status, state))
+            box_tasks.append({"eid": eid, "team_meta": team_meta, "status": status, "state": state})
     with ThreadPoolExecutor(max_workers=12) as pool:
-        boxes = list(pool.map(lambda t: (fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={t}", timeout=6), t, t, t), box_tasks))
-        rosters = list(pool.map(lambda r: (r, r, get_roster(sport_path, r), r, r), roster_tasks))
-    for box, team_meta, status, state in boxes:
+        boxes = list(pool.map(lambda t: {"box": fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={t['eid']}", timeout=6), "meta": t["team_meta"], "status": t["status"], "state": t["state"]}, box_tasks))
+        rosters = list(pool.map(lambda r: {"ab": r["ab"], "meta": r["meta"], "rlist": get_roster(sport_path, r["meta"]["tid"]), "status": r["status"], "state": r["state"]}, roster_tasks))
+    for item in boxes:
+        box, team_meta, status, state = item["box"], item["meta"], item["status"], item["state"]
         pmap = {}
         for tg in box.get("boxscore", {}).get("players", list()):
             ab = tg.get("team", {}).get("abbreviation", "")
@@ -142,15 +143,16 @@ def parse_scoreboard(sport_path, lg_code):
             seen_p.add((ab, nm))
             if lg_code == "nfl":
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
-            bg, logo, _ = team_meta.get(ab, ("#1e293b", "", ""))
-            players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": d["stats"]})
-    for ab, meta, rlist, status, state in rosters:
-        bg, logo, _ = meta
-        for nm, pos in rlist:
+            m = team_meta.get(ab, {"bg": "#1e293b", "logo": ""})
+            players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": d["stats"]})
+    for r in rosters:
+        ab, m, status, state = r["ab"], r["meta"], r["status"], r["state"]
+        for p in r["rlist"]:
+            nm, pos = p["name"], p["pos"]
             if (lg_code == "nfl" and pos not in ("QB", "RB", "WR", "TE")) or (ab, nm) in seen_p:
                 continue
             seen_p.add((ab, nm))
-            players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": {}})
+            players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": {}})
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
@@ -177,5 +179,3 @@ def api_live():
 def index():
     return render_template("index.html")
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
