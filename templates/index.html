@@ -421,15 +421,11 @@ async function refresh() {
     const res = await fetch('/api/live?t=' + Date.now());
     if (!res.ok) throw new Error('Feed returned HTTP ' + res.status);
     liveData = await res.json();
-   async function refresh() {
-  try {
-    const res = await fetch('/api/live?t=' + Date.now());
-    if (!res.ok) throw new Error('Feed returned HTTP ' + res.status);
-    liveData = await res.json();
-    const allG = [...(liveData.games.NFL||[]), ...(liveData.games.NBA||[]), ...(liveData.games.CFB||[])];
-    document.getElementById('live-ticker').innerHTML = allG.slice(0, 24).map(g => `<span class="tk-item"><span class="tk-lg">${g.league}</span> ${g.away} ${g.state==='pre'?'':g.ascore} @ ${g.home} ${g.state==='pre'?'':g.hscore} <span class="tk-odds">(${g.status}${g.odds?' • '+g.odds:''})</span></span>`).join('') || 'OmniStatPro Live Game Center';
-    document.getElementById('card-cnt').textContent = userCards.length;
-
+    const tk = document.getElementById('live-ticker');
+    if (tk && liveData.games) {
+      const allG = [...(liveData.games.NFL||[]), ...(liveData.games.NBA||[]), ...(liveData.games.CFB||[])];
+      tk.innerHTML = allG.slice(0, 24).map(g => `<span class="tk-item"><span class="tk-lg">${g.league}</span> ${g.away} ${g.state==='pre'?'':g.ascore} @ ${g.home} ${g.state==='pre'?'':g.hscore} <span class="tk-odds">(${g.status}${g.odds?' • '+g.odds:''})</span></span>`).join('') || 'OmniStatPro Live Game Center';
+    }
     document.getElementById('card-cnt').textContent = userCards.length;
     if (curTab === 'scoreboard') renderGames();
     if (curTab === 'stats') renderPlayers();
@@ -439,6 +435,7 @@ async function refresh() {
     document.getElementById('games-area').innerHTML = `<p style="color:#f87171">Sync issue: ${e.message}</p>`;
   }
 }
+
 refresh(); setInterval(refresh, 15000);
 </script>
 </body>
