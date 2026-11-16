@@ -96,7 +96,7 @@
   <div class="hero-inner">
     <div class="logo-box">
       <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
-      <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
+      <img class="brand-logo logo-light" src="/static/logo_light.png" alt="OmniStatPro">
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
@@ -109,3 +109,153 @@
   <div class="nav">
     <button class="tab-btn active" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
     <button class="tab-btn" data-t="stats" onclick="setTab('stats')">Live Stats</button>
+    <button class="tab-btn" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
+    <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card (<span id="draft-cnt">0</span>)</button>
+  </div>
+</div>
+
+<div class="main-wrap">
+  <div id="view-scoreboard">
+    <div class="filter-bar">
+      <div class="filter-grp">
+        <button class="pill active" data-lg="ALL" onclick="setLg('ALL')">All Sports</button>
+        <button class="pill" data-lg="NFL" onclick="setLg('NFL')">NFL</button>
+        <button class="pill" data-lg="NBA" onclick="setLg('NBA')">NBA</button>
+        <button class="pill" data-lg="CFB" onclick="setLg('CFB')">CFB</button>
+      </div>
+      <div class="filter-grp">
+        <button class="pill active" data-st="ALL" onclick="setSt('ALL')">All Games</button>
+        <button class="pill" data-st="in" onclick="setSt('in')">Live Now</button>
+        <button class="pill" data-st="pre" onclick="setSt('pre')">Upcoming</button>
+        <button class="pill" data-st="post" onclick="setSt('post')">Final</button>
+      </div>
+    </div>
+    <div id="games-area">Loading live games...</div>
+  </div>
+
+  <div id="view-stats" style="display:none">
+    <h2>Live Player Stats</h2>
+    <div class="row-flex">
+      <button class="pill active" data-plg="NFL" onclick="setPlg('NFL')">NFL Players</button>
+      <button class="pill" data-plg="NBA" onclick="setPlg('NBA')">NBA Players</button>
+      <input class="search-box" id="p-search" placeholder="Search player or team..." oninput="renderPlayers()">
+    </div>
+    <div class="tbl-wrap"><table id="p-table"></table></div>
+  </div>
+
+  <div id="view-cards" style="display:none"></div>
+
+  <div id="view-build" style="display:none;margin-top:16px">
+    <div class="builder">
+      <h2 style="margin-top:0">Create Custom Bet Card (Max 8 Legs)</h2>
+      <div class="row-flex">
+        <input id="b-cost" type="number" step="0.01" placeholder="Cost ($)" style="width:140px">
+        <input id="b-pay" type="number" step="0.01" placeholder="Payout ($)" style="width:160px">
+      </div>
+      <div class="row-flex">
+        <select id="b-type" onchange="syncBuilderOpts()">
+          <option value="prop">Player Prop</option>
+          <option value="ml">Game Winner (Moneyline)</option>
+        </select>
+        <select id="b-sport" onchange="syncBuilderOpts()">
+          <option value="NFL">NFL</option>
+          <option value="NBA">NBA</option>
+          <option value="CFB">CFB</option>
+        </select>
+      </div>
+      <div id="prop-inputs" class="row-flex">
+        <input id="b-player" list="player-datalist" placeholder="Type player name..." style="flex:1;min-width:190px">
+        <datalist id="player-datalist"></datalist>
+        <select id="b-stat"></select>
+        <input id="b-target" type="number" step="0.5" placeholder="Target (e.g. 50)" style="width:150px">
+      </div>
+      <div id="ml-inputs" class="row-flex" style="display:none">
+        <select id="b-team" style="flex:1;min-width:220px"></select>
+      </div>
+      <div class="row-flex">
+        <button class="pill" onclick="addLeg()">+ Add Leg to Card</button>
+        <button class="btn-primary" onclick="saveCard()">Save Card to Tracker</button>
+      </div>
+      <div id="draft-legs"></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'scoreboard', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
+let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]');
+if (localStorage.getItem('osp_theme') === 'light') { document.body.classList.add('light'); document.getElementById('theme-btn').textContent = 'Dark'; }
+function toggleTheme() { const l = document.body.classList.toggle('light'); localStorage.setItem('osp_theme', l?'light':'dark'); document.getElementById('theme-btn').textContent = l?'Dark':'Light'; }
+function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._tm); t._tm = setTimeout(() => t.style.display = 'none', 2200); }
+function setTab(t) {
+  curTab = t;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.t === t));
+  ['scoreboard','stats','cards','build'].forEach(v => {
+    const el = document.getElementById('view-' + v);
+    if (el) el.style.display = (v === t ? 'block' : 'none');
+  });
+  if (t === 'scoreboard') renderGames();
+  if (t === 'stats') renderPlayers();
+  if (t === 'cards') renderCards();
+  if (t === 'build') { syncBuilderOpts(); renderDraft(); }
+}
+function setLg(lg) { curLg = lg; document.querySelectorAll('[data-lg]').forEach(b => b.classList.toggle('active', b.dataset.lg === lg)); renderGames(); }
+function setSt(st) { curSt = st; document.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('active', b.dataset.st === st)); renderGames(); }
+function setPlg(lg) { curPlg = lg; document.querySelectorAll('[data-plg]').forEach(b => b.classList.toggle('active', b.dataset.plg === lg)); renderPlayers(); }
+const money = v => '$' + ((Number(v)||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+
+function quickPickTeam(sport, team) {
+  if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
+  draftLegs.push({type: 'ml', sport, team});
+  document.getElementById('draft-cnt').textContent = draftLegs.length;
+  showToast(`Added ${team} (${sport}) to Bet Card (${draftLegs.length}/8)`);
+}
+
+function renderGames() {
+  const lgs = curLg === 'ALL' ? ['NFL','NBA','CFB'] : [curLg];
+  let html = '';
+  lgs.forEach(lg => {
+    const raw = liveData.games[lg] || [];
+    const list = curSt === 'ALL' ? raw : raw.filter(g => g.state === curSt);
+    if (!list.length) return;
+    html += `<h2>${lg} Games (${list.length})</h2><div class="grid">` + list.map(g => {
+      const isLive = g.state === 'in';
+      const stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
+      const safeAway = g.away.replace(/'/g, "\\'"), safeHome = g.home.replace(/'/g, "\\'");
+      return `<div class="sb-card ${isLive?'is-live':''}">
+        <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
+        <div class="sb-team" style="background:${g.bg0};color:${g.fg0}">
+          <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${g.away}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
+          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeAway}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
+        </div>
+        <div class="sb-team" style="background:${g.bg1};color:${g.fg1}">
+          <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${g.home}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
+          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeHome}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
+        </div>
+        ${g.odds ? `<div class="sb-foot"><span>Line</span><span>${g.odds}</span></div>` : ''}
+      </div>`;
+    }).join('') + `</div>`;
+  });
+  document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No games match this filter right now.</p>';
+}
+
+function renderPlayers() {
+  const q = (document.getElementById('p-search').value || '').toLowerCase();
+  const list = (liveData.players[curPlg] || []).filter(p => p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q));
+  const cols = curPlg === 'NFL' ? ['PASS YDS','PASS TD','RUSH YDS','RUSH TD','REC','REC YDS','REC TD','SCRIM YDS'] : ['PTS','REB','AST','3PM','STL','BLK','PRA'];
+  const hdr = `<tr><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th>${c}</th>`).join('') + `</tr>`;
+  const rows = list.slice(0, 120).map(p => `<tr><td>${p.name}</td><td>${p.team}</td><td>${p.status}</td>` + cols.map(c => `<td>${p.stats[c] ?? 0}</td>`).join('') + `</tr>`).join('');
+  document.getElementById('p-table').innerHTML = hdr + rows;
+}
+
+function evalLeg(leg) {
+  if (leg.type === 'ml') {
+    const g = (liveData.games[leg.sport] || []).find(x => x.away === leg.team || x.home === leg.team || x.away_full === leg.team || x.home_full === leg.team);
+    if (!g) return {name: leg.team, stat: 'Win Game', gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
+    const isAway = (g.away === leg.team || g.away_full === leg.team);
+    const myS = Number(isAway ? g.ascore : g.hscore) || 0, oppS = Number(isAway ? g.hscore : g.ascore) || 0;
+    const diff = myS - oppS;
+    const hit = g.state === 'post' && diff > 0;
+    const miss = g.state === 'post' && diff <= 0;
