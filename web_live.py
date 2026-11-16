@@ -43,8 +43,10 @@ def parse_scoreboard(sport_path, lg_code):
         comps = comp.get("competitors", list())
         if len(comps) < 2:
             continue
-        home = next((c for c in comps if c.get("homeAway") == "home"), comps)
-        away = next((c for c in comps if c.get("homeAway") != "home"), comps[-1])
+        first_c = next(iter(comps), {})
+        last_c = next(reversed(comps), {})
+        home = next((c for c in comps if c.get("homeAway") == "home"), first_c)
+        away = next((c for c in comps if c.get("homeAway") != "home"), last_c)
         st_obj = ev.get("status", {}).get("type", {})
         state = st_obj.get("state", "pre")
         status = "Final" if state == "post" else st_obj.get("shortDetail", "Scheduled")
@@ -56,7 +58,7 @@ def parse_scoreboard(sport_path, lg_code):
         a_rec = next((r.get("summary", "") for r in away.get("records", list()) if r.get("type") == "total"), "")
         h_rec = next((r.get("summary", "") for r in home.get("records", list()) if r.get("type") == "total"), "")
         bcasts = [n for b in comp.get("broadcasts", list()) for n in b.get("names", list()) if n]
-        tv = bcasts if bcasts else ""
+        tv = next(iter(bcasts), "")
         odds_obj = next(iter(comp.get("odds", list())), {})
         odds_txt = str(odds_obj.get("details", "") or "")
         ou = odds_obj.get("overUnder", "")
@@ -66,14 +68,15 @@ def parse_scoreboard(sport_path, lg_code):
         bg0, fg0, lg0 = doc_brand.team_style(a_name, league=lg_code)
         bg1, fg1, lg1 = doc_brand.team_style(h_name, league=lg_code)
         sort_rank = 0 if state == "in" else (1 if state == "pre" else 2)
-        games.append((sort_rank, str(ev.get("date", "")), {
+        games.append({
+            "rank": sort_rank, "date": str(ev.get("date", "")),
             "id": eid, "league": lg_code.upper(), "state": state, "status": status,
             "tv": tv, "odds": odds_txt,
             "away": a_name, "away_full": a_full, "arec": a_rec, "ascore": str(away.get("score", "0")), "aposs": (poss_id == str(away.get("id", "")) and state == "in"),
             "home": h_name, "home_full": h_full, "hrec": h_rec, "hscore": str(home.get("score", "0")), "hposs": (poss_id == str(home.get("id", "")) and state == "in"),
             "bg0": rgb_css(bg0), "fg0": rgb_css(fg0), "lg0": lg0,
             "bg1": rgb_css(bg1), "fg1": rgb_css(fg1), "lg1": lg1
-        }))
+        })
         if lg_code not in ("nfl", "nba") or not eid:
             continue
         box = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={eid}") if state != "pre" else {}
@@ -129,8 +132,8 @@ def parse_scoreboard(sport_path, lg_code):
                 seen_p.add((ab, nm))
                 bg, _, logo = doc_brand.team_style(ab, league=lg_code)
                 players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": rgb_css(bg), "logo": logo, "stats": {}})
-    games.sort(key=lambda x: (x, x))
-    return [g for _, _, g in games], players
+    games.sort(key=lambda g: (g["rank"], g["date"]))
+    return games, players
 
 def get_live_payload():
     now = time.time()
