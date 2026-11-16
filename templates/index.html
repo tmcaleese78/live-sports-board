@@ -2,60 +2,126 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Live Sports & Prop Tracker</title>
+<title>OmniStatPro — Live Sports & Prop Board</title>
 <style>
-  body { font-family: Calibri, -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; }
-  h2 { color: #1a73e8; font-size: 16px; letter-spacing: 0.5px; margin: 22px 0 10px; text-transform: uppercase; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
-  .card { background: #fff; border-radius: 14px; border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(15,23,42,0.08); overflow: hidden; }
-  .card.hit { border-color: #16a34a; } .card.miss { border-color: #b91c1c; }
-  .top-bar { display: grid; grid-template-columns: 1fr 1fr; background: #1e293b; color: #fff; font-weight: 700; font-size: 15px; text-align: center; padding: 9px 0; }
-  .top-bar.hit { background: #16a34a; } .top-bar.miss { background: #b91c1c; }
-  .top-bar div:first-child { border-right: 1px solid rgba(255,255,255,0.25); }
-  .hdr-row, .p-row { display: grid; grid-template-columns: 48px 1.6fr 1fr 0.7fr 0.7fr; align-items: center; text-align: center; border-top: 1px solid #cbd5e1; }
-  .hdr-row { background: #f1f5f9; color: #475569; font-weight: 700; font-size: 13px; padding: 7px 0; }
-  .p-row { font-weight: 700; font-size: 15px; min-height: 44px; }
-  .p-row.hit { background: #ecfdf5; color: #15803d; } .p-row.miss { background: #fef2f2; color: #b91c1c; }
+  :root {
+    --bg: #0b1120; --surface: #131c31; --surface2: #1b2640; --border: #283552;
+    --text: #f1f5f9; --muted: #94a3b8; --hdr: #38bdf8; --shadow: 0 8px 24px rgba(0,0,0,0.35);
+    --hit-bg: rgba(22,163,74,0.16); --hit-txt: #4ade80; --hit-bdr: #16a34a;
+    --miss-bg: rgba(220,38,38,0.16); --miss-txt: #f87171; --miss-bdr: #dc2626;
+  }
+  body.light {
+    --bg: #f1f5f9; --surface: #ffffff; --surface2: #f8fafc; --border: #cbd5e1;
+    --text: #1e293b; --muted: #64748b; --hdr: #1a73e8; --shadow: 0 4px 14px rgba(15,23,42,0.08);
+    --hit-bg: #ecfdf5; --hit-txt: #15803d; --hit-bdr: #16a34a;
+    --miss-bg: #fef2f2; --miss-txt: #b91c1c; --miss-bdr: #dc2626;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: Calibri, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 18px 22px 40px; transition: background .2s, color .2s; }
+  .topbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 14px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; letter-spacing: 0.6px; }
+  .brand span { color: var(--hdr); }
+  .controls { display: flex; align-items: center; gap: 10px; }
+  .live-pill { display: flex; align-items: center; gap: 7px; background: var(--surface); border: 1px solid var(--border); padding: 6px 12px; border-radius: 999px; font-size: 13px; font-weight: 700; color: var(--muted); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; box-shadow: 0 0 8px #22c55e; animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+  .theme-btn { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 6px 13px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .f-btn { background: var(--surface); color: var(--muted); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .f-btn.active { background: var(--hdr); color: #0b1120; border-color: var(--hdr); }
+  body.light .f-btn.active { color: #fff; }
+  h2 { color: var(--hdr); font-size: 15px; letter-spacing: 0.8px; margin: 24px 0 10px; text-transform: uppercase; font-weight: 800; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(365px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border-radius: 14px; border: 2px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
+  .card.hit { border-color: var(--hit-bdr); } .card.miss { border-color: var(--miss-bdr); }
+  .card-banner { display: grid; grid-template-columns: 1fr 1fr; background: #1e293b; color: #fff; font-weight: 800; font-size: 15px; text-align: center; padding: 9px 0; }
+  .card-banner.hit { background: #16a34a; } .card-banner.miss { background: #b91c1c; }
+  .card-banner div:first-child { border-right: 1px solid rgba(255,255,255,0.25); }
+  .hdr-row, .p-main { display: grid; grid-template-columns: 48px 1.6fr 1fr 0.65fr 0.65fr; align-items: center; text-align: center; }
+  .hdr-row { background: var(--surface2); color: var(--muted); font-weight: 700; font-size: 12px; text-transform: uppercase; padding: 7px 0; border-top: 1px solid var(--border); }
+  .p-wrap { border-top: 1px solid var(--border); }
+  .p-wrap.hit { background: var(--hit-bg); color: var(--hit-txt); }
+  .p-wrap.miss { background: var(--miss-bg); color: var(--miss-txt); }
+  .p-main { font-weight: 700; font-size: 15px; min-height: 44px; }
   .logo-cell { height: 100%; display: flex; align-items: center; justify-content: center; padding: 4px; }
-  .logo-cell img { width: 30px; height: 30px; object-fit: contain; }
-  .sum-row { display: grid; grid-template-columns: 1.3fr 1fr; padding: 11px 16px; font-weight: 700; font-size: 16px; border-top: 1px solid #cbd5e1; }
-  .sum-row:first-child { border-top: none; background: #f1f5f9; }
-  .sum-row.paid { background: #ecfdf5; color: #15803d; }
-  .cfb-card { display: grid; grid-template-columns: 1.9fr 1fr; background: #fff; border-radius: 14px; border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(15,23,42,0.08); overflow: hidden; }
+  .logo-cell img { width: 28px; height: 28px; object-fit: contain; }
+  .prog-track { height: 4px; width: 100%; background: rgba(148,163,184,0.18); }
+  .prog-fill { height: 100%; transition: width 0.5s ease; }
+  .sum-row { display: grid; grid-template-columns: 1.35fr 1fr; padding: 12px 16px; font-weight: 800; font-size: 16px; border-top: 1px solid var(--border); }
+  .sum-row:first-child { border-top: none; background: var(--surface2); }
+  .sum-row.paid { background: var(--hit-bg); color: var(--hit-txt); }
+  .cfb-card { display: grid; grid-template-columns: 1.9fr 1fr; background: var(--surface); border-radius: 14px; border: 2px solid var(--border); box-shadow: var(--shadow); overflow: hidden; }
   .team-line { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-weight: 700; font-size: 16px; }
   .team-left { display: flex; align-items: center; gap: 10px; } .team-left img { width: 28px; height: 28px; }
-  .cfb-status { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; border-left: 1px solid #cbd5e1; font-weight: 700; font-size: 15px; text-align: center; padding: 8px; }
+  .cfb-status { display: flex; flex-direction: column; align-items: center; justify-content: center; background: var(--surface2); border-left: 1px solid var(--border); font-weight: 700; font-size: 14px; text-align: center; padding: 8px; }
 </style>
 </head>
 <body>
+<div class="topbar">
+  <div class="brand">OMNI<span>STAT</span>PRO</div>
+  <div class="controls">
+    <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE • Syncing...</span></div>
+    <button class="theme-btn" id="theme-btn" onclick="toggleTheme()">Light Mode</button>
+  </div>
+</div>
+<div class="filters" id="filters">
+  <button class="f-btn active" data-f="all" onclick="setFilter('all')">All</button>
+  <button class="f-btn" data-f="nfl" onclick="setFilter('nfl')">NFL</button>
+  <button class="f-btn" data-f="nba" onclick="setFilter('nba')">NBA</button>
+  <button class="f-btn" data-f="cfb" onclick="setFilter('cfb')">CFB</button>
+  <button class="f-btn" data-f="alive" onclick="setFilter('alive')">Alive Cards</button>
+  <button class="f-btn" data-f="hit" onclick="setFilter('hit')">Cashed</button>
+  <button class="f-btn" data-f="miss" onclick="setFilter('miss')">Missed</button>
+</div>
 <div id="app">Loading live stats...</div>
 <script>
+let curFilter = 'all', lastData = null;
+if (localStorage.getItem('osp_theme') === 'light') { document.body.classList.add('light'); document.getElementById('theme-btn').textContent = 'Dark Mode'; }
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light');
+  localStorage.setItem('osp_theme', isLight ? 'light' : 'dark');
+  document.getElementById('theme-btn').textContent = isLight ? 'Dark Mode' : 'Light Mode';
+}
+function setFilter(f) {
+  curFilter = f;
+  document.querySelectorAll('.f-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  if (lastData) renderAll(lastData);
+}
 const money = v => '$' + (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+function calcPct(p) {
+  if (p.hit) return 100;
+  const g = parseFloat(p.gained), m = String(p.stat).match(/(\d+(?:\.\d+)?)/);
+  const t = m ? parseFloat(m[1]) : 0;
+  return (t > 0 && !isNaN(g)) ? Math.max(0, Math.min(100, (g / t) * 100)) : 0;
+}
 function renderBlock(b) {
   const st = b.all_hit ? 'hit' : (b.any_miss ? 'miss' : '');
-  const rows = b.players.map(p => `<div class="p-row ${p.hit?'hit':(p.miss?'miss':'')}">
-    <div class="logo-cell" style="background:${p.bg}">${p.logo?`<img src="${p.logo}">`:''}</div>
-    <div>${p.name}</div><div>${p.stat}</div><div>${p.gained}</div><div>${p.needed}</div></div>`).join('');
-  return `<div class="card ${st}"><div class="top-bar ${st}"><div>Cost: ${b.cost}</div><div>Payout: ${b.payout}</div></div>
+  const rows = b.players.map(p => {
+    const pct = calcPct(p), barClr = p.hit ? '#22c55e' : (p.miss ? '#ef4444' : (p.bg || '#38bdf8'));
+    return `<div class="p-wrap ${p.hit?'hit':(p.miss?'miss':'')}">
+      <div class="p-main"><div class="logo-cell" style="background:${p.bg}">${p.logo?`<img src="${p.logo}">`:''}</div>
+      <div>${p.name}</div><div>${p.stat}</div><div>${p.gained}</div><div>${p.needed}</div></div>
+      <div class="prog-track"><div class="prog-fill" style="width:${pct}%;background:${barClr}"></div></div></div>`;
+  }).join('');
+  return `<div class="card ${st}"><div class="card-banner ${st}"><div>Cost: ${b.cost}</div><div>Payout: ${b.payout}</div></div>
     <div class="hdr-row"><div></div><div>Name</div><div>Stat</div><div>Gained</div><div>Needed</div></div>${rows}</div>`;
 }
-async function refresh() {
-  try {
-    const d = await (await fetch('/api/data')).json();
-    let html = `<h2>Player Cards Summary</h2><div class="grid"><div class="card ${d.summary.paid>0?'hit':''}">
-      <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(d.summary.cost)}</div></div>
-      <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(d.summary.live)}</div></div>
-      <div class="sum-row ${d.summary.paid>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(d.summary.paid)}</div></div></div></div>`;
-    if (d.nfl.length) html += `<h2>NFL Players & Targets</h2><div class="grid">${d.nfl.map(renderBlock).join('')}</div>`;
-    if (d.nba.length) html += `<h2>NBA Players & Targets</h2><div class="grid">${d.nba.map(renderBlock).join('')}</div>`;
-    if (d.cfb.length) html += `<h2>College Football Games</h2><div class="grid">${d.cfb.map(g => `<div class="cfb-card"><div>
-      <div class="team-line" style="background:${g.bg0};color:${g.fg0}"><div class="team-left">${g.lg0?`<img src="${g.lg0}">`:''}<span>${g.away}</span></div><span>${g.ascore}</span></div>
-      <div class="team-line" style="background:${g.bg1};color:${g.fg1};border-top:1px solid rgba(255,255,255,0.2)"><div class="team-left">${g.lg1?`<img src="${g.lg1}">`:''}<span>${g.home}</span></div><span>${g.hscore}</span></div></div>
-      <div class="cfb-status"><div>${g.status}</div>${g.note?`<div style="font-size:13px;color:#475569;margin-top:4px">(${g.note})</div>`:''}</div></div>`).join('')}</div>`;
-    document.getElementById('app').innerHTML = html;
-  } catch (e) {}
+function filterBlocks(list) {
+  if (curFilter === 'alive') return list.filter(b => !b.any_miss && !b.all_hit);
+  if (curFilter === 'hit') return list.filter(b => b.all_hit);
+  if (curFilter === 'miss') return list.filter(b => b.any_miss);
+  return list;
 }
-refresh(); setInterval(refresh, 10000);
-</script>
-</body>
-</html>
+function renderAll(d) {
+  let html = `<h2>Player Cards Summary</h2><div class="grid"><div class="card ${d.summary.paid>0?'hit':''}">
+    <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(d.summary.cost)}</div></div>
+    <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(d.summary.live)}</div></div>
+    <div class="sum-row ${d.summary.paid>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(d.summary.paid)}</div></div></div></div>`;
+  const nfl = (curFilter === 'nba' || curFilter === 'cfb') ? [] : filterBlocks(d.nfl);
+  const nba = (curFilter === 'nfl' || curFilter === 'cfb') ? [] : filterBlocks(d.nba);
+  const cfb = ['all', 'cfb'].includes(curFilter) ? d.cfb : [];
+  if (nfl.length) html += `<h2>NFL Players & Targets</h2><div class="grid">${nfl.map(renderBlock).join('')}</div>`;
+  if (nba.length) html += `<h2>NBA Players & Targets</h2><div class="grid">${nba.map(renderBlock).join('')}</div>`;
+  if (cfb.length) html += `<h2>College Football Games</h2><div class="grid">${cfb.map(g => `<div class="cfb-card"><div>
+    <div class="team-line" style="background:${g.bg0};color:${g.fg0}"><div class="team-left">${g.lg0?`<img src="${g.lg0}">`:''}<span>${g.away}</span></div><span>${g.ascore}</span></div>
+    <div class="team-line" style="background:${g.bg1};color:${g.fg1};border-top:1px solid rgba(255,255,255,0.2)"><div class="team-left">${g.lg1?`<img src="${g.lg1}">`:''}<span>${g.home}</span></div><span>${g.hscore}</span></div></div>
