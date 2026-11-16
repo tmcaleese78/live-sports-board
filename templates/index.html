@@ -317,3 +317,53 @@ function syncBuilderOpts() {
 }
 
 function addLeg() {
+  if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
+  const type = document.getElementById('b-type').value, sport = document.getElementById('b-sport').value;
+  if (type === 'prop') {
+    const player = document.getElementById('b-player').value.trim(), stat = document.getElementById('b-stat').value, target = parseFloat(document.getElementById('b-target').value);
+    if (!player || isNaN(target)) return alert('Enter a player name and target number.');
+    draftLegs.push({type, sport, player, stat, target});
+    document.getElementById('b-player').value = ''; document.getElementById('b-target').value = '';
+  } else {
+    const team = document.getElementById('b-team').value;
+    if (!team) return alert('Select a team.');
+    draftLegs.push({type, sport, team});
+  }
+  renderDraft();
+}
+
+function renderDraft() {
+  document.getElementById('draft-cnt').textContent = draftLegs.length;
+  document.getElementById('draft-legs').innerHTML = draftLegs.map((l, i) => `<div class="leg-chip"><span>${l.sport}: ${l.type==='ml' ? l.team + ' (Win)' : l.player + ' — ' + l.target + ' ' + l.stat}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`).join('');
+}
+
+function saveCard() {
+  if (!draftLegs.length) return alert('Add at least 1 leg first.');
+  const cost = parseFloat(document.getElementById('b-cost').value) || 0;
+  const payout = parseFloat(document.getElementById('b-pay').value) || 0;
+  userCards.push({cost, payout, legs: draftLegs});
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  draftLegs = []; renderDraft();
+  document.getElementById('b-cost').value = ''; document.getElementById('b-pay').value = '';
+  setTab('cards');
+}
+
+async function refresh() {
+  try {
+    const res = await fetch('/api/live?t=' + Date.now());
+    if (!res.ok) throw new Error('Feed returned HTTP ' + res.status);
+    liveData = await res.json();
+    document.getElementById('card-cnt').textContent = userCards.length;
+    if (curTab === 'scoreboard') renderGames();
+    if (curTab === 'stats') renderPlayers();
+    if (curTab === 'cards') renderCards();
+    document.getElementById('sync-time').textContent = 'LIVE • ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  } catch (e) {
+    document.getElementById('games-area').innerHTML = `<p style="color:#f87171">Sync issue: ${e.message}</p>`;
+  }
+}
+refresh(); setInterval(refresh, 15000);
+</script>
+</body>
+</html>
+
