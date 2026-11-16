@@ -1,4 +1,4 @@
 flask
 gunicorn
 gspread
-curl_cffi
+requests
