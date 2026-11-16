@@ -9,8 +9,14 @@
 <link rel="preconnect" href="https://gstatic.com" crossorigin>
 <link href="https://googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
-  :root {
-    --bg: #050914; --bg-grad: radial-gradient(circle at 50% -10%, rgba(29,140,248,0.16), transparent 55%);
+   :root {
+    --bg: #03060e;
+    --bg-grad:
+      radial-gradient(ellipse 75% 42% at 50% -6%, rgba(29,140,248,0.26) 0%, rgba(14,165,233,0.08) 45%, transparent 75%),
+      radial-gradient(circle at 12% 28%, rgba(37,99,235,0.12) 0%, transparent 42%),
+      radial-gradient(circle at 88% 32%, rgba(56,189,248,0.10) 0%, transparent 42%),
+      linear-gradient(rgba(148,163,184,0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(148,163,184,0.035) 1px, transparent 1px);
     --surface: #0b1222; --surface2: #111b33; --border: rgba(148,163,184,0.16);
     --text: #f8fafc; --muted: #94a3b8; --accent: #1d8cf8; --accent-glow: rgba(29,140,248,0.35);
     --shadow: 0 12px 32px rgba(0,0,0,0.6);
@@ -18,7 +24,11 @@
     --miss-bg: rgba(220,38,38,0.16); --miss-txt: #f87171; --miss-bdr: #ef4444;
   }
   body.light {
-    --bg: #edf2f8; --bg-grad: radial-gradient(circle at 50% -10%, rgba(0,102,255,0.08), transparent 55%);
+    --bg: #e6edf5;
+    --bg-grad:
+      radial-gradient(ellipse 80% 45% at 50% -8%, rgba(0,102,255,0.12) 0%, transparent 70%),
+      linear-gradient(rgba(15,23,42,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(15,23,42,0.04) 1px, transparent 1px);
     --surface: #ffffff; --surface2: #f1f5f9; --border: rgba(15,23,42,0.12);
     --text: #0f172a; --muted: #475569; --accent: #0066ff; --accent-glow: rgba(0,102,255,0.2);
     --shadow: 0 6px 20px rgba(15,23,42,0.07);
@@ -26,7 +36,8 @@
     --miss-bg: #fef2f2; --miss-txt: #b91c1c; --miss-bdr: #dc2626;
   }
   * { box-sizing: border-box; }
-  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background: var(--bg); background-image: var(--bg-grad); background-attachment: fixed; color: var(--text); margin: 0; padding: 0 0 56px; -webkit-font-smoothing: antialiased; }
+  body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background-color: var(--bg); background-image: var(--bg-grad); background-size: 100% 100%, 100% 100%, 100% 100%, 44px 44px, 44px 44px; background-attachment: fixed; color: var(--text); margin: 0; padding: 0 0 56px; -webkit-font-smoothing: antialiased; }
+
   .hero-header { background: linear-gradient(180deg, #000000 0%, #060d1c 100%); border-bottom: 1px solid rgba(56,189,248,0.35); box-shadow: 0 6px 30px rgba(0,0,0,0.65); padding: 12px 24px; }
   body.light .hero-header { background: #ffffff; border-bottom: 1px solid var(--border); box-shadow: 0 2px 12px rgba(15,23,42,0.06); }
   .hero-inner { max-width: 1440px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
