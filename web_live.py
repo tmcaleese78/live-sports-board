@@ -1,19 +1,12 @@
 import os
 import time
 import requests
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, jsonify, render_template
 
 app = Flask(__name__)
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
-
-@app.before_request
-def force_https_www():
-    host = request.headers.get("Host", "")
-    proto = request.headers.get("X-Forwarded-Proto", "https")
-    if "omnistatpro.com" in host and (proto == "http" or host == "omnistatpro.com"):
-        return redirect(f"https://omnistatpro.com{request.full_path.rstrip('?')}", code=301)
 
 def fetch_json(url, timeout=10):
     try:
