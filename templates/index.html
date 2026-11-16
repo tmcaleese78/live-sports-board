@@ -91,14 +91,15 @@
 
 <div class="nav-bar">
   <div class="nav">
-    <button class="tab-btn active" data-t="board" onclick="setTab('board')">Live Scoreboard &amp; Stats</button>
+    <button class="tab-btn active" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
+    <button class="tab-btn" data-t="stats" onclick="setTab('stats')">Live Stats</button>
     <button class="tab-btn" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
     <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card</button>
   </div>
 </div>
 
 <div class="main-wrap">
-  <div id="view-board">
+  <div id="view-scoreboard">
     <div class="row-flex" style="margin-top:14px">
       <button class="pill active" data-lg="ALL" onclick="setLg('ALL')">All Sports</button>
       <button class="pill" data-lg="NFL" onclick="setLg('NFL')">NFL</button>
@@ -106,6 +107,9 @@
       <button class="pill" data-lg="CFB" onclick="setLg('CFB')">CFB</button>
     </div>
     <div id="games-area">Loading live games...</div>
+  </div>
+
+  <div id="view-stats" style="display:none">
     <h2>Live Player Stats</h2>
     <div class="row-flex">
       <button class="pill active" data-plg="NFL" onclick="setPlg('NFL')">NFL Players</button>
@@ -126,6 +130,3 @@
       </div>
       <div class="row-flex">
         <select id="b-type" onchange="syncBuilderOpts()">
-          <option value="prop">Player Prop</option>
-          <option value="ml">Game Winner (Moneyline)</option>
-        </select>
