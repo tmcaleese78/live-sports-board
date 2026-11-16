@@ -90,8 +90,8 @@ function setFilter(f) {
 const money = v => '$' + (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
 function calcPct(p) {
   if (p.hit) return 100;
-  const g = parseFloat(p.gained), m = String(p.stat).match(/(\d+(?:\.\d+)?)/);
-  const t = m ? parseFloat(m[1]) : 0;
+  const g = parseFloat(p.gained);
+  const t = parseFloat(String(p.stat).trim().split(/\s+/)[0]);
   return (t > 0 && !isNaN(g)) ? Math.max(0, Math.min(100, (g / t) * 100)) : 0;
 }
 function renderBlock(b) {
