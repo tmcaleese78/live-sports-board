@@ -1,9 +1,13 @@
 import os
 import time
 import requests
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, redirect, render_template, request
 
 app = Flask(__name__)
+@app.before_request
+def upgrade_to_https():
+    if request.headers.get("X-Forwarded-Proto") == "http":
+        return redirect(f"https://{request.host}{request.full_path.rstrip('?')}", code=301)
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
