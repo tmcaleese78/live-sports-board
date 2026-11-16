@@ -22,10 +22,12 @@
   }
   * { box-sizing: border-box; }
   body { font-family: Calibri, -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0 0 48px; }
-  .hero-header { background: #000000; border-bottom: 2px solid var(--accent); box-shadow: 0 4px 24px var(--accent-glow); padding: 10px 20px; }
+  .hero-header { background: #000000; border-bottom: 2px solid var(--accent); box-shadow: 0 4px 24px var(--accent-glow); padding: 12px 20px; }
   body.light .hero-header { background: #ffffff; }
   .hero-inner { max-width: 1440px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; }
-  .brand-logo { height: 64px; width: auto; max-width: 100%; object-fit: contain; display: block; }
+  .logo-box { flex: 1 1 560px; max-width: 780px; }
+  .brand-logo { height: 98px; width: 100%; max-width: 780px; object-fit: contain; object-position: left center; display: block; }
+  @media (max-width: 640px) { .brand-logo { height: 68px; } }
   .logo-light { display: none; }
   body.light .logo-dark { display: none; }
   body.light .logo-light { display: block; }
@@ -76,7 +78,7 @@
 <body>
 <header class="hero-header">
   <div class="hero-inner">
-    <div>
+    <div class="logo-box">
       <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
       <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
     </div>
@@ -126,9 +128,4 @@
         <select id="b-type" onchange="syncBuilderOpts()">
           <option value="prop">Player Prop</option>
           <option value="ml">Game Winner (Moneyline)</option>
-        </select>
-        <select id="b-sport" onchange="syncBuilderOpts()">
-          <option value="NFL">NFL</option>
-          <option value="NBA">NBA</option>
-          <option value="CFB">CFB</option>
         </select>
