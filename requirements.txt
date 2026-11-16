@@ -1,0 +1,4 @@
+flask
+gunicorn
+gspread
+curl_cffi

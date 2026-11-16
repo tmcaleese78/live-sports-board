@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Sports & Prop Tracker</title>
+<style>
+  body { font-family: Calibri, -apple-system, BlinkMacSystemFont, sans-serif; background: #f1f5f9; color: #1e293b; margin: 0; padding: 20px; }
+  h2 { color: #1a73e8; font-size: 16px; letter-spacing: 0.5px; margin: 22px 0 10px; text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+  .card { background: #fff; border-radius: 14px; border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(15,23,42,0.08); overflow: hidden; }
+  .card.hit { border-color: #16a34a; } .card.miss { border-color: #b91c1c; }
+  .top-bar { display: grid; grid-template-columns: 1fr 1fr; background: #1e293b; color: #fff; font-weight: 700; font-size: 15px; text-align: center; padding: 9px 0; }
+  .top-bar.hit { background: #16a34a; } .top-bar.miss { background: #b91c1c; }
+  .top-bar div:first-child { border-right: 1px solid rgba(255,255,255,0.25); }
+  .hdr-row, .p-row { display: grid; grid-template-columns: 48px 1.6fr 1fr 0.7fr 0.7fr; align-items: center; text-align: center; border-top: 1px solid #cbd5e1; }
+  .hdr-row { background: #f1f5f9; color: #475569; font-weight: 700; font-size: 13px; padding: 7px 0; }
+  .p-row { font-weight: 700; font-size: 15px; min-height: 44px; }
+  .p-row.hit { background: #ecfdf5; color: #15803d; } .p-row.miss { background: #fef2f2; color: #b91c1c; }
+  .logo-cell { height: 100%; display: flex; align-items: center; justify-content: center; padding: 4px; }
+  .logo-cell img { width: 30px; height: 30px; object-fit: contain; }
+  .sum-row { display: grid; grid-template-columns: 1.3fr 1fr; padding: 11px 16px; font-weight: 700; font-size: 16px; border-top: 1px solid #cbd5e1; }
+  .sum-row:first-child { border-top: none; background: #f1f5f9; }
+  .sum-row.paid { background: #ecfdf5; color: #15803d; }
+  .cfb-card { display: grid; grid-template-columns: 1.9fr 1fr; background: #fff; border-radius: 14px; border: 2px solid #cbd5e1; box-shadow: 0 4px 12px rgba(15,23,42,0.08); overflow: hidden; }
+  .team-line { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; font-weight: 700; font-size: 16px; }
+  .team-left { display: flex; align-items: center; gap: 10px; } .team-left img { width: 28px; height: 28px; }
+  .cfb-status { display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8fafc; border-left: 1px solid #cbd5e1; font-weight: 700; font-size: 15px; text-align: center; padding: 8px; }
+</style>
+</head>
+<body>
+<div id="app">Loading live stats...</div>
+<script>
+const money = v => '$' + (Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
+function renderBlock(b) {
+  const st = b.all_hit ? 'hit' : (b.any_miss ? 'miss' : '');
+  const rows = b.players.map(p => `<div class="p-row ${p.hit?'hit':(p.miss?'miss':'')}">
+    <div class="logo-cell" style="background:${p.bg}">${p.logo?`<img src="${p.logo}">`:''}</div>
+    <div>${p.name}</div><div>${p.stat}</div><div>${p.gained}</div><div>${p.needed}</div></div>`).join('');
+  return `<div class="card ${st}"><div class="top-bar ${st}"><div>Cost: ${b.cost}</div><div>Payout: ${b.payout}</div></div>
+    <div class="hdr-row"><div></div><div>Name</div><div>Stat</div><div>Gained</div><div>Needed</div></div>${rows}</div>`;
+}
+async function refresh() {
+  try {
+    const d = await (await fetch('/api/data')).json();
+    let html = `<h2>Player Cards Summary</h2><div class="grid"><div class="card ${d.summary.paid>0?'hit':''}">
+      <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(d.summary.cost)}</div></div>
+      <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(d.summary.live)}</div></div>
+      <div class="sum-row ${d.summary.paid>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(d.summary.paid)}</div></div></div></div>`;
+    if (d.nfl.length) html += `<h2>NFL Players & Targets</h2><div class="grid">${d.nfl.map(renderBlock).join('')}</div>`;
+    if (d.nba.length) html += `<h2>NBA Players & Targets</h2><div class="grid">${d.nba.map(renderBlock).join('')}</div>`;
+    if (d.cfb.length) html += `<h2>College Football Games</h2><div class="grid">${d.cfb.map(g => `<div class="cfb-card"><div>
+      <div class="team-line" style="background:${g.bg0};color:${g.fg0}"><div class="team-left">${g.lg0?`<img src="${g.lg0}">`:''}<span>${g.away}</span></div><span>${g.ascore}</span></div>
+      <div class="team-line" style="background:${g.bg1};color:${g.fg1};border-top:1px solid rgba(255,255,255,0.2)"><div class="team-left">${g.lg1?`<img src="${g.lg1}">`:''}<span>${g.home}</span></div><span>${g.hscore}</span></div></div>
+      <div class="cfb-status"><div>${g.status}</div>${g.note?`<div style="font-size:13px;color:#475569;margin-top:4px">(${g.note})</div>`:''}</div></div>`).join('')}</div>`;
+    document.getElementById('app').innerHTML = html;
+  } catch (e) {}
+}
+refresh(); setInterval(refresh, 10000);
+</script>
+</body>
+</html>
