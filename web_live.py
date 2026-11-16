@@ -2,21 +2,21 @@ import os
 import time
 import requests
 from flask import Flask, jsonify, render_template
-import doc_brand
 
 app = Flask(__name__)
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
 
-def rgb_css(c):
-    return f"rgb({int(c['red']*255)},{int(c['green']*255)},{int(c['blue']*255)})"
-
 def fetch_json(url, timeout=10):
     try:
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout).json()
     except Exception:
         return {}
+
+def clean_hex(val, fallback):
+    s = str(val or "").strip().lstrip("#")
+    return f"#{s}" if len(s) == 6 else fallback
 
 def get_roster(sport_path, tid):
     key = (sport_path, tid)
@@ -65,8 +65,10 @@ def parse_scoreboard(sport_path, lg_code):
         if ou:
             odds_txt = f"{odds_txt} | O/U {ou}".strip(" |")
         poss_id = str(comp.get("situation", {}).get("possession", ""))
-        bg0, fg0, lg0 = doc_brand.team_style(a_name, league=lg_code)
-        bg1, fg1, lg1 = doc_brand.team_style(h_name, league=lg_code)
+        bg0 = clean_hex(a_tm.get("color"), "#1e293b")
+        bg1 = clean_hex(h_tm.get("color"), "#0f172a")
+        lg0 = a_tm.get("logo") or next((x.get("href", "") for x in a_tm.get("logos", list())), "")
+        lg1 = h_tm.get("logo") or next((x.get("href", "") for x in h_tm.get("logos", list())), "")
         sort_rank = 0 if state == "in" else (1 if state == "pre" else 2)
         games.append({
             "rank": sort_rank, "date": str(ev.get("date", "")),
@@ -74,11 +76,16 @@ def parse_scoreboard(sport_path, lg_code):
             "tv": tv, "odds": odds_txt,
             "away": a_name, "away_full": a_full, "arec": a_rec, "ascore": str(away.get("score", "0")), "aposs": (poss_id == str(away.get("id", "")) and state == "in"),
             "home": h_name, "home_full": h_full, "hrec": h_rec, "hscore": str(home.get("score", "0")), "hposs": (poss_id == str(home.get("id", "")) and state == "in"),
-            "bg0": rgb_css(bg0), "fg0": rgb_css(fg0), "lg0": lg0,
-            "bg1": rgb_css(bg1), "fg1": rgb_css(fg1), "lg1": lg1
+            "bg0": bg0, "fg0": "#ffffff", "lg0": lg0,
+            "bg1": bg1, "fg1": "#ffffff", "lg1": lg1
         })
         if lg_code not in ("nfl", "nba") or not eid:
             continue
+        team_meta = {}
+        for c in comps:
+            t = c.get("team", {})
+            ab = t.get("abbreviation", "")
+            team_meta[ab] = (clean_hex(t.get("color"), "#1e293b"), t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), t.get("id", ""))
         box = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={eid}") if state != "pre" else {}
         pmap = {}
         for tg in box.get("boxscore", {}).get("players", list()):
@@ -121,17 +128,14 @@ def parse_scoreboard(sport_path, lg_code):
             seen_p.add((ab, nm))
             if lg_code == "nfl":
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
-            bg, _, logo = doc_brand.team_style(ab, league=lg_code)
-            players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": rgb_css(bg), "logo": logo, "stats": d["stats"]})
-        for c in comps:
-            t = c.get("team", {})
-            ab, tid = t.get("abbreviation", ""), t.get("id", "")
+            bg, logo, _ = team_meta.get(ab, ("#1e293b", "", ""))
+            players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": d["stats"]})
+        for ab, (bg, logo, tid) in team_meta.items():
             for nm, pos in get_roster(sport_path, tid):
                 if (lg_code == "nfl" and pos not in ("QB", "RB", "WR", "TE")) or (ab, nm) in seen_p:
                     continue
                 seen_p.add((ab, nm))
-                bg, _, logo = doc_brand.team_style(ab, league=lg_code)
-                players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": rgb_css(bg), "logo": logo, "stats": {}})
+                players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": {}})
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
