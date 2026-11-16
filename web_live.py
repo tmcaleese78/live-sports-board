@@ -1,5 +1,6 @@
 import os
 import time
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, jsonify, redirect, render_template, request
 
@@ -13,7 +14,7 @@ def upgrade_to_https():
     if request.headers.get("X-Forwarded-Proto") == "http":
         return redirect(f"https://{request.host}{request.full_path.rstrip('?')}", code=301)
 
-def fetch_json(url, timeout=10):
+def fetch_json(url, timeout=6):
     try:
         return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout).json()
     except Exception:
@@ -27,7 +28,7 @@ def get_roster(sport_path, tid):
     key = (sport_path, tid)
     if key in _ROSTER_CACHE:
         return _ROSTER_CACHE[key]
-    data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/teams/{tid}/roster", timeout=8)
+    data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/teams/{tid}/roster", timeout=5)
     out = list()
     for grp in data.get("athletes", list()):
         items = grp.get("items", list()) if isinstance(grp, dict) else [grp]
@@ -39,9 +40,10 @@ def get_roster(sport_path, tid):
     return out
 
 def parse_scoreboard(sport_path, lg_code):
-    sb = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard")
+    sb = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard", timeout=6)
     games, players = list(), list()
     seen_p = set()
+    box_tasks, roster_tasks = list(), list()
     for ev in sb.get("events", list()):
         eid = ev.get("id", "")
         comp = next(iter(ev.get("competitions", list())), {})
@@ -90,8 +92,15 @@ def parse_scoreboard(sport_path, lg_code):
         for c in comps:
             t = c.get("team", {})
             ab = t.get("abbreviation", "")
-            team_meta[ab] = (clean_hex(t.get("color"), "#1e293b"), t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), t.get("id", ""))
-        box = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={eid}") if state != "pre" else {}
+            meta = (clean_hex(t.get("color"), "#1e293b"), t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), t.get("id", ""))
+            team_meta[ab] = meta
+            roster_tasks.append((ab, meta, status, state))
+        if state != "pre":
+            box_tasks.append((eid, team_meta, status, state))
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        boxes = list(pool.map(lambda t: (fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={t}", timeout=6), t, t, t), box_tasks))
+        rosters = list(pool.map(lambda r: (r, r, get_roster(sport_path, r), r, r), roster_tasks))
+    for box, team_meta, status, state in boxes:
         pmap = {}
         for tg in box.get("boxscore", {}).get("players", list()):
             ab = tg.get("team", {}).get("abbreviation", "")
@@ -135,12 +144,13 @@ def parse_scoreboard(sport_path, lg_code):
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
             bg, logo, _ = team_meta.get(ab, ("#1e293b", "", ""))
             players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": d["stats"]})
-        for ab, (bg, logo, tid) in team_meta.items():
-            for nm, pos in get_roster(sport_path, tid):
-                if (lg_code == "nfl" and pos not in ("QB", "RB", "WR", "TE")) or (ab, nm) in seen_p:
-                    continue
-                seen_p.add((ab, nm))
-                players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": {}})
+    for ab, meta, rlist, status, state in rosters:
+        bg, logo, _ = meta
+        for nm, pos in rlist:
+            if (lg_code == "nfl" and pos not in ("QB", "RB", "WR", "TE")) or (ab, nm) in seen_p:
+                continue
+            seen_p.add((ab, nm))
+            players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": bg, "logo": logo, "stats": {}})
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
@@ -148,9 +158,13 @@ def get_live_payload():
     now = time.time()
     if _CACHE["data"] and (now - _CACHE["ts"]) < 15:
         return _CACHE["data"]
-    nfl_g, nfl_p = parse_scoreboard("football/nfl", "nfl")
-    nba_g, nba_p = parse_scoreboard("basketball/nba", "nba")
-    cfb_g, _ = parse_scoreboard("football/college-football", "cfb")
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl")
+        f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba")
+        f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb")
+        nfl_g, nfl_p = f_nfl.result()
+        nba_g, nba_p = f_nba.result()
+        cfb_g, _ = f_cfb.result()
     payload = {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": nfl_p, "NBA": nba_p}}
     _CACHE["ts"], _CACHE["data"] = now, payload
     return payload
