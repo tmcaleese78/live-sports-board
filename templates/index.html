@@ -174,9 +174,70 @@
     z-index: 2;
   }
   .hdr-row { top: 41px; }
+   #p-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  #p-table th {
+    background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 35%, #cbd5e1 70%, #94a3b8 100%);
+    color: #020617;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 10px 10px;
+    text-align: center;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.35);
+  }
+  #p-table th:nth-child(2) { text-align: left; }
+  #p-table tr.p-row {
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1e293b) 42%, #070d1a) 0%, rgba(11, 18, 34, 0.94) 55%, rgba(7, 13, 26, 0.98) 100%);
+    border-bottom: 1px solid rgba(56, 189, 248, 0.14);
+    transition: filter 0.15s ease;
+  }
+  #p-table tr.p-row:hover {
+    filter: brightness(1.15);
+  }
+  #p-table tr.p-row td {
+    padding: 10px 10px;
+    color: #f8fafc;
+    font-weight: 700;
+    font-size: 13.5px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  #p-table tr.p-row td.tm-logo-td {
+    width: 52px;
+    min-width: 52px;
+    padding: 8px 10px;
+    border-left: 5px solid var(--tm-clr, #38bdf8);
+    background: transparent !important;
+  }
+  #p-table tr.p-row td.tm-logo-td img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    display: block;
+    margin: 0 auto;
+    filter:
+      drop-shadow(1px 0 0 #ffffff)
+      drop-shadow(-1px 0 0 #ffffff)
+      drop-shadow(0 1px 0 #ffffff)
+      drop-shadow(0 -1px 0 #ffffff)
+      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
+  }
+  #p-table tr.p-row td.p-name-td {
+    text-align: left;
+    font-weight: 800;
+    white-space: nowrap;
+  }
+  #p-table tr.p-row td.p-sub-td {
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 12.5px;
+  }
+   
 </style>
 </head>
-
 <body>
 <div class="arena-bg"><div class="arena-beams"></div><div class="arena-floor"></div><div class="arena-orb"></div><div class="arena-orb r"></div></div>
 <header class="hero-header">
