@@ -252,16 +252,17 @@ function renderGames() {
     const list = curSt === 'ALL' ? raw : raw.filter(g => g.state === curSt);
     if (!list.length) return;
     html += `<h2>${lg} Games (${list.length})</h2><div class="grid">` + list.map(g => {
-      const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
-      const safeAway = String(g.away || '').replace(/'/g, "\\'"), safeHome = String(g.home || '').replace(/'/g, "\\'");
+           const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
+      const awayDisp = g.away_full || g.away, homeDisp = g.home_full || g.home;
+      const safeAway = String(awayDisp).replace(/'/g, "\\'"), safeHome = String(homeDisp).replace(/'/g, "\\'");
       return `<div class="sb-card ${isLive?'is-live':''}">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
         <div class="sb-team" style="background:${g.bg0};color:${g.fg0}">
-          <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${g.away}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
+          <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
           <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeAway}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
         </div>
         <div class="sb-team" style="background:${g.bg1};color:${g.fg1}">
-          <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${g.home}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
+          <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
           <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeHome}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
         ${g.odds ? `<div class="sb-foot"><span>Line</span><span>${g.odds}</span></div>` : ''}
@@ -370,13 +371,15 @@ function syncBuilderOpts() {
     const opts = sp === 'NBA' ? ['PTS','REB','AST','3PM','PRA','PR','PA','RA','STL','BLK'] : ['PASS YDS','RUSH YDS','REC YDS','SCRIM YDS','REC','PASS TD','RUSH TD','REC TD','COMP','CAR'];
     document.getElementById('b-stat').innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
     document.getElementById('player-datalist').innerHTML = ((liveData.players && liveData.players[sp]) || []).map(p => `<option value="${p.name}">`).join('');
-  } else if (tp === 'ml' || tp === 'spread') {
-    const teams = []; ((liveData.games && liveData.games[sp]) || []).forEach(g => { teams.push(g.away, g.home); });
+   } else if (tp === 'ml' || tp === 'spread') {
+    const teams = []; ((liveData.games && liveData.games[sp]) || []).forEach(g => { teams.push(g.away_full || g.away, g.home_full || g.home); });
     document.getElementById('b-team').innerHTML = teams.map(t => `<option value="${t}">${t}</option>`).join('');
   } else {
-    document.getElementById('b-game').innerHTML = ((liveData.games && liveData.games[sp]) || []).map(g => `<option value="${g.away} @ ${g.home}">${g.away} @ ${g.home}</option>`).join('');
+    document.getElementById('b-game').innerHTML = ((liveData.games && liveData.games[sp]) || []).map(g => {
+      const lbl = `${g.away_full || g.away} @ ${g.home_full || g.home}`;
+      return `<option value="${lbl}">${lbl}</option>`;
+    }).join('');
   }
-}
 
 function addLeg() {
   if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
