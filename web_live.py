@@ -16,35 +16,40 @@ def api_player(lg, pid):
     sp = paths.get(lg.lower())
     if not sp or not pid:
         return jsonify({"error": "Invalid player"}), 400
-    ck = f"{lg.lower()}:{pid}"
+    ck = f"v2:{lg.lower()}:{pid}"
     now = time.time()
     if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
         return jsonify(_PLAYER_CACHE[ck]["data"])
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        f_bio = pool.submit(fetch_json, f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}", 6)
         f_ov = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/overview", 6)
         f_gl = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/gamelog", 6)
+        bio = f_bio.result()
         ov = f_ov.result()
         gl = f_gl.result()
 
-    ath = ov.get("athlete", {})
+    ath = bio.get("athlete") or ov.get("athlete") or {}
     tm = ath.get("team", {})
     season_stats = []
-    st_blk = ov.get("statistics", {})
-    labels = st_blk.get("labels", [])
+    st_blk = ov.get("statistics") or bio.get("statistics") or {}
+    labels = st_blk.get("labels") or st_blk.get("names") or []
     splits = st_blk.get("splits", [])
     if labels and splits:
-        vals = splits[0].get("stats", [])
+        first_split = splits[0] if isinstance(splits[0], dict) else {}
+        vals = first_split.get("stats", [])
         season_stats = [{"label": labels[i], "val": vals[i]} for i in range(min(len(labels), len(vals)))]
 
-    gl_labels = gl.get("labels", [])
+    gl_labels = gl.get("labels") or gl.get("names") or []
     events_map = gl.get("events", {})
     games_log = []
     for st_type in gl.get("seasonTypes", []):
         for cat in st_type.get("categories", []):
+            if not gl_labels:
+                gl_labels = cat.get("labels") or cat.get("names") or []
             for ev in cat.get("events", []):
                 eid = str(ev.get("eventId", ""))
-                meta = events_map.get(eid, {})
+                meta = events_map.get(eid, {}) if isinstance(events_map, dict) else {}
                 opp = meta.get("opponent", {})
                 games_log.append({
                     "date": str(meta.get("gameDate", ""))[:10],
