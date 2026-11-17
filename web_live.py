@@ -44,10 +44,22 @@ def get_roster(sport_path, tid):
 
 def parse_scoreboard(sport_path, lg_code):
     sb = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard", timeout=6)
+    events = list(sb.get("events", list()))
+    if lg_code == "nfl" and events and all(
+        ev.get("status", {}).get("type", {}).get("state") == "post" for ev in events
+    ):
+        wk = sb.get("week", {}).get("number")
+        st_type = sb.get("season", {}).get("type")
+        if wk and st_type:
+            nxt = fetch_json(
+                f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard?week={int(wk) + 1}&seasontype={st_type}",
+                timeout=6,
+            )
+            events.extend(nxt.get("events", list()))
     games, players = list(), list()
     seen_p = set()
     box_tasks, roster_tasks = list(), list()
-    for ev in sb.get("events", list()):
+    for ev in events:
         eid = ev.get("id", "")
         comp = next(iter(ev.get("competitions", list())), {})
         comps = comp.get("competitors", list())
