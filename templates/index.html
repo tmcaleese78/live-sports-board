@@ -265,14 +265,14 @@ function renderGames() {
       let footBtns = '';
       const spM = String(g.odds || '').match(/^([A-Z0-9]+)\s*([+-]?\d+(?:\.\d+)?)/i);
       const ouM = String(g.odds || '').match(/O\/U\s*(\d+(?:\.\d+)?)/i);
-      if (spM) {
-        const fav = spM[1].toUpperCase(), line = parseFloat(spM[2]);
+          if (spM) {
+        const fav = spM.at(1).toUpperCase(), line = parseFloat(spM.at(2));
         const favFull = (fav === String(g.away).toUpperCase()) ? awayDisp : (fav === String(g.home).toUpperCase() ? homeDisp : fav);
         const safeFav = String(favFull).replace(/'/g, "\\'");
         footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'spread',team:'${safeFav}',spread:${line}},'${fav} ${line>0?'+'+line:line}')">+ ${fav} ${line>0?'+'+line:line}</button>`;
       }
       if (ouM) {
-        const tot = parseFloat(ouM[1]);
+        const tot = parseFloat(ouM.at(1));
         footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Over',total:${tot}},'Over ${tot}')">+ O ${tot}</button>`;
         footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Under',total:${tot}},'Under ${tot}')">+ U ${tot}</button>`;
       }
