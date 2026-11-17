@@ -8,6 +8,69 @@ app = Flask(__name__)
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
+_PLAYER_CACHE = {}
+
+@app.route("/api/player/<lg>/<pid>")
+def api_player(lg, pid):
+    paths = {"nfl": "football/nfl", "nba": "basketball/nba"}
+    sp = paths.get(lg.lower())
+    if not sp or not pid:
+        return jsonify({"error": "Invalid player"}), 400
+    ck = f"{lg.lower()}:{pid}"
+    now = time.time()
+    if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
+        return jsonify(_PLAYER_CACHE[ck]["data"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_ov = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/overview", 6)
+        f_gl = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/gamelog", 6)
+        ov = f_ov.result()
+        gl = f_gl.result()
+
+    ath = ov.get("athlete", {})
+    tm = ath.get("team", {})
+    season_stats = []
+    st_blk = ov.get("statistics", {})
+    labels = st_blk.get("labels", [])
+    splits = st_blk.get("splits", [])
+    if labels and splits:
+        vals = splits[0].get("stats", [])
+        season_stats = [{"label": labels[i], "val": vals[i]} for i in range(min(len(labels), len(vals)))]
+
+    gl_labels = gl.get("labels", [])
+    events_map = gl.get("events", {})
+    games_log = []
+    for st_type in gl.get("seasonTypes", []):
+        for cat in st_type.get("categories", []):
+            for ev in cat.get("events", []):
+                eid = str(ev.get("eventId", ""))
+                meta = events_map.get(eid, {})
+                opp = meta.get("opponent", {})
+                games_log.append({
+                    "date": str(meta.get("gameDate", ""))[:10],
+                    "opp": opp.get("abbreviation", ""),
+                    "atVs": meta.get("atVs", "vs"),
+                    "result": meta.get("gameResult", ""),
+                    "score": meta.get("score", ""),
+                    "stats": ev.get("stats", [])
+                })
+    games_log.sort(key=lambda x: x["date"], reverse=True)
+
+    payload = {
+        "id": pid,
+        "name": ath.get("displayName", ""),
+        "jersey": ath.get("jersey", ""),
+        "pos": ath.get("position", {}).get("abbreviation", ""),
+        "headshot": ath.get("headshot", {}).get("href", ""),
+        "team": tm.get("displayName", ""),
+        "abbr": tm.get("abbreviation", ""),
+        "bg": clean_hex(tm.get("color"), "#1e293b"),
+        "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
+        "season": season_stats,
+        "gamelog": {"labels": gl_labels, "games": games_log[:10]}
+    }
+    _PLAYER_CACHE[ck] = {"ts": now, "data": payload}
+    return jsonify(payload)
 
 @app.before_request
 def upgrade_to_https():
@@ -37,7 +100,11 @@ def get_roster(sport_path, tid):
             items = [grp]
         for a in items:
             if isinstance(a, dict) and a.get("displayName"):
-                out.append({"name": a["displayName"], "pos": a.get("position", {}).get("abbreviation", "")})
+                out.append({
+                    "id": str(a.get("id", "")),
+                    "name": a["displayName"],
+                    "pos": a.get("position", {}).get("abbreviation", "")
+                })
     if out:
         _ROSTER_CACHE[key] = out
     return out
@@ -135,7 +202,7 @@ def parse_scoreboard(sport_path, lg_code):
                     nm = a.get("displayName", "")
                     if not nm:
                         continue
-                    rec = pmap.setdefault((ab, nm), {"pos": a.get("position", {}).get("abbreviation", ""), "stats": {}})
+                    rec = pmap.setdefault((ab, nm), {"id": str(a.get("id", "")), "pos": a.get("position", {}).get("abbreviation", ""), "stats": {}})
                     st = ath.get("stats", list())
                     gv = lambda k: float(st[im[k]]) if (k in im and im[k] < len(st) and str(st[im[k]]).replace(".","",1).isdigit()) else 0.0
                     if lg_code == "nfl":
@@ -166,7 +233,7 @@ def parse_scoreboard(sport_path, lg_code):
             if lg_code == "nfl":
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
             m = team_meta.get(ab, {"bg": "#1e293b", "logo": ""})
-            players.append({"name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": d["stats"]})
+            players.append({"id": d.get("id", ""), "name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": d["stats"]})
     for r in rosters:
         ab, m, status, state = r["ab"], r["meta"], r["status"], r["state"]
         for p in r["rlist"]:
@@ -174,7 +241,7 @@ def parse_scoreboard(sport_path, lg_code):
             if (lg_code == "nfl" and pos not in ("QB", "RB", "WR", "TE")) or (ab, nm) in seen_p:
                 continue
             seen_p.add((ab, nm))
-            players.append({"name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": {}})
+            players.append({"id": p.get("id", ""), "name": nm, "team": ab, "pos": pos, "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": {}})
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
