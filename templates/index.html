@@ -121,7 +121,7 @@
   <div class="hero-inner">
     <div class="logo-box">
       <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
-      <img class="brand-logo logo-light" src="/static/logo_light.png" alt="OmniStatPro">
+      <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
     </div>
     <div style="display:flex;gap:8px;align-items:center">
       <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
@@ -270,8 +270,6 @@ function renderGames() {
     }).join('') + `</div>`;
   });
   document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No games match this filter right now.</p>';
-}
-
 }
 
 function sortBy(col) {
