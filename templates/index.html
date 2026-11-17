@@ -371,7 +371,7 @@ function syncBuilderOpts() {
     const opts = sp === 'NBA' ? ['PTS','REB','AST','3PM','PRA','PR','PA','RA','STL','BLK'] : ['PASS YDS','RUSH YDS','REC YDS','SCRIM YDS','REC','PASS TD','RUSH TD','REC TD','COMP','CAR'];
     document.getElementById('b-stat').innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
     document.getElementById('player-datalist').innerHTML = ((liveData.players && liveData.players[sp]) || []).map(p => `<option value="${p.name}">`).join('');
-   } else if (tp === 'ml' || tp === 'spread') {
+  } else if (tp === 'ml' || tp === 'spread') {
     const teams = []; ((liveData.games && liveData.games[sp]) || []).forEach(g => { teams.push(g.away_full || g.away, g.home_full || g.home); });
     document.getElementById('b-team').innerHTML = teams.map(t => `<option value="${t}">${t}</option>`).join('');
   } else {
@@ -380,6 +380,7 @@ function syncBuilderOpts() {
       return `<option value="${lbl}">${lbl}</option>`;
     }).join('');
   }
+}
 
 function addLeg() {
   if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
@@ -399,6 +400,14 @@ function addLeg() {
     draftLegs.push({type, sport, game, ou, total});
   }
   renderDraft();
+}
+
+function renderDraft() {
+  document.getElementById('draft-cnt').textContent = draftLegs.length;
+  document.getElementById('draft-legs').innerHTML = draftLegs.map((l, i) => {
+    const txt = l.type === 'ml' ? `${l.team} (Win)` : l.type === 'spread' ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})` : l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.target} ${l.stat}`;
+    return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
+  }).join('');
 }
 
 function renderDraft() {
