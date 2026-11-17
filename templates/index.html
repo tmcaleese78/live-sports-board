@@ -249,7 +249,6 @@ function quickPickTeam(sport, team) {
   document.getElementById('draft-cnt').textContent = draftLegs.length;
   showToast(`Added ${label} (${sport}) to Bet Card (${draftLegs.length}/8)`);
 }
-
 function renderGames() {
   const lgs = curLg === 'ALL' ? ['NFL','NBA','CFB'] : [curLg];
   let html = '';
@@ -265,7 +264,7 @@ function renderGames() {
       let footBtns = '';
       const spM = String(g.odds || '').match(/^([A-Z0-9]+)\s*([+-]?\d+(?:\.\d+)?)/i);
       const ouM = String(g.odds || '').match(/O\/U\s*(\d+(?:\.\d+)?)/i);
-          if (spM) {
+      if (spM) {
         const fav = spM.at(1).toUpperCase(), line = parseFloat(spM.at(2));
         const favFull = (fav === String(g.away).toUpperCase()) ? awayDisp : (fav === String(g.home).toUpperCase() ? homeDisp : fav);
         const safeFav = String(favFull).replace(/'/g, "\\'");
@@ -292,7 +291,6 @@ function renderGames() {
   });
   document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No games match this filter right now.</p>';
 }
-
 
 function sortBy(col) {
   if (sortCol === col) sortDir *= -1;
