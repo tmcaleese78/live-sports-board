@@ -235,7 +235,42 @@
     font-weight: 600;
     font-size: 12.5px;
   }
-   
+  .p-wrap {
+    border-top: 1px solid rgba(56, 189, 248, 0.16);
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1e293b) 42%, #070d1a) 0%, rgba(11, 18, 34, 0.94) 55%, rgba(7, 13, 26, 0.98) 100%);
+    border-left: 5px solid var(--tm-clr, #38bdf8);
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+  .p-wrap.hit {
+    background: linear-gradient(90deg, rgba(22, 163, 74, 0.36) 0%, rgba(11, 28, 22, 0.94) 65%, rgba(7, 18, 15, 0.98) 100%) !important;
+    border-left-color: #22c55e !important;
+    color: var(--hit-txt);
+  }
+  .p-wrap.miss {
+    background: linear-gradient(90deg, rgba(220, 38, 38, 0.36) 0%, rgba(32, 12, 18, 0.94) 65%, rgba(20, 8, 12, 0.98) 100%) !important;
+    border-left-color: #ef4444 !important;
+    color: var(--miss-txt);
+  }
+  .p-main .logo-cell {
+    background: transparent !important;
+    padding: 4px;
+  }
+  .p-main .logo-cell img {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    filter:
+      drop-shadow(1px 0 0 #ffffff)
+      drop-shadow(-1px 0 0 #ffffff)
+      drop-shadow(0 1px 0 #ffffff)
+      drop-shadow(0 -1px 0 #ffffff)
+      drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
+  }
+  .p-main > div:nth-child(2) {
+    text-align: left;
+    padding-left: 6px;
+    font-weight: 800;
+  }   
 </style>
 </head>
 <body>
@@ -524,8 +559,8 @@ function renderCards() {
     const evals = c.legs.map(evalLeg), allHit = evals.length > 0 && evals.every(x => x.hit), anyMiss = evals.some(x => x.miss);
     totC += Number(c.cost) || 0; if (!anyMiss) liveP += Number(c.payout) || 0; if (allHit) paidP += Number(c.payout) || 0;
     const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-    const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}">
-      <div class="p-main"><div class="logo-cell" style="background:${e.bg}">${e.logo?`<img src="${e.logo}">`:''}</div>
+       const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
+      <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.hit?'#22c55e':(e.miss?'#ef4444':e.bg)}"></div></div></div>`).join('');
     return `<div class="card ${st}"><div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}</div><button class="del-btn" onclick="delCard(${idx})">✕</button></div>
