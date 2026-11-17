@@ -31,7 +31,10 @@ def get_roster(sport_path, tid):
     data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/teams/{tid}/roster", timeout=5)
     out = list()
     for grp in data.get("athletes", list()):
-        items = grp.get("items", list()) if isinstance(grp, dict) else [grp]
+        if isinstance(grp, dict) and "items" in grp:
+            items = grp.get("items", list())
+        else:
+            items = [grp]
         for a in items:
             if isinstance(a, dict) and a.get("displayName"):
                 out.append({"name": a["displayName"], "pos": a.get("position", {}).get("abbreviation", "")})
@@ -97,6 +100,14 @@ def parse_scoreboard(sport_path, lg_code):
             roster_tasks.append({"ab": ab, "meta": meta, "status": status, "state": state})
         if state != "pre":
             box_tasks.append({"eid": eid, "team_meta": team_meta, "status": status, "state": state})
+        if lg_code == "nba" and not roster_tasks:
+        tms = fetch_json(f"https://{HOST}/apis/site/v2/sports/basketball/nba/teams", timeout=5)
+        for sp_t in tms.get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", []):
+            t = sp_t.get("team", {})
+            ab = t.get("abbreviation", "")
+            meta = {"bg": clean_hex(t.get("color"), "#1e293b"), "logo": t.get("logo") or next((x.get("href", "") for x in t.get("logos", [])), ""), "tid": t.get("id", "")}
+            roster_tasks.append({"ab": ab, "meta": meta, "status": "Off Day", "state": "pre"})
+
     with ThreadPoolExecutor(max_workers=12) as pool:
         boxes = list(pool.map(lambda t: {"box": fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={t['eid']}", timeout=6), "meta": t["team_meta"], "status": t["status"], "state": t["state"]}, box_tasks))
         rosters = list(pool.map(lambda r: {"ab": r["ab"], "meta": r["meta"], "rlist": get_roster(sport_path, r["meta"]["tid"]), "status": r["status"], "state": r["state"]}, roster_tasks))
