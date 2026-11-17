@@ -274,6 +274,59 @@
   #view-cards .grid {
     align-items: start;
   }
+  .p-link {
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    transition: color 0.15s ease;
+  }
+  .p-link:hover {
+    color: #38bdf8 !important;
+    text-decoration: underline;
+  }
+  .pc-hero {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1e293b) 55%, #070d1a) 0%, rgba(11, 18, 34, 0.96) 100%);
+    border-left: 5px solid var(--tm-clr, #38bdf8);
+    margin-bottom: 14px;
+  }
+  .pc-headshot {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: rgba(15, 23, 42, 0.85);
+    border: 2px solid rgba(255, 255, 255, 0.25);
+  }
+  .pc-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(84px, 1fr));
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  .pc-stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .pc-stat-lbl {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .pc-stat-val {
+    font-size: 16px;
+    font-weight: 900;
+    color: #f8fafc;
+    margin-top: 2px;
+  }
 </style>
 <script src="https://jsdelivr.net"></script>
 </head>
@@ -405,6 +458,15 @@
       <p style="color:var(--muted);font-size:13px;margin-top:0">Signed in as <strong id="auth-user-email" style="color:#38bdf8"></strong>. Your bet cards sync automatically across devices.</p>
       <button class="pill" style="width:100%;padding:10px;margin-top:10px;border-color:#ef4444;color:#f87171" onclick="handleLogout()">Sign Out</button>
     </div>
+  </div>
+</div>
+<div class="modal-bg" id="player-modal" onclick="if(event.target===this)closePlayerCard()">
+  <div class="modal-box" style="max-width:680px">
+    <div class="modal-hdr">
+      <strong id="pc-title" style="font-size:17px">Player Profile & Research</strong>
+      <button class="pill" onclick="closePlayerCard()">✕ Close</button>
+    </div>
+    <div id="pc-body">Loading player profile...</div>
   </div>
 </div>
 
@@ -544,7 +606,11 @@ function renderPlayers() {
     const rows = list.slice(0, 120).map(p => {
     const bg = p.bg || '#1e293b';
     const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}">` : '';
-    return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${p.name}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + `</tr>`;
+    const safeName = String(p.name || '').replace(/'/g, "\\'");
+    const nameHtml = p.id
+      ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>`
+      : p.name;
+    return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${nameHtml}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + `</tr>`;
   }).join('');
   document.getElementById('p-table').innerHTML = hdr + rows;
 }
@@ -758,6 +824,48 @@ async function handleLogout() {
 sbClient.auth.getSession().then(({ data }) => {
   if (data && data.session && data.session.user) syncCloudCards(data.session.user);
 });
+function closePlayerCard() { document.getElementById('player-modal').classList.remove('open'); }
+
+async function openPlayerCard(lg, pid, name) {
+  document.getElementById('pc-title').textContent = `${lg} • ${name}`;
+  document.getElementById('pc-body').innerHTML = '<p style="color:var(--muted)">Loading season stats & game log...</p>';
+  document.getElementById('player-modal').classList.add('open');
+  try {
+    const res = await fetch(`/api/player/${lg}/${pid}`);
+    const d = await res.json();
+    const bg = d.bg || '#1e293b';
+    let html = `<div class="pc-hero" style="--tm-clr:${bg}">
+      ${d.headshot ? `<img class="pc-headshot" src="${d.headshot}" alt="${d.name}">` : ''}
+      <div style="flex:1">
+        <div style="font-size:20px;font-weight:900;color:#fff">${d.name || name} ${d.jersey ? `<span style="color:#38bdf8;font-size:15px">#${d.jersey}</span>` : ''}</div>
+        <div style="font-size:13px;font-weight:700;color:#cbd5e1;margin-top:2px">${d.team || ''} ${d.pos ? `• ${d.pos}` : ''}</div>
+      </div>
+      ${d.logo ? `<img src="${d.logo}" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff) drop-shadow(0 -1px 0 #fff)">` : ''}
+    </div>`;
+
+    if (d.season && d.season.length) {
+      html += `<div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Season Averages / Totals</div>
+      <div class="pc-stat-grid">` + d.season.map(s => `<div class="pc-stat-box"><div class="pc-stat-lbl">${s.label}</div><div class="pc-stat-val">${s.val}</div></div>`).join('') + `</div>`;
+    }
+
+    if (d.gamelog && d.gamelog.games && d.gamelog.games.length) {
+      const hdrs = (d.gamelog.labels || []).map(l => `<th>${l}</th>`).join('');
+      const rows = d.gamelog.games.map(g => `<tr>
+        <td style="white-space:nowrap;font-weight:700">${g.date}</td>
+        <td style="white-space:nowrap;font-weight:800">${g.atVs} ${g.opp}</td>
+        <td style="white-space:nowrap;color:${String(g.result).startsWith('W')?'#4ade80':'#f87171'};font-weight:800">${g.result} ${g.score}</td>
+        ${(g.stats || []).map(v => `<td>${v}</td>`).join('')}
+      </tr>`).join('');
+      html += `<div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:12px 0 6px">Recent Game Log</div>
+      <div style="overflow-x:auto"><table class="box-tbl"><tr><th>Date</th><th>Opp</th><th>Result</th>${hdrs}</tr>${rows}</table></div>`;
+    } else {
+      html += `<p style="color:var(--muted)">No recent game log entries found for this season yet.</p>`;
+    }
+    document.getElementById('pc-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card right now.</p>`;
+  }
+}
 </script>
 </body>
 </html>
