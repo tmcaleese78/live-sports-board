@@ -170,6 +170,49 @@ def get_live_payload():
     payload = {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": nfl_p, "NBA": nba_p}}
     _CACHE["ts"], _CACHE["data"] = now, payload
     return payload
+@app.route("/api/boxscore/<lg>/<eid>")
+def api_boxscore(lg, eid):
+    paths = {"nfl": "football/nfl", "nba": "basketball/nba", "cfb": "football/college-football"}
+    sp = paths.get(lg.lower())
+    if not sp:
+        return jsonify({"error": "Invalid league"}), 400
+    data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sp}/summary?event={eid}", timeout=8)
+    hdr = next(iter(data.get("header", {}).get("competitions", list())), {})
+    teams = list()
+    for c in hdr.get("competitors", list()):
+        t = c.get("team", {})
+        ls = [str(x.get("displayValue", "-")) for x in c.get("linescores", list())]
+        teams.append({
+            "name": t.get("displayName", t.get("shortDisplayName", "")),
+            "abbr": t.get("abbreviation", ""),
+            "logo": next((x.get("href", "") for x in t.get("logos", list())), t.get("logo", "")),
+            "score": str(c.get("score", "0")),
+            "lines": ls,
+            "homeAway": c.get("homeAway", "")
+        })
+    teams.sort(key=lambda x: 0 if x["homeAway"] == "away" else 1)
+    team_stats = list()
+    for tg in data.get("boxscore", {}).get("teams", list()):
+        ab = tg.get("team", {}).get("abbreviation", "")
+        st = [{"label": s.get("label", ""), "val": s.get("displayValue", "")} for s in tg.get("statistics", list())]
+        team_stats.append({"abbr": ab, "stats": st})
+    player_groups = list()
+    for tg in data.get("boxscore", {}).get("players", list()):
+        t_name = tg.get("team", {}).get("displayName", "")
+        cats = list()
+        for cat in tg.get("statistics", list()):
+            labels = list(cat.get("labels", list()))
+            rows = list()
+            for ath in cat.get("athletes", list()):
+                nm = ath.get("athlete", {}).get("displayName", "")
+                if nm:
+                    rows.append({"name": nm, "stats": list(ath.get("stats", list()))})
+            if rows:
+                cats.append({"name": cat.get("text") or cat.get("name", ""), "labels": labels, "rows": rows})
+        if cats:
+            player_groups.append({"team": t_name, "cats": cats})
+    st_txt = hdr.get("status", {}).get("type", {}).get("shortDetail", "")
+    return jsonify({"status": st_txt, "teams": teams, "team_stats": team_stats, "players": player_groups})
 
 @app.route("/api/live")
 def api_live():
