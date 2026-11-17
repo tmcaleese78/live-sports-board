@@ -362,7 +362,9 @@ function renderGames() {
   let html = '';
   lgs.forEach(lg => {
     const raw = (liveData.games && liveData.games[lg]) || [];
-    const list = curSt === 'ALL' ? raw : raw.filter(g => g.state === curSt);
+       const list = curSt === 'ALL'
+      ? raw.filter(g => !(lg === 'NFL' && g.state === 'post'))
+      : raw.filter(g => g.state === curSt);
     if (!list.length) return;
     html += `<h2>${lg} Games (${list.length})</h2><div class="grid">` + list.map(g => {
       const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
