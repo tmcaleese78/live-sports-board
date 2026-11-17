@@ -272,7 +272,7 @@ async function openBox(lg, eid, title) {
     const res = await fetch(`/api/boxscore/${lg}/${eid}`);
     const d = await res.json();
     const maxP = Math.max(4, ...(d.teams || []).map(t => (t.lines || []).length));
-    const pHdr = Array.from({length: maxP}, (_, i) => `<th>${i < 4 ? (lg==='NBA'?'Q'+(i+1):'Q'+(i+1)) : 'OT'+(i-3)}</th>`).join('');
+    const pHdr = Array.from({length: maxP}, (_, i) => `<th>${i < 4 ? 'Q'+(i+1) : 'OT'+(i-3)}</th>`).join('');
     let html = `<p style="color:#4ade80;font-weight:800;margin-top:0">${d.status || ''}</p>`;
     if (d.teams && d.teams.length) {
       html += `<table class="box-tbl"><tr><th>Team</th>${pHdr}<th>Total</th></tr>` + d.teams.map(t => {
@@ -340,7 +340,6 @@ function renderGames() {
 }
 
 
-   
   const lgs = curLg === 'ALL' ? ['NFL','NBA','CFB'] : [curLg];
   let html = '';
   lgs.forEach(lg => {
