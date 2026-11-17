@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://googleapis.com">
 <link rel="preconnect" href="https://gstatic.com" crossorigin>
 <link href="https://googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+
 <style>
     :root {
     --bg: #02050c; --surface: rgba(11, 18, 34, 0.86); --surface2: rgba(17, 27, 51, 0.92);
@@ -78,7 +79,7 @@
   .sum-row.paid { background: var(--hit-bg); color: var(--hit-txt); }
   .sb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11.5px; font-weight: 700; letter-spacing: 0.4px; color: var(--muted); }
   .sb-badge { display: inline-flex; align-items: center; gap: 6px; } .sb-live-tag { color: #4ade80; font-weight: 800; }
-    .sb-team { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 11px 16px; font-weight: 700; font-size: 15px; border-left: 5px solid var(--tm-clr, #1d8cf8); background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1d8cf8) 22%, transparent) 0%, transparent 65%); }
+  .sb-team { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 11px 16px; font-weight: 700; font-size: 15px; border-left: 5px solid var(--tm-clr, #1d8cf8); background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1d8cf8) 22%, transparent) 0%, transparent 65%); }
   .sb-team + .sb-team { border-top: 1px solid var(--border); }
   .sb-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
   .sb-left img { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
@@ -106,6 +107,14 @@
   .btn-primary:hover { transform: translateY(-1px); }
   .leg-chip { display: flex; justify-content: space-between; align-items: center; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 9px 14px; margin-bottom: 8px; font-weight: 700; font-size: 13.5px; }
   .toast { position: fixed; bottom: 22px; right: 22px; background: linear-gradient(135deg, #0066ff, #1d8cf8); color: #fff; font-weight: 700; font-size: 13px; padding: 11px 18px; border-radius: 999px; box-shadow: 0 10px 28px rgba(0,0,0,0.5); display: none; z-index: 99; }
+  .sb-card { cursor: pointer; }
+  .modal-bg { position: fixed; inset: 0; background: rgba(2,5,12,0.82); backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center; padding: 16px; z-index: 100; }
+  .modal-bg.open { display: flex; }
+  .modal-box { width: 100%; max-width: 820px; max-height: 86vh; overflow-y: auto; background: #0b1222; border: 1px solid rgba(56,189,248,0.35); border-radius: 18px; box-shadow: 0 24px 60px rgba(0,0,0,0.85); padding: 20px; }
+  .modal-hdr { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 12px; margin-bottom: 14px; }
+  .box-tbl { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  .box-tbl th, .box-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--border); text-align: right; }
+  .box-tbl th:first-child, .box-tbl td:first-child { text-align: left; }
 </style>
 </head>
 
@@ -207,6 +216,15 @@
     </div>
   </div>
 </div>
+<div class="modal-bg" id="box-modal" onclick="if(event.target===this)closeBox()">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <strong id="box-title" style="font-size:17px">Game Box Score</strong>
+      <button class="pill" onclick="closeBox()">✕ Close</button>
+    </div>
+    <div id="box-body">Loading box score...</div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
   
@@ -245,6 +263,40 @@ function quickPickOdds(sport, legObj, label) {
 }
 
 function renderGames() {
+ function closeBox() { document.getElementById('box-modal').classList.remove('open'); }
+
+async function openBox(lg, eid, title) {
+  document.getElementById('box-title').textContent = `${lg} • ${title}`;
+  document.getElementById('box-body').innerHTML = '<p style="color:var(--muted)">Loading live box score...</p>';
+  document.getElementById('box-modal').classList.add('open');
+  try {
+    const res = await fetch(`/api/boxscore/${lg}/${eid}`);
+    const d = await res.json();
+    const maxP = Math.max(4, ...(d.teams || []).map(t => (t.lines || []).length));
+    const pHdr = Array.from({length: maxP}, (_, i) => `<th>${i < 4 ? (lg==='NBA'?'Q'+(i+1):'Q'+(i+1)) : 'OT'+(i-3)}</th>`).join('');
+    let html = `<p style="color:#4ade80;font-weight:800;margin-top:0">${d.status || ''}</p>`;
+    if (d.teams && d.teams.length) {
+      html += `<table class="box-tbl"><tr><th>Team</th>${pHdr}<th>Total</th></tr>` + d.teams.map(t => {
+        const cells = Array.from({length: maxP}, (_, i) => `<td>${(t.lines && t.lines.at(i)) ?? '-'}</td>`).join('');
+        return `<tr><td style="display:flex;align-items:center;gap:8px;font-weight:700">${t.logo?`<img src="${t.logo}" style="width:22px;height:22px">`:''}${t.name}</td>${cells}<td style="font-weight:900;font-size:15px">${t.score}</td></tr>`;
+      }).join('') + `</table>`;
+    }
+    if (d.players && d.players.length) {
+      d.players.forEach(pg => {
+        html += `<h3 style="color:var(--accent);margin:16px 0 8px">${pg.team}</h3>`;
+        pg.cats.forEach(cat => {
+          html += `<div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;margin:8px 0 4px">${cat.name}</div><div style="overflow-x:auto"><table class="box-tbl"><tr><th>Player</th>` + cat.labels.map(l => `<th>${l}</th>`).join('') + `</tr>` + cat.rows.map(r => `<tr><td style="font-weight:700;white-space:nowrap">${r.name}</td>` + r.stats.map(v => `<td>${v}</td>`).join('') + `</tr>`).join('') + `</table></div>`;
+        });
+      });
+    } else {
+      html += `<p style="color:var(--muted)">Player box score stats will appear once the game begins.</p>`;
+    }
+    document.getElementById('box-body').innerHTML = html;
+  } catch (e) {
+    document.getElementById('box-body').innerHTML = `<p style="color:#f87171">Unable to load box score right now.</p>`;
+  }
+}
+   
   const lgs = curLg === 'ALL' ? ['NFL','NBA','CFB'] : [curLg];
   let html = '';
   lgs.forEach(lg => {
@@ -270,7 +322,7 @@ function renderGames() {
         footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Over',total:${tot}},'Over ${tot}')">+ O ${tot}</button>`;
         footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Under',total:${tot}},'Under ${tot}')">+ U ${tot}</button>`;
       }
-      return `<div class="sb-card ${isLive?'is-live':''}">
+      return `<div class="sb-card ${isLive?'is-live':''}" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
         <div class="sb-team" style="--tm-clr:${g.bg0}">
           <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
