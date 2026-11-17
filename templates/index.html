@@ -85,18 +85,19 @@
   .sum-row.paid { background: var(--hit-bg); color: var(--hit-txt); }
   .sb-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); font-size: 11.5px; font-weight: 700; letter-spacing: 0.4px; color: var(--muted); }
   .sb-badge { display: inline-flex; align-items: center; gap: 6px; } .sb-live-tag { color: #4ade80; font-weight: 800; }
-  .sb-team { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; font-weight: 700; font-size: 15px; background: linear-gradient(90deg, rgba(255,255,255,0.03), transparent); }
+    .sb-team { position: relative; display: flex; align-items: center; justify-content: space-between; padding: 11px 14px 11px 16px; font-weight: 700; font-size: 15px; border-left: 5px solid var(--tm-clr, #1d8cf8); background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1d8cf8) 22%, transparent) 0%, transparent 65%); }
   .sb-team + .sb-team { border-top: 1px solid var(--border); }
   .sb-left { display: flex; align-items: center; gap: 11px; min-width: 0; }
-  .sb-left img { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 5px rgba(0,0,0,0.5)); }
-  .sb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,0.45); }
-  .sb-rec { font-size: 12px; font-weight: 600; opacity: 0.85; margin-left: 5px; }
+  .sb-left img { width: 30px; height: 30px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.45)); }
+  .sb-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .sb-rec { font-size: 12px; font-weight: 600; color: var(--muted); margin-left: 5px; }
   .sb-poss { width: 8px; height: 8px; border-radius: 50%; background: #facc15; box-shadow: 0 0 8px #facc15; flex-shrink: 0; }
   .sb-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-  .sb-score { font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 900; min-width: 30px; text-align: right; color: #ffffff; text-shadow: 0 1px 3px rgba(0,0,0,0.45); }
-  .pick-btn { background: rgba(15,23,42,0.55); backdrop-filter: blur(6px); color: #f8fafc; border: 1px solid rgba(255,255,255,0.32); border-radius: 999px; padding: 4px 11px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; cursor: pointer; transition: all .15s; }
-  .pick-btn:hover { background: #1d8cf8; border-color: #ffffff; transform: scale(1.04); }
-  .sb-foot { display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; background: var(--surface2); border-top: 1px solid var(--border); font-size: 11.5px; font-weight: 700; color: var(--muted); }
+  .sb-score { font-family: 'Barlow Condensed', sans-serif; font-size: 24px; font-weight: 900; min-width: 30px; text-align: right; color: var(--text); }
+  .pick-btn { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 999px; padding: 4px 11px; font-size: 11px; font-weight: 700; letter-spacing: 0.3px; cursor: pointer; transition: all .15s; }
+  .pick-btn:hover { background: #1d8cf8; color: #ffffff; border-color: #60a5fa; transform: scale(1.04); }
+  .sb-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; padding: 8px 14px; background: var(--surface2); border-top: 1px solid var(--border); font-size: 11.5px; font-weight: 700; color: var(--muted); }
+  .odds-pills { display: flex; flex-wrap: wrap; gap: 6px; }
   .filter-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-top: 16px; }
   .filter-grp { display: flex; flex-wrap: wrap; gap: 8px; }
   .search-box, select, input { background: var(--surface2); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 9px 13px; font-size: 13.5px; font-family: inherit; outline: none; transition: border-color .15s; }
@@ -242,6 +243,11 @@ function quickPickTeam(sport, team) {
   draftLegs.push({type: 'ml', sport, team, spread: 0});
   document.getElementById('draft-cnt').textContent = draftLegs.length;
   showToast(`Added ${team} (${sport}) to Bet Card (${draftLegs.length}/8)`);
+ function quickPickOdds(sport, legObj, label) {
+  if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
+  draftLegs.push({sport, ...legObj});
+  document.getElementById('draft-cnt').textContent = draftLegs.length;
+  showToast(`Added ${label} (${sport}) to Bet Card (${draftLegs.length}/8)`);
 }
 
 function renderGames() {
@@ -255,22 +261,38 @@ function renderGames() {
       const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
       const awayDisp = g.away_full || g.away, homeDisp = g.home_full || g.home;
       const safeAway = String(awayDisp).replace(/'/g, "\\'"), safeHome = String(homeDisp).replace(/'/g, "\\'");
+      const gmLabel = `${awayDisp} @ ${homeDisp}`, safeGm = gmLabel.replace(/'/g, "\\'");
+      let footBtns = '';
+      const spM = String(g.odds || '').match(/^([A-Z0-9]+)\s*([+-]?\d+(?:\.\d+)?)/i);
+      const ouM = String(g.odds || '').match(/O\/U\s*(\d+(?:\.\d+)?)/i);
+      if (spM) {
+        const fav = spM[1].toUpperCase(), line = parseFloat(spM[2]);
+        const favFull = (fav === String(g.away).toUpperCase()) ? awayDisp : (fav === String(g.home).toUpperCase() ? homeDisp : fav);
+        const safeFav = String(favFull).replace(/'/g, "\\'");
+        footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'spread',team:'${safeFav}',spread:${line}},'${fav} ${line>0?'+'+line:line}')">+ ${fav} ${line>0?'+'+line:line}</button>`;
+      }
+      if (ouM) {
+        const tot = parseFloat(ouM[1]);
+        footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Over',total:${tot}},'Over ${tot}')">+ O ${tot}</button>`;
+        footBtns += `<button class="pick-btn" onclick="quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Under',total:${tot}},'Under ${tot}')">+ U ${tot}</button>`;
+      }
       return `<div class="sb-card ${isLive?'is-live':''}">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
-        <div class="sb-team" style="background:${g.bg0};color:${g.fg0}">
+        <div class="sb-team" style="--tm-clr:${g.bg0}">
           <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeAway}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
+          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeAway}')">+ Win</button><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
         </div>
-        <div class="sb-team" style="background:${g.bg1};color:${g.fg1}">
+        <div class="sb-team" style="--tm-clr:${g.bg1}">
           <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeHome}')">+ Pick</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
+          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeHome}')">+ Win</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
-        ${g.odds ? `<div class="sb-foot"><span>Line</span><span>${g.odds}</span></div>` : ''}
+        ${g.odds ? `<div class="sb-foot"><span>${g.odds}</span><div class="odds-pills">${footBtns}</div></div>` : ''}
       </div>`;
     }).join('') + `</div>`;
   });
   document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No games match this filter right now.</p>';
 }
+
 
 function sortBy(col) {
   if (sortCol === col) sortDir *= -1;
