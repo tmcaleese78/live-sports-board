@@ -479,10 +479,10 @@ function renderPlayers() {
   if (!sortCol || !cols.includes(sortCol)) { sortCol = curPlg === 'NFL' ? 'PASS YDS' : 'PTS'; sortDir = 1; }
   list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
   const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol===c?(sortDir===1?' ▼':' ▲'):''}</th>`).join('') + `</tr>`;
-  const rows = list.slice(0, 120).map(p => {
+    const rows = list.slice(0, 120).map(p => {
     const bg = p.bg || '#1e293b';
     const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}">` : '';
-    return `<tr><td class="tm-logo-td" style="--tm-clr:${bg};background:${bg}">${logoHtml}</td><td>${p.name}</td><td>${p.team}</td><td>${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + `</tr>`;
+    return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${p.name}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + `</tr>`;
   }).join('');
   document.getElementById('p-table').innerHTML = hdr + rows;
 }
