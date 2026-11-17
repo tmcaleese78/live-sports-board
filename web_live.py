@@ -16,15 +16,15 @@ def api_player(lg, pid):
     sp = paths.get(lg.lower())
     if not sp or not pid:
         return jsonify({"error": "Invalid player"}), 400
-    ck = f"v2:{lg.lower()}:{pid}"
+    ck = f"v3:{lg.lower()}:{pid}"
     now = time.time()
     if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
         return jsonify(_PLAYER_CACHE[ck]["data"])
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         f_bio = pool.submit(fetch_json, f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}", 6)
-        f_ov = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/overview", 6)
-        f_gl = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/gamelog", 6)
+        f_ov = pool.submit(fetch_json, f"https://site.web.api.espn.com/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 6)
+        f_gl = pool.submit(fetch_json, f"https://site.web.api.espn.com/apis/common/v3/sports/{sp}/athletes/{pid}/gamelog", 6)
         bio = f_bio.result()
         ov = f_ov.result()
         gl = f_gl.result()
@@ -35,31 +35,34 @@ def api_player(lg, pid):
     st_blk = ov.get("statistics") or bio.get("statistics") or {}
     labels = st_blk.get("labels") or st_blk.get("names") or []
     splits = st_blk.get("splits", [])
-    if labels and splits:
+    if labels and isinstance(splits, list) and len(splits) > 0:
         first_split = splits[0] if isinstance(splits[0], dict) else {}
         vals = first_split.get("stats", [])
         season_stats = [{"label": labels[i], "val": vals[i]} for i in range(min(len(labels), len(vals)))]
 
-    gl_labels = gl.get("labels") or gl.get("names") or []
-    events_map = gl.get("events", {})
-    games_log = []
-    for st_type in gl.get("seasonTypes", []):
+    gl_src = gl if gl.get("seasonTypes") else ov.get("gamelog", {})
+    gl_labels = gl_src.get("labels") or gl_src.get("names") or []
+    events_map = gl_src.get("events", {})
+    games_by_id = {}
+    for st_type in gl_src.get("seasonTypes", []):
         for cat in st_type.get("categories", []):
             if not gl_labels:
                 gl_labels = cat.get("labels") or cat.get("names") or []
             for ev in cat.get("events", []):
                 eid = str(ev.get("eventId", ""))
+                if not eid or eid in games_by_id:
+                    continue
                 meta = events_map.get(eid, {}) if isinstance(events_map, dict) else {}
                 opp = meta.get("opponent", {})
-                games_log.append({
+                games_by_id[eid] = {
                     "date": str(meta.get("gameDate", ""))[:10],
                     "opp": opp.get("abbreviation", ""),
                     "atVs": meta.get("atVs", "vs"),
                     "result": meta.get("gameResult", ""),
                     "score": meta.get("score", ""),
                     "stats": ev.get("stats", [])
-                })
-    games_log.sort(key=lambda x: x["date"], reverse=True)
+                }
+    games_log = sorted(games_by_id.values(), key=lambda x: x["date"], reverse=True)
 
     payload = {
         "id": pid,
