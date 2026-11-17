@@ -275,7 +275,7 @@
   
 <script>
 let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'scoreboard', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
-let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]'), sortCol = '', sortDir = -1;
+let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]'), sortCol = 'PASS YDS', sortDir = 1;
 localStorage.removeItem('osp_theme');
 document.body.classList.remove('light');
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._tm); t._tm = setTimeout(() => t.style.display = 'none', 2200); }
@@ -290,7 +290,13 @@ function setTab(t) {
 }
 function setLg(lg) { curLg = lg; document.querySelectorAll('[data-lg]').forEach(b => b.classList.toggle('active', b.dataset.lg === lg)); renderGames(); }
 function setSt(st) { curSt = st; document.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('active', b.dataset.st === st)); renderGames(); }
-function setPlg(lg) { curPlg = lg; document.querySelectorAll('[data-plg]').forEach(b => b.classList.toggle('active', b.dataset.plg === lg)); renderPlayers(); }
+function setPlg(lg) {
+  curPlg = lg;
+  sortCol = lg === 'NFL' ? 'PASS YDS' : 'PTS';
+  sortDir = 1;
+  document.querySelectorAll('[data-plg]').forEach(b => b.classList.toggle('active', b.dataset.plg === lg));
+  renderPlayers();
+}
 const money = v => '$' + ((Number(v)||0).toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2}));
 
 function quickPickTeam(sport, team) {
@@ -371,7 +377,7 @@ function renderGames() {
 
 function sortBy(col) {
   if (sortCol === col) sortDir *= -1;
-  else { sortCol = col; sortDir = -1; }
+  else { sortCol = col; sortDir = 1; }
   renderPlayers();
 }
 
@@ -394,9 +400,10 @@ function renderPlayers() {
   const q = (document.getElementById('p-search').value || '').toLowerCase();
   const tf = tSel ? tSel.value : 'ALL';
   let list = all.filter(p => (tf === 'ALL' || p.team === tf) && (p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)));
-  const cols = curPlg === 'NFL' ? ['PASS YDS','PASS TD','RUSH YDS','RUSH TD','REC','REC YDS','REC TD','SCRIM YDS'] : ['PTS','REB','AST','3PM','STL','BLK','PRA'];
-  if (sortCol && cols.includes(sortCol)) list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
-  const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol===c?(sortDir===-1?' ▼':' ▲'):''}</th>`).join('') + `</tr>`;
+    const cols = curPlg === 'NFL' ? ['PASS YDS','PASS TD','RUSH YDS','RUSH TD','REC','REC YDS','REC TD','SCRIM YDS'] : ['PTS','REB','AST','3PM','STL','BLK','PRA'];
+  if (!sortCol || !cols.includes(sortCol)) { sortCol = curPlg === 'NFL' ? 'PASS YDS' : 'PTS'; sortDir = 1; }
+  list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
+  const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol===c?(sortDir===1?' ▼':' ▲'):''}</th>`).join('') + `</tr>`;
   const rows = list.slice(0, 120).map(p => {
     const bg = p.bg || '#1e293b';
     const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}">` : '';
