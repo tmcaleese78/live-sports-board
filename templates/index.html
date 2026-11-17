@@ -17,14 +17,7 @@
     --hit-bg: rgba(22,163,74,0.18); --hit-txt: #4ade80; --hit-bdr: #22c55e;
     --miss-bg: rgba(220,38,38,0.18); --miss-txt: #f87171; --miss-bdr: #ef4444;
   }
-  body.light {
-    --bg: #e4ecf5; --surface: rgba(255, 255, 255, 0.92); --surface2: rgba(241, 245, 249, 0.95);
-    --border: rgba(15, 23, 42, 0.12); --text: #0f172a; --muted: #475569;
-    --accent: #0066ff; --accent-glow: rgba(0,102,255,0.22);
-    --shadow: 0 8px 24px rgba(15,23,42,0.08);
-    --hit-bg: #ecfdf5; --hit-txt: #15803d; --hit-bdr: #16a34a;
-    --miss-bg: #fef2f2; --miss-txt: #b91c1c; --miss-bdr: #dc2626;
-  }
+ 
   * { box-sizing: border-box; }
   body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; font-variant-numeric: tabular-nums; background: var(--bg); color: var(--text); margin: 0; padding: 0 0 64px; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
   .arena-bg { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
@@ -124,10 +117,9 @@
       <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
       <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
     </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
-      <button class="pill" id="theme-btn" onclick="toggleTheme()">Light</button>
-    </div>
+   <div style="display:flex;gap:8px;align-items:center">
+  <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
+</div>
   </div>
 </header>
 
@@ -221,8 +213,8 @@
 <script>
 let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'scoreboard', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
 let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]'), sortCol = '', sortDir = -1;
-if (localStorage.getItem('osp_theme') === 'light') { document.body.classList.add('light'); document.getElementById('theme-btn').textContent = 'Dark'; }
-function toggleTheme() { const l = document.body.classList.toggle('light'); localStorage.setItem('osp_theme', l?'light':'dark'); document.getElementById('theme-btn').textContent = l?'Dark':'Light'; }
+localStorage.removeItem('osp_theme');
+document.body.classList.remove('light');
 function showToast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.style.display = 'block'; clearTimeout(t._tm); t._tm = setTimeout(() => t.style.display = 'none', 2200); }
 function setTab(t) {
   curTab = t;
