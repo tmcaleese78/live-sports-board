@@ -243,12 +243,15 @@ function quickPickTeam(sport, team) {
   draftLegs.push({type: 'ml', sport, team, spread: 0});
   document.getElementById('draft-cnt').textContent = draftLegs.length;
   showToast(`Added ${team} (${sport}) to Bet Card (${draftLegs.length}/8)`);
- function quickPickOdds(sport, legObj, label) {
+}
+
+function quickPickOdds(sport, legObj, label) {
   if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
   draftLegs.push({sport, ...legObj});
   document.getElementById('draft-cnt').textContent = draftLegs.length;
   showToast(`Added ${label} (${sport}) to Bet Card (${draftLegs.length}/8)`);
 }
+
 function renderGames() {
   const lgs = curLg === 'ALL' ? ['NFL','NBA','CFB'] : [curLg];
   let html = '';
