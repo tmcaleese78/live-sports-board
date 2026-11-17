@@ -361,7 +361,7 @@ function renderGames() {
         const safeFav = String(favFull).replace(/'/g, "\\'");
         footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'spread',team:'${safeFav}',spread:${line}},'${fav} ${line>0?'+'+line:line}')">+ ${fav} ${line>0?'+'+line:line}</button>`;
 
-      if (ouM) {
+           if (ouM) {
         const tot = parseFloat(ouM.at(1));
         footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Over',total:${tot}},'Over ${tot}')">+ O ${tot}</button>`;
         footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Under',total:${tot}},'Under ${tot}')">+ U ${tot}</button>`;
@@ -375,11 +375,6 @@ function renderGames() {
         <div class="sb-team" style="--tm-clr:${g.bg1}">
           <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
           <div class="sb-right"><button class="pick-btn" onclick="event.stopPropagation();quickPickTeam('${lg}','${safeHome}')">+ Win</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
-        </div>
-        </div>
-        <div class="sb-team" style="--tm-clr:${g.bg1}">
-          <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><button class="pick-btn" onclick="quickPickTeam('${lg}','${safeHome}')">+ Win</button><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
         ${g.odds ? `<div class="sb-foot"><span>${g.odds}</span><div class="odds-pills">${footBtns}</div></div>` : ''}
       </div>`;
