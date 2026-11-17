@@ -358,8 +358,8 @@ function renderGames() {
         const fav = spM.at(1).toUpperCase(), line = parseFloat(spM.at(2));
         const favFull = (fav === String(g.away).toUpperCase()) ? awayDisp : (fav === String(g.home).toUpperCase() ? homeDisp : fav);
         const safeFav = String(favFull).replace(/'/g, "\\'");
-        footBtns += `        footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'spread',team:'${safeFav}',spread:${line}},'${fav} ${line>0?'+'+line:line}')">+ ${fav} ${line>0?'+'+line:line}</button>`;
-      }
+        footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'spread',team:'${safeFav}',spread:${line}},'${fav} ${line>0?'+'+line:line}')">+ ${fav} ${line>0?'+'+line:line}</button>`;
+
       if (ouM) {
         const tot = parseFloat(ouM.at(1));
         footBtns += `<button class="pick-btn" onclick="event.stopPropagation();quickPickOdds('${lg}',{type:'total',game:'${safeGm}',ou:'Over',total:${tot}},'Over ${tot}')">+ O ${tot}</button>`;
