@@ -275,6 +275,7 @@
     align-items: start;
   }
 </style>
+<script src="https://jsdelivr.net"></script>
 </head>
 <body>
 <div class="arena-bg"><div class="arena-beams"></div><div class="arena-floor"></div><div class="arena-orb"></div><div class="arena-orb r"></div></div>
@@ -284,12 +285,12 @@
       <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
       <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
     </div>
-   <div style="display:flex;gap:8px;align-items:center">
-  <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
-</div>
+     <div style="display:flex;gap:8px;align-items:center">
+     <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
+     <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
+   </div>
   </div>
 </header>
-
 <div class="nav-bar">
   <div class="nav">
     <button class="tab-btn active" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
@@ -380,6 +381,30 @@
       <button class="pill" onclick="closeBox()">✕ Close</button>
     </div>
     <div id="box-body">Loading box score...</div>
+  </div>
+</div>
+<div class="modal-bg" id="auth-modal" onclick="if(event.target===this)closeAuthModal()">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-hdr">
+      <strong id="auth-modal-title" style="font-size:17px">OmniStatPro Account</strong>
+      <button class="pill" onclick="closeAuthModal()">✕ Close</button>
+    </div>
+    <div id="auth-logged-out">
+      <p style="color:var(--muted);font-size:13px;margin-top:0">Sign in or create a free account to sync your Bet Cards across all your devices.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
+        <input id="auth-email" type="email" placeholder="Email address" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px">
+        <input id="auth-pass" type="password" placeholder="Password (min 6 characters)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px">
+        <div id="auth-err" style="color:#f87171;font-size:12.5px;display:none"></div>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button class="btn-primary" style="flex:1;padding:10px" onclick="handleAuth('login')">Sign In</button>
+          <button class="pill" style="flex:1;padding:10px;text-align:center" onclick="handleAuth('signup')">Create Account</button>
+        </div>
+      </div>
+    </div>
+    <div id="auth-logged-in" style="display:none">
+      <p style="color:var(--muted);font-size:13px;margin-top:0">Signed in as <strong id="auth-user-email" style="color:#38bdf8"></strong>. Your bet cards sync automatically across devices.</p>
+      <button class="pill" style="width:100%;padding:10px;margin-top:10px;border-color:#ef4444;color:#f87171" onclick="handleLogout()">Sign Out</button>
+    </div>
   </div>
 </div>
 
@@ -575,7 +600,7 @@ function renderCards() {
     <div class="sum-row ${paidP>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(paidP)}</div></div></div></div>`;
   document.getElementById('view-cards').innerHTML = sumHtml + `<h2>My Bet Cards</h2>` + (cardsHtml ? `<div class="grid">${cardsHtml}</div>` : `<p style="color:var(--muted)">No cards saved yet. Click <b>+ Build Bet Card</b> or tap <b>+ Pick</b> on any game to create a ticket.</p>`);
 }
-function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); renderCards(); }
+function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); pushCardsToCloud(); renderCards(); }
 
 function syncBuilderOpts() {
   const tp = document.getElementById('b-type').value, sp = document.getElementById('b-sport').value;
@@ -599,7 +624,6 @@ function syncBuilderOpts() {
 }
 
 function addLeg() {
-  if (draftLegs.length >= 8) return alert('Max 8 legs per card.');
   const type = document.getElementById('b-type').value, sport = document.getElementById('b-sport').value;
   if (type === 'prop') {
     const player = document.getElementById('b-player').value.trim(), stat = document.getElementById('b-stat').value, target = parseFloat(document.getElementById('b-target').value);
@@ -626,19 +650,12 @@ function renderDraft() {
   }).join('');
 }
 
-function renderDraft() {
-  document.getElementById('draft-cnt').textContent = draftLegs.length;
-  document.getElementById('draft-legs').innerHTML = draftLegs.map((l, i) => {
-    const txt = l.type === 'ml' ? `${l.team} (Win)` : l.type === 'spread' ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})` : l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.target} ${l.stat}`;
-    return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
-  }).join('');
-}
-
 function saveCard() {
   if (!draftLegs.length) return alert('Add at least 1 leg first.');
   const cost = parseFloat(document.getElementById('b-cost').value) || 0, payout = parseFloat(document.getElementById('b-pay').value) || 0;
   userCards.push({cost, payout, legs: draftLegs});
-  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+   localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  pushCardsToCloud();
   draftLegs = []; renderDraft();
   document.getElementById('b-cost').value = ''; document.getElementById('b-pay').value = '';
   setTab('cards');
@@ -661,6 +678,86 @@ async function refresh() {
 }
 
 refresh(); setInterval(refresh, 15000);
+const sbClient = window.supabase.createClient(
+  'https://supabase.co',
+  'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh'
+);
+let currentUser = null;
+
+function openAuthModal() { document.getElementById('auth-modal').classList.add('open'); }
+function closeAuthModal() { document.getElementById('auth-modal').classList.remove('open'); }
+
+async function pushCardsToCloud() {
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  if (!currentUser) return;
+  await sbClient.from('user_cards').upsert({
+    user_id: currentUser.id,
+    cards_json: userCards,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function syncCloudCards(user) {
+  currentUser = user;
+  const btn = document.getElementById('auth-btn');
+  if (!user) {
+    if (btn) btn.textContent = 'Sign In / Sign Up';
+    document.getElementById('auth-logged-out').style.display = 'block';
+    document.getElementById('auth-logged-in').style.display = 'none';
+    return;
+  }
+  if (btn) btn.textContent = user.email.split('@')[0];
+  document.getElementById('auth-user-email').textContent = user.email;
+  document.getElementById('auth-logged-out').style.display = 'none';
+  document.getElementById('auth-logged-in').style.display = 'block';
+
+  const { data } = await sbClient.from('user_cards').select('cards_json').eq('user_id', user.id).maybeSingle();
+  const cloudCards = (data && Array.isArray(data.cards_json)) ? data.cards_json : [];
+  if (cloudCards.length > 0) {
+    userCards = cloudCards;
+    localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  } else if (userCards.length > 0) {
+    await pushCardsToCloud();
+  }
+  document.getElementById('card-cnt').textContent = userCards.length;
+  if (curTab === 'cards') renderCards();
+}
+
+async function handleAuth(mode) {
+  const email = document.getElementById('auth-email').value.trim();
+  const password = document.getElementById('auth-pass').value;
+  const errEl = document.getElementById('auth-err');
+  errEl.style.display = 'none';
+  if (!email || password.length < 6) {
+    errEl.textContent = 'Enter a valid email and a password of at least 6 characters.';
+    errEl.style.display = 'block';
+    return;
+  }
+  const res = mode === 'signup'
+    ? await sbClient.auth.signUp({ email, password })
+    : await sbClient.auth.signInWithPassword({ email, password });
+  if (res.error) {
+    errEl.textContent = res.error.message;
+    errEl.style.display = 'block';
+    return;
+  }
+  if (res.data && res.data.user) {
+    await syncCloudCards(res.data.user);
+    closeAuthModal();
+    showToast(mode === 'signup' ? 'Account created & synced!' : 'Signed in & cards synced!');
+  }
+}
+
+async function handleLogout() {
+  await sbClient.auth.signOut();
+  await syncCloudCards(null);
+  closeAuthModal();
+  showToast('Signed out');
+}
+
+sbClient.auth.getSession().then(({ data }) => {
+  if (data && data.session && data.session.user) syncCloudCards(data.session.user);
+});
 </script>
 </body>
 </html>
