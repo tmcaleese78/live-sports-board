@@ -18,14 +18,14 @@ def api_season(lg):
     sp = paths.get(lg.lower())
     if not sp:
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"v2:{lg.lower()}"
+    ck = f"v3:{lg.lower()}"
     now = time.time()
     if ck in _SEASON_CACHE and (now - _SEASON_CACHE[ck]["ts"]) < 900:
         return jsonify(_SEASON_CACHE[ck]["data"])
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         f_st = pool.submit(fetch_json, f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
-        f_ld = pool.submit(fetch_json, f"https://{HOST}/apis/site/v2/sports/{sp}/leaders", 6)
+        f_ld = pool.submit(fetch_json, f"https://espn.com{sp}/leaders", 6)
         st_data = f_st.result()
         ld_data = f_ld.result()
 
