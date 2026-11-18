@@ -347,6 +347,7 @@
   <div class="nav">
     <button class="tab-btn active" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
     <button class="tab-btn" data-t="stats" onclick="setTab('stats')">Live Stats</button>
+    <button class="tab-btn" data-t="season" onclick="setTab('season')">Season Stats</button>
     <button class="tab-btn" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
     <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card (<span id="draft-cnt">0</span>)</button>
   </div>
@@ -379,6 +380,17 @@
       <input class="search-box" id="p-search" placeholder="Search player name..." oninput="renderPlayers()">
     </div>
     <div class="tbl-wrap"><table id="p-table"></table></div>
+  </div>
+  <div id="view-season" style="display:none">
+    <h2>Season Stats & Research</h2>
+    <div class="row-flex">
+      <button class="pill active" data-slg="NFL" onclick="setSeasonLg('NFL')">NFL</button>
+      <button class="pill" data-slg="NBA" onclick="setSeasonLg('NBA')">NBA</button>
+      <button class="pill active" data-smode="players" onclick="setSeasonMode('players')">Season Leaders</button>
+      <button class="pill" data-smode="teams" onclick="setSeasonMode('teams')">Team Rankings</button>
+      <input class="search-box" id="s-search" placeholder="Search player or team..." oninput="renderSeason()">
+    </div>
+    <div id="season-area">Loading season stats...</div>
   </div>
 
   <div id="view-cards" style="display:none"></div>
@@ -480,9 +492,10 @@ function showToast(msg) { const t = document.getElementById('toast'); t.textCont
 function setTab(t) {
   curTab = t;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.t === t));
-  ['scoreboard','stats','cards','build'].forEach(v => { const el = document.getElementById('view-' + v); if (el) el.style.display = (v === t ? 'block' : 'none'); });
+  ['scoreboard','stats','season','cards','build'].forEach(v => { const el = document.getElementById('view-' + v); if (el) el.style.display = (v === t ? 'block' : 'none'); });
   if (t === 'scoreboard') renderGames();
   if (t === 'stats') renderPlayers();
+  if (t === 'season') loadSeason();
   if (t === 'cards') renderCards();
   if (t === 'build') { syncBuilderOpts(); renderDraft(); }
 }
@@ -874,6 +887,89 @@ async function openPlayerCard(lg, pid, name) {
     document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card right now.</p>`;
   }
 }
+let seasonCache = {}, curSlg = 'NFL', curSmode = 'players', teamSortCol = 'pct', teamSortDir = 1;
+
+function setSeasonLg(lg) {
+  curSlg = lg;
+  document.querySelectorAll('[data-slg]').forEach(b => b.classList.toggle('active', b.dataset.slg === lg));
+  loadSeason();
+}
+
+function setSeasonMode(m) {
+  curSmode = m;
+  document.querySelectorAll('[data-smode]').forEach(b => b.classList.toggle('active', b.dataset.smode === m));
+  renderSeason();
+}
+
+function sortTeamsBy(col) {
+  if (teamSortCol === col) teamSortDir *= -1;
+  else { teamSortCol = col; teamSortDir = 1; }
+  renderSeason();
+}
+
+async function loadSeason() {
+  const area = document.getElementById('season-area');
+  if (seasonCache[curSlg]) return renderSeason();
+  area.innerHTML = '<p style="color:var(--muted)">Loading season stats...</p>';
+  try {
+    const res = await fetch(`/api/season/${curSlg}`);
+    seasonCache[curSlg] = await res.json();
+    renderSeason();
+  } catch (e) {
+    area.innerHTML = '<p style="color:#f87171">Unable to load season stats right now.</p>';
+  }
+}
+
+function renderSeason() {
+  const area = document.getElementById('season-area');
+  const d = seasonCache[curSlg];
+  if (!d) return;
+  const q = (document.getElementById('s-search').value || '').toLowerCase();
+
+  if (curSmode === 'teams') {
+    let tms = [...(d.teams || [])].filter(t => t.name.toLowerCase().includes(q) || t.abbr.toLowerCase().includes(q));
+    tms.sort((a, b) => teamSortDir * ((parseFloat(b[teamSortCol]) || 0) - (parseFloat(a[teamSortCol]) || 0)));
+    const cols = [['rec','RECORD'],['pct','WIN %'],['pf','PTS FOR'],['pa','PTS ALLOWED'],['diff','DIFF']];
+    const hdr = `<tr><th style="width:52px">Team</th><th style="text-align:left">Team Name</th>` +
+      cols.map(([k, lbl]) => `<th style="cursor:pointer" onclick="sortTeamsBy('${k}')">${lbl}${teamSortCol===k?(teamSortDir===1?' ▼':' ▲'):''}</th>`).join('') + `</tr>`;
+    const rows = tms.map(t => `<tr class="p-row" style="--tm-clr:${t.bg}">
+      <td class="tm-logo-td">${t.logo ? `<img src="${t.logo}">` : ''}</td>
+      <td class="p-name-td">${t.name} <span style="color:var(--muted);font-weight:600">(${t.abbr})</span></td>
+      <td>${t.rec}</td><td>${t.pct}</td><td>${t.pf}</td><td>${t.pa}</td>
+      <td style="color:${parseFloat(t.diff)>=0?'#4ade80':'#f87171'}">${t.diff}</td>
+    </tr>`).join('');
+    area.innerHTML = `<div class="tbl-wrap"><table id="p-table">${hdr}${rows}</table></div>`;
+    return;
+  }
+
+  const cats = d.leaders || [];
+  if (!cats.length) {
+    area.innerHTML = '<p style="color:var(--muted)">No season leader stats available right now.</p>';
+    return;
+  }
+  let html = `<div class="grid">`;
+  cats.forEach(c => {
+    const filtered = (c.players || []).filter(p => p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q));
+    if (!filtered.length) return;
+    const rows = filtered.map((p, idx) => {
+      const safeName = String(p.name || '').replace(/'/g, "\\'");
+      const nameHtml = p.id
+        ? `<span class="p-link" onclick="openPlayerCard('${curSlg}','${p.id}','${safeName}')">${p.name}</span>`
+        : p.name;
+      return `<div class="p-wrap" style="--tm-clr:${p.bg}">
+        <div class="p-main" style="grid-template-columns:36px 42px 1.8fr 0.9fr">
+          <div style="color:var(--muted);font-size:12px">#${idx+1}</div>
+          <div class="logo-cell">${p.logo ? `<img src="${p.logo}">` : ''}</div>
+          <div style="text-align:left;padding-left:6px">${nameHtml} <span style="color:var(--muted);font-size:11.5px">(${p.team})</span></div>
+          <div style="font-size:15px;font-weight:900;color:#38bdf8">${p.val}</div>
+        </div>
+      </div>`;
+    }).join('');
+    html += `<div class="card"><div class="sb-top"><span>${c.category}</span><span>${curSlg}</span></div>${rows}</div>`;
+  });
+  html += `</div>`;
+  area.innerHTML = html;
+}    
 </script>
 </body>
 </html>
