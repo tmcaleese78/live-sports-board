@@ -763,12 +763,11 @@ async function refresh() {
     document.getElementById('games-area').innerHTML = `<p style="color:#f87171">Sync issue: ${e.message}</p>`;
   }
 }
-
+    
 refresh(); setInterval(refresh, 15000);
-const sbClient = window.supabase.createClient(
-  'https://supabase.co',
-  'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh'
-);
+const sbClient = window.supabase
+  ? window.supabase.createClient('https://supabase.co', 'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh')
+  : null;
 let currentUser = null;
 
 function openAuthModal() { document.getElementById('auth-modal').classList.add('open'); }
@@ -776,7 +775,7 @@ function closeAuthModal() { document.getElementById('auth-modal').classList.remo
 
 async function pushCardsToCloud() {
   localStorage.setItem('osp_cards', JSON.stringify(userCards));
-  if (!currentUser) return;
+  if (!currentUser || !sbClient) return;
   await sbClient.from('user_cards').upsert({
     user_id: currentUser.id,
     cards_json: userCards,
