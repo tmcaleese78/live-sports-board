@@ -375,6 +375,27 @@
     margin-left: 6px;
     text-transform: uppercase;
   }
+  .book-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-size: 10.5px;
+    font-weight: 900;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-right: 6px;
+    background: rgba(56, 189, 248, 0.22);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+  }
+  .book-fanduel { background: rgba(20, 147, 255, 0.22); color: #38bdf8; border-color: rgba(20, 147, 255, 0.55); }
+  .book-draftkings { background: rgba(83, 211, 55, 0.2); color: #4ade80; border-color: rgba(83, 211, 55, 0.5); }
+  .book-prizepicks { background: rgba(168, 85, 247, 0.22); color: #c084fc; border-color: rgba(168, 85, 247, 0.55); }
+  .book-underdog { background: rgba(250, 204, 21, 0.2); color: #facc15; border-color: rgba(250, 204, 21, 0.5); }
+  .book-betmgm { background: rgba(217, 179, 108, 0.22); color: #fcd34d; border-color: rgba(217, 179, 108, 0.55); }
+  .book-caesars { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.5); }
+  .book-espnbet { background: rgba(45, 212, 191, 0.2); color: #2dd4bf; border-color: rgba(45, 212, 191, 0.5); }
+
 </style>
 <script src="https://unpkg.com"></script>
 </head>
@@ -447,6 +468,20 @@
   <div id="view-build" style="display:none;margin-top:16px">
     <div class="builder">
         <h2 style="margin-top:0">Create Custom Bet Card</h2>
+        <div class="row-flex" style="margin-bottom:10px">
+      <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
+        <option value="FanDuel">FanDuel</option>
+        <option value="DraftKings">DraftKings</option>
+        <option value="PrizePicks">PrizePicks</option>
+        <option value="Underdog">Underdog</option>
+        <option value="BetMGM">BetMGM</option>
+        <option value="Caesars">Caesars</option>
+        <option value="ESPN BET">ESPN BET</option>
+        <option value="Sleeper">Sleeper</option>
+        <option value="Other">Other Book</option>
+      </select>
+      <input id="b-title" class="search-box" placeholder="Optional slip label (e.g. TNF 4-Leg)" style="max-width:260px">
+    </div>
       <div class="row-flex">
         <input id="b-cost" type="number" step="0.01" placeholder="Cost ($)" style="width:140px">
         <input id="b-pay" type="number" step="0.01" placeholder="Payout ($)" style="width:160px">
@@ -739,13 +774,30 @@ function buildSampleCards() {
   return samples;
 }
 
+let curBookFilter = 'ALL';
+function setBookFilter(b) {
+  curBookFilter = b;
+  renderCards();
+}
+
+function bookClass(b) {
+  const k = String(b || '').toLowerCase().replace(/[^a-z]/g, '');
+  return ['fanduel','draftkings','prizepicks','underdog','betmgm','caesars','espnbet'].includes(k) ? `book-${k}` : '';
+}
+
 function renderCards() {
   document.getElementById('card-cnt').textContent = userCards.length;
   const isDemo = userCards.length === 0;
-  const activeList = isDemo ? buildSampleCards() : userCards;
-  let totC = 0, liveP = 0, paidP = 0;
+  const rawList = isDemo ? buildSampleCards() : userCards;
+  const booksPresent = [...new Set(rawList.map(c => c.book || 'Other'))];
+  if (curBookFilter !== 'ALL' && !booksPresent.includes(curBookFilter)) curBookFilter = 'ALL';
+  const activeList = (!isDemo && curBookFilter !== 'ALL')
+    ? rawList.filter(c => (c.book || 'Other') === curBookFilter)
+    : rawList;
 
-  const cardsHtml = activeList.map((c, idx) => {
+  let totC = 0, liveP = 0, paidP = 0;
+  const cardsHtml = activeList.map(c => {
+    const realIdx = userCards.indexOf(c);
     const evals = c.legs.map(evalLeg);
     const allHit = evals.length > 0 && evals.every(x => x.hit);
     const anyMiss = evals.some(x => x.miss);
@@ -759,9 +811,13 @@ function renderCards() {
       <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.hit?'#22c55e':(e.miss?'#ef4444':e.bg)}"></div></div></div>`).join('');
-    const titleTag = c.title ? `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#38bdf8;background:rgba(15,23,42,0.9);border-bottom:1px solid rgba(56,189,248,0.18)">${c.title}${c.isSample?'<span class="sample-tag">Live Sample</span>':''}</div>` : '';
-    const delBtn = isDemo ? '' : `<button class="del-btn" onclick="delCard(${idx})">✕</button>`;
-    return `<div class="card ${st}">${titleTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}${delBtn}</div></div>
+    const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
+    const lbl = c.title && !c.book ? c.title : (c.title || `${c.legs.length}-Leg Card`);
+    const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
+      <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${c.isSample?'<span class="sample-tag">Live Sample</span>':''}</div>
+    </div>`;
+    const delBtn = isDemo ? '' : `<button class="del-btn" onclick="delCard(${realIdx})">✕</button>`;
+    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}${delBtn}</div></div>
       <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
   }).join('');
 
@@ -777,14 +833,19 @@ function renderCards() {
   </div>` : '';
 
   const stripHtml = isDemo ? '' : `<div class="sweat-strip">
-    <div class="sweat-box"><div class="sweat-lbl">Active Slips</div><div class="sweat-val">${userCards.length}</div></div>
+    <div class="sweat-box"><div class="sweat-lbl">Active Slips</div><div class="sweat-val">${activeList.length}</div></div>
     <div class="sweat-box"><div class="sweat-lbl">Total Risked</div><div class="sweat-val">${money(totC)}</div></div>
     <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(liveP)}</div></div>
     <div class="sweat-box"><div class="sweat-lbl">Paid Out</div><div class="sweat-val" style="color:#4ade80">${money(paidP)}</div></div>
   </div>`;
 
+  const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
+    <button class="pill ${curBookFilter==='ALL'?'active':''}" onclick="setBookFilter('ALL')">All Platforms (${rawList.length})</button>` +
+    booksPresent.map(b => `<button class="pill ${curBookFilter===b?'active':''}" onclick="setBookFilter('${b}')">${b} (${rawList.filter(c=>(c.book||'Other')===b).length})</button>`).join('') +
+  `</div>` : '';
+
   const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards</h2>`;
-  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + secTitle + (cardsHtml ? `<div class="grid">${cardsHtml}</div>` : `<p style="color:var(--muted)">Loading live demo slips...</p>`);
+  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`);
 }
 
 function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); pushCardsToCloud(); renderCards(); }
@@ -840,7 +901,12 @@ function renderDraft() {
 function saveCard() {
   if (!draftLegs.length) return alert('Add at least 1 leg first.');
   const cost = parseFloat(document.getElementById('b-cost').value) || 0, payout = parseFloat(document.getElementById('b-pay').value) || 0;
-  userCards.push({cost, payout, legs: draftLegs});
+   const bookEl = document.getElementById('b-book');
+  const titleEl = document.getElementById('b-title');
+  const book = bookEl ? bookEl.value : 'Other';
+  const title = titleEl ? titleEl.value.trim() : '';
+  userCards.push({ book, title, cost, payout, legs: draftLegs });
+  if (titleEl) titleEl.value = '';
    localStorage.setItem('osp_cards', JSON.stringify(userCards));
   pushCardsToCloud();
   draftLegs = []; renderDraft();
