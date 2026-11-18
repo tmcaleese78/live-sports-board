@@ -717,10 +717,10 @@ function buildSampleCards() {
       cost: 25,
       payout: 145,
       isSample: true,
-      legs: [
-        { type: 'prop', sport: 'NBA', player: nbaP[0].name, stat: 'PTS', line: 20 },
-        { type: 'prop', sport: 'NBA', player: nbaP[1].name, stat: 'REB', line: 6 },
-        { type: 'prop', sport: 'NBA', player: nbaP[2].name, stat: 'AST', line: 5 }
+            legs: [
+        { type: 'prop', sport: 'NBA', player: nbaP[0].name, stat: 'PTS', target: 20 },
+        { type: 'prop', sport: 'NBA', player: nbaP[1].name, stat: 'REB', target: 6 },
+        { type: 'prop', sport: 'NBA', player: nbaP[2].name, stat: 'AST', target: 5 }
       ]
     });
   }
@@ -731,8 +731,8 @@ function buildSampleCards() {
       payout: 60,
       isSample: true,
       legs: [
-        { type: 'prop', sport: 'NFL', player: nflP[0].name, stat: 'PASS YDS', line: 225 },
-        { type: 'prop', sport: 'NFL', player: nflP[1].name, stat: 'RUSH YDS', line: 65 }
+        { type: 'prop', sport: 'NFL', player: nflP[0].name, stat: 'PASS YDS', target: 225 },
+        { type: 'prop', sport: 'NFL', player: nflP[1].name, stat: 'RUSH YDS', target: 65 }
       ]
     });
   }
