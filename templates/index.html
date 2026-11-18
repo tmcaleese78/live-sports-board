@@ -409,61 +409,36 @@
   .sample-tag {
     white-space: nowrap;
   }
-  .brand-logo {
-    height: 110px;
-    width: auto;
-    max-width: 100%;
-    object-fit: contain;
-    display: block;
-  }
-  @media (max-width: 640px) {
-    .brand-logo {
-      height: 76px;
-    }
-  }
-  .logo-box {
+   .logo-box {
     max-width: 72% !important;
+    height: 118px !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: flex-start !important;
   }
   .brand-logo {
-    height: 155px !important;
-    width: auto !important;
+    width: 440px !important;
     max-width: 100% !important;
-    object-fit: contain !important;
-    display: block !important;
-  }
-  @media (max-width: 640px) {
-    .logo-box {
-      max-width: 62% !important;
-    }
-    .brand-logo {
-      height: 105px !important;
-    }
-  }
-  .logo-box {
-    max-width: 72% !important;
-  }
-  .brand-logo {
-    height: 155px !important;
-    width: auto !important;
-    max-width: 100% !important;
-    object-fit: contain !important;
+    height: auto !important;
     display: block !important;
     mix-blend-mode: lighten !important;
+    margin-top: -12px !important;
   }
   @media (max-width: 640px) {
     .hero-inner {
       flex-direction: column !important;
       align-items: flex-start !important;
-      gap: 10px !important;
+      gap: 8px !important;
     }
     .logo-box {
       max-width: 100% !important;
       width: 100% !important;
+      height: 104px !important;
     }
     .brand-logo {
-      height: auto !important;
       width: 100% !important;
-      max-height: 145px !important;
+      max-width: 100% !important;
+      margin-top: -10px !important;
     }
   }
 
