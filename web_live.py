@@ -1,5 +1,6 @@
 import os
 import time
+import threading
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, jsonify, redirect, render_template, request
@@ -117,7 +118,7 @@ def get_roster(sport_path, tid):
         _ROSTER_CACHE[key] = out
     return out
 
-def parse_scoreboard(sport_path, lg_code):
+def parse_scoreboard(sport_path, lg_code, fast=False):
     sb = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard", timeout=6)
     events = list(sb.get("events", list()))
     if lg_code == "nfl" and events and all(
@@ -176,7 +177,7 @@ def parse_scoreboard(sport_path, lg_code):
             "bg0": bg0, "fg0": "#ffffff", "lg0": lg0,
             "bg1": bg1, "fg1": "#ffffff", "lg1": lg1
         })
-        if lg_code not in ("nfl", "nba") or not eid:
+        if fast or lg_code not in ("nfl", "nba") or not eid:
             continue
         team_meta = {}
         for c in comps:
@@ -185,8 +186,11 @@ def parse_scoreboard(sport_path, lg_code):
             meta = {"bg": clean_hex(t.get("color"), "#1e293b"), "logo": t.get("logo") or next((x.get("href", "") for x in t.get("logos", list())), ""), "tid": t.get("id", "")}
             team_meta[ab] = meta
             roster_tasks.append({"ab": ab, "meta": meta, "status": status, "state": state})
-    if state != "pre":
+        if state != "pre":
             box_tasks.append({"eid": eid, "team_meta": team_meta, "status": status, "state": state})
+    if fast:
+        games.sort(key=lambda g: (g["rank"], g["date"]))
+        return games, []
     if lg_code == "nba" and not roster_tasks:
         tms = fetch_json(f"https://{HOST}/apis/site/v2/sports/basketball/nba/teams", timeout=5)
         for sp_t in tms.get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", []):
@@ -253,20 +257,31 @@ def parse_scoreboard(sport_path, lg_code):
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
-def get_live_payload():
+def get_live_payload(fast=False):
     now = time.time()
-    if _CACHE["data"] and (now - _CACHE["ts"]) < 15:
+    if _CACHE["data"] and (now - _CACHE["ts"]) < 20:
         return _CACHE["data"]
+    if fast and not _CACHE["data"]:
+        threading.Thread(target=get_live_payload, kwargs={"fast": False}, daemon=True).start()
+        with ThreadPoolExecutor(max_workers=3) as pool:
+            f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl", True)
+            f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba", True)
+            f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb", True)
+            nfl_g, _ = f_nfl.result()
+            nba_g, _ = f_nba.result()
+            cfb_g, _ = f_cfb.result()
+        return {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": [], "NBA": []}, "partial": True}
     with ThreadPoolExecutor(max_workers=3) as pool:
-        f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl")
-        f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba")
-        f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb")
+        f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl", False)
+        f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba", False)
+        f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb", False)
         nfl_g, nfl_p = f_nfl.result()
         nba_g, nba_p = f_nba.result()
         cfb_g, _ = f_cfb.result()
     payload = {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": nfl_p, "NBA": nba_p}}
     _CACHE["ts"], _CACHE["data"] = now, payload
     return payload
+
 @app.route("/api/boxscore/<lg>/<eid>")
 def api_boxscore(lg, eid):
     paths = {"nfl": "football/nfl", "nba": "basketball/nba", "cfb": "football/college-football"}
@@ -313,7 +328,10 @@ def api_boxscore(lg, eid):
 
 @app.route("/api/live")
 def api_live():
-    return jsonify(get_live_payload())
+    is_fast = request.args.get("fast") == "1"
+    return jsonify(get_live_payload(fast=is_fast))
+
+threading.Thread(target=get_live_payload, kwargs={"fast": False}, daemon=True).start()
 
 @app.route("/")
 def index():
