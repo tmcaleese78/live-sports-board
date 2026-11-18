@@ -326,6 +326,55 @@
     color: #f8fafc;
     margin-top: 2px;
   }
+  .sweat-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .sweat-box {
+    background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(7, 13, 26, 0.98) 100%);
+    border: 1px solid rgba(56, 189, 248, 0.25);
+    border-radius: 12px;
+    padding: 12px 14px;
+  }
+  .sweat-lbl {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .sweat-val {
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 24px;
+    font-weight: 900;
+    color: #f8fafc;
+    margin-top: 2px;
+  }
+  .mission-hero {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.16) 0%, rgba(15, 23, 42, 0.96) 60%, rgba(7, 13, 26, 0.98) 100%);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 14px;
+    padding: 18px 20px;
+    margin-bottom: 18px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+  }
+  .sample-tag {
+    background: rgba(56, 189, 248, 0.2);
+    color: #38bdf8;
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 6px;
+    margin-left: 6px;
+    text-transform: uppercase;
+  }
 </style>
 <script src="https://unpkg.com"></script>
 </head>
@@ -345,11 +394,11 @@
 </header>
 <div class="nav-bar">
   <div class="nav">
-    <button class="tab-btn active" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
+    <button class="tab-btn active" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
+    <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card</button>
+    <button class="tab-btn" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
     <button class="tab-btn" data-t="stats" onclick="setTab('stats')">Live Stats</button>
     <button class="tab-btn" data-t="season" onclick="setTab('season')">Season Stats</button>
-    <button class="tab-btn" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
-    <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card (<span id="draft-cnt">0</span>)</button>
   </div>
 </div>
 <div class="main-wrap">
@@ -484,7 +533,7 @@
 <div class="toast" id="toast"></div>
   
 <script>
-let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'scoreboard', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
+let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'cards', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
 let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]'), sortCol = 'PASS YDS', sortDir = 1;
 localStorage.removeItem('osp_theme');
 document.body.classList.remove('light');
@@ -658,26 +707,38 @@ function evalLeg(leg) {
   return {name: leg.player, stat: `${tgt} ${leg.stat}`, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
-function renderCards() {
-  document.getElementById('card-cnt').textContent = userCards.length;
-  let totC = 0, liveP = 0, paidP = 0;
-  const cardsHtml = userCards.map((c, idx) => {
-    const evals = c.legs.map(evalLeg), allHit = evals.length > 0 && evals.every(x => x.hit), anyMiss = evals.some(x => x.miss);
-    totC += Number(c.cost) || 0; if (!anyMiss) liveP += Number(c.payout) || 0; if (allHit) paidP += Number(c.payout) || 0;
-    const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-       const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
-      <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
-      <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
-      <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.hit?'#22c55e':(e.miss?'#ef4444':e.bg)}"></div></div></div>`).join('');
-    return `<div class="card ${st}"><div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}</div><button class="del-btn" onclick="delCard(${idx})">✕</button></div>
-      <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
-  }).join('');
-  const sumHtml = `<h2>My Summary</h2><div class="grid"><div class="card ${paidP>0?'hit':''}">
-    <div class="sum-row"><div>Total Cost</div><div style="text-align:center">${money(totC)}</div></div>
-    <div class="sum-row"><div>Live Potential Payout</div><div style="text-align:center">${money(liveP)}</div></div>
-    <div class="sum-row ${paidP>0?'paid':''}"><div>Paid Out</div><div style="text-align:center">${money(paidP)}</div></div></div></div>`;
-  document.getElementById('view-cards').innerHTML = sumHtml + `<h2>My Bet Cards</h2>` + (cardsHtml ? `<div class="grid">${cardsHtml}</div>` : `<p style="color:var(--muted)">No cards saved yet. Click <b>+ Build Bet Card</b> or tap <b>+ Pick</b> on any game to create a ticket.</p>`);
+function buildSampleCards() {
+  const nbaP = (liveData.players && liveData.players.NBA) || [];
+  const nflP = (liveData.players && liveData.players.NFL) || [];
+  const samples = [];
+  if (nbaP.length >= 3) {
+    samples.push({
+      title: 'FANDUEL • NBA 3-Leg Sweat',
+      cost: 25,
+      payout: 145,
+      isSample: true,
+      legs: [
+        { type: 'prop', sport: 'NBA', player: nbaP[0].name, stat: 'PTS', line: 20 },
+        { type: 'prop', sport: 'NBA', player: nbaP[1].name, stat: 'REB', line: 6 },
+        { type: 'prop', sport: 'NBA', player: nbaP[2].name, stat: 'AST', line: 5 }
+      ]
+    });
+  }
+  if (nflP.length >= 2) {
+    samples.push({
+      title: 'PRIZEPICKS • NFL Core Slip',
+      cost: 20,
+      payout: 60,
+      isSample: true,
+      legs: [
+        { type: 'prop', sport: 'NFL', player: nflP[0].name, stat: 'PASS YDS', line: 225 },
+        { type: 'prop', sport: 'NFL', player: nflP[1].name, stat: 'RUSH YDS', line: 65 }
+      ]
+    });
+  }
+  return samples;
 }
+
 function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); pushCardsToCloud(); renderCards(); }
 
 function syncBuilderOpts() {
