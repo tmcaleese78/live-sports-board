@@ -409,6 +409,18 @@
   .sample-tag {
     white-space: nowrap;
   }
+  .brand-logo {
+    height: 110px;
+    width: auto;
+    max-width: 100%;
+    object-fit: contain;
+    display: block;
+  }
+  @media (max-width: 640px) {
+    .brand-logo {
+      height: 76px;
+    }
+  }
 
 </style>
 <script src="https://unpkg.com"></script>
@@ -418,7 +430,7 @@
 <header class="hero-header">
   <div class="hero-inner">
     <div class="logo-box">
-      <img class="brand-logo logo-dark" src="/static/logo-dark.png" alt="OmniStatPro">
+      <img class="brand-logo logo-dark" src="/static/logo-dark.png?v=2"
       <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
     </div>
      <div style="display:flex;gap:8px;align-items:center">
