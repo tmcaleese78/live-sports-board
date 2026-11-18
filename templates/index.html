@@ -924,7 +924,8 @@ function renderSeason() {
   const area = document.getElementById('season-area');
   const d = seasonCache[curSlg];
   if (!d) return;
-  const q = (document.getElementById('s-search').value || '').toLowerCase();
+  const sEl = document.getElementById('s-search');
+  const q = (sEl ? sEl.value : '').toLowerCase();
 
   if (curSmode === 'teams') {
     let tms = [...(d.teams || [])].filter(t => t.name.toLowerCase().includes(q) || t.abbr.toLowerCase().includes(q));
