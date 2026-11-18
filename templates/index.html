@@ -887,6 +887,7 @@ async function openPlayerCard(lg, pid, name) {
     document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card right now.</p>`;
   }
 }
+<script>
 let seasonCache = {}, curSlg = 'NFL', curSmode = 'players', teamSortCol = 'pct', teamSortDir = 1;
 
 function setSeasonLg(lg) {
@@ -909,21 +910,23 @@ function sortTeamsBy(col) {
 
 async function loadSeason() {
   const area = document.getElementById('season-area');
+  if (!area) return;
   if (seasonCache[curSlg]) return renderSeason();
   area.innerHTML = '<p style="color:var(--muted)">Loading season stats...</p>';
   try {
     const res = await fetch(`/api/season/${curSlg}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     seasonCache[curSlg] = await res.json();
     renderSeason();
   } catch (e) {
-    area.innerHTML = '<p style="color:#f87171">Unable to load season stats right now.</p>';
+    area.innerHTML = `<p style="color:#f87171">Unable to load season stats (${e.message}).</p>`;
   }
 }
 
 function renderSeason() {
   const area = document.getElementById('season-area');
   const d = seasonCache[curSlg];
-  if (!d) return;
+  if (!area || !d) return;
   const sEl = document.getElementById('s-search');
   const q = (sEl ? sEl.value : '').toLowerCase();
 
@@ -970,7 +973,7 @@ function renderSeason() {
   });
   html += `</div>`;
   area.innerHTML = html;
-}    
+}
 </script>
 </body>
 </html>
