@@ -18,14 +18,14 @@ def api_season(lg):
     sp = paths.get(lg.lower())
     if not sp:
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"v3:{lg.lower()}"
+    ck = f"v4:{lg.lower()}"
     now = time.time()
     if ck in _SEASON_CACHE and (now - _SEASON_CACHE[ck]["ts"]) < 900:
         return jsonify(_SEASON_CACHE[ck]["data"])
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         f_st = pool.submit(fetch_json, f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
-        f_ld = pool.submit(fetch_json, f"https://espn.com{sp}/leaders", 6)
+        f_ld = pool.submit(fetch_json, f"https://espn.com{sp}/statistics/byathlete?limit=150", 8)
         st_data = f_st.result()
         ld_data = f_ld.result()
 
@@ -58,104 +58,58 @@ def api_season(lg):
             seen_t.add(t["abbr"])
             uniq_teams.append(t)
 
-    raw_ld = ld_data.get("leaders", {})
-    cats_list = raw_ld.get("categories", []) if isinstance(raw_ld, dict) else (raw_ld if isinstance(raw_ld, list) else [])
-    if not cats_list:
-        cats_list = ld_data.get("categories", [])
+    cat_specs = (
+        [("passing", "YDS", "Passing Yards"), ("passing", "TD", "Passing TDs"),
+         ("rushing", "YDS", "Rushing Yards"), ("rushing", "TD", "Rushing TDs"),
+         ("receiving", "YDS", "Receiving Yards"), ("receiving", "REC", "Receptions")]
+        if lg.lower() == "nfl" else
+        [("offensive", "PTS", "Points Per Game"), ("general", "REB", "Rebounds Per Game"),
+         ("offensive", "AST", "Assists Per Game"), ("offensive", "3PM", "3-Pointers Made"),
+         ("defensive", "STL", "Steals Per Game"), ("defensive", "BLK", "Blocks Per Game")]
+    )
+    buckets = {title: [] for _, _, title in cat_specs}
+    cat_meta = {}
+    for c in ld_data.get("categories", []):
+        cname = str(c.get("name", "")).lower()
+        lbls = [str(x).upper() for x in (c.get("labels") or c.get("names") or [])]
+        cat_meta[cname] = lbls
+
+    for item in ld_data.get("athletes", []):
+        ath = item.get("athlete", {})
+        tm = ath.get("team") or next(iter(ath.get("teams", [])), {})
+        pid = str(ath.get("id", ""))
+        nm = ath.get("displayName", "")
+        ab = tm.get("abbreviation", "")
+        bg = clean_hex(tm.get("color"), "#1e293b")
+        logo = next((x.get("href", "") for x in tm.get("logos", [])), "")
+        by_cat = {}
+        for c in item.get("categories", []):
+            cname = str(c.get("name", "")).lower()
+            by_cat[cname] = c.get("totals") or c.get("values") or []
+        for cname, stat_lbl, title in cat_specs:
+            lbls = cat_meta.get(cname, [])
+            vals = by_cat.get(cname, [])
+            if stat_lbl in lbls:
+                idx = lbls.index(stat_lbl)
+                if idx < len(vals):
+                    raw_v = str(vals[idx]).replace(",", "")
+                    try:
+                        num_v = float(raw_v)
+                    except ValueError:
+                        num_v = 0.0
+                    if num_v > 0:
+                        buckets[title].append({"id": pid, "name": nm, "team": ab, "bg": bg, "logo": logo, "val": str(vals[idx]), "_num": num_v})
 
     leaders_out = []
-    for cat in cats_list:
-        if not isinstance(cat, dict):
-            continue
-        c_name = cat.get("displayName") or cat.get("name", "")
-        rows = []
-        for ld in cat.get("leaders", [])[:15]:
-            ath = ld.get("athlete", {})
-            tm = ld.get("team") or ath.get("team") or {}
-            rows.append({
-                "id": str(ath.get("id", "")),
-                "name": ath.get("displayName", ""),
-                "pos": ath.get("position", {}).get("abbreviation", ""),
-                "team": tm.get("abbreviation", ""),
-                "bg": clean_hex(tm.get("color"), "#1e293b"),
-                "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
-                "val": ld.get("displayValue", "0")
-            })
+    for _, _, title in cat_specs:
+        rows = sorted(buckets[title], key=lambda x: x["_num"], reverse=True)[:15]
+        for r in rows:
+            r.pop("_num", None)
         if rows:
-            leaders_out.append({"category": c_name, "players": rows})
+            leaders_out.append({"category": title, "players": rows})
 
     payload = {"league": lg.upper(), "teams": uniq_teams, "leaders": leaders_out}
     _SEASON_CACHE[ck] = {"ts": now, "data": payload}
-    return jsonify(payload)
-
-@app.route("/api/player/<lg>/<pid>")
-def api_player(lg, pid):
-    paths = {"nfl": "football/nfl", "nba": "basketball/nba"}
-    sp = paths.get(lg.lower())
-    if not sp or not pid:
-        return jsonify({"error": "Invalid player"}), 400
-    ck = f"v3:{lg.lower()}:{pid}"
-    now = time.time()
-    if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
-        return jsonify(_PLAYER_CACHE[ck]["data"])
-
-    with ThreadPoolExecutor(max_workers=3) as pool:
-        f_bio = pool.submit(fetch_json, f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}", 6)
-        f_ov = pool.submit(fetch_json, f"https://site.web.api.espn.com/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 6)
-        f_gl = pool.submit(fetch_json, f"https://site.web.api.espn.com/apis/common/v3/sports/{sp}/athletes/{pid}/gamelog", 6)
-        bio = f_bio.result()
-        ov = f_ov.result()
-        gl = f_gl.result()
-
-    ath = bio.get("athlete") or ov.get("athlete") or {}
-    tm = ath.get("team", {})
-    season_stats = []
-    st_blk = ov.get("statistics") or bio.get("statistics") or {}
-    labels = st_blk.get("labels") or st_blk.get("names") or []
-    splits = st_blk.get("splits", [])
-    if labels and isinstance(splits, list) and len(splits) > 0:
-        first_split = splits[0] if isinstance(splits[0], dict) else {}
-        vals = first_split.get("stats", [])
-        season_stats = [{"label": labels[i], "val": vals[i]} for i in range(min(len(labels), len(vals)))]
-
-    gl_src = gl if gl.get("seasonTypes") else ov.get("gamelog", {})
-    gl_labels = gl_src.get("labels") or gl_src.get("names") or []
-    events_map = gl_src.get("events", {})
-    games_by_id = {}
-    for st_type in gl_src.get("seasonTypes", []):
-        for cat in st_type.get("categories", []):
-            if not gl_labels:
-                gl_labels = cat.get("labels") or cat.get("names") or []
-            for ev in cat.get("events", []):
-                eid = str(ev.get("eventId", ""))
-                if not eid or eid in games_by_id:
-                    continue
-                meta = events_map.get(eid, {}) if isinstance(events_map, dict) else {}
-                opp = meta.get("opponent", {})
-                games_by_id[eid] = {
-                    "date": str(meta.get("gameDate", ""))[:10],
-                    "opp": opp.get("abbreviation", ""),
-                    "atVs": meta.get("atVs", "vs"),
-                    "result": meta.get("gameResult", ""),
-                    "score": meta.get("score", ""),
-                    "stats": ev.get("stats", [])
-                }
-    games_log = sorted(games_by_id.values(), key=lambda x: x["date"], reverse=True)
-
-    payload = {
-        "id": pid,
-        "name": ath.get("displayName", ""),
-        "jersey": ath.get("jersey", ""),
-        "pos": ath.get("position", {}).get("abbreviation", ""),
-        "headshot": ath.get("headshot", {}).get("href", ""),
-        "team": tm.get("displayName", ""),
-        "abbr": tm.get("abbreviation", ""),
-        "bg": clean_hex(tm.get("color"), "#1e293b"),
-        "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
-        "season": season_stats,
-        "gamelog": {"labels": gl_labels, "games": games_log[:10]}
-    }
-    _PLAYER_CACHE[ck] = {"ts": now, "data": payload}
     return jsonify(payload)
 
 @app.before_request
