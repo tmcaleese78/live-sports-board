@@ -395,6 +395,20 @@
   .book-betmgm { background: rgba(217, 179, 108, 0.22); color: #fcd34d; border-color: rgba(217, 179, 108, 0.55); }
   .book-caesars { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.5); }
   .book-espnbet { background: rgba(45, 212, 191, 0.2); color: #2dd4bf; border-color: rgba(45, 212, 191, 0.5); }
+  #view-cards .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
+    gap: 16px;
+    align-items: start;
+  }
+  #view-cards .card {
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .sample-tag {
+    white-space: nowrap;
+  }
 
 </style>
 <script src="https://unpkg.com"></script>
@@ -748,26 +762,32 @@ function buildSampleCards() {
   const samples = [];
   if (nbaP.length >= 3) {
     samples.push({
-      title: 'FANDUEL • NBA 3-Leg Sweat',
+      book: 'FanDuel',
+      title: 'NBA 3-Leg Sweat',
       cost: 25,
       payout: 145,
       isSample: true,
-            legs: [
+      legs: [
         { type: 'prop', sport: 'NBA', player: nbaP[0].name, stat: 'PTS', target: 20 },
         { type: 'prop', sport: 'NBA', player: nbaP[1].name, stat: 'REB', target: 6 },
         { type: 'prop', sport: 'NBA', player: nbaP[2].name, stat: 'AST', target: 5 }
       ]
     });
   }
-  if (nflP.length >= 2) {
+  const qb = nflP.find(p => p.pos === 'QB') || nflP[0];
+  const rb = nflP.find(p => p.pos === 'RB') || nflP[1];
+  const wr = nflP.find(p => p.pos === 'WR') || nflP[2];
+  if (qb && rb) {
     samples.push({
-      title: 'PRIZEPICKS • NFL Core Slip',
+      book: 'PrizePicks',
+      title: 'NFL Core Slip',
       cost: 20,
       payout: 60,
       isSample: true,
       legs: [
-        { type: 'prop', sport: 'NFL', player: nflP[0].name, stat: 'PASS YDS', target: 225 },
-        { type: 'prop', sport: 'NFL', player: nflP[1].name, stat: 'RUSH YDS', target: 65 }
+        { type: 'prop', sport: 'NFL', player: qb.name, stat: 'PASS YDS', target: 225 },
+        { type: 'prop', sport: 'NFL', player: rb.name, stat: 'RUSH YDS', target: 65 },
+        ...(wr ? [{ type: 'prop', sport: 'NFL', player: wr.name, stat: 'REC YDS', target: 55 }] : [])
       ]
     });
   }
