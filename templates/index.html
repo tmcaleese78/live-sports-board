@@ -439,6 +439,33 @@
       height: 105px !important;
     }
   }
+  .logo-box {
+    max-width: 72% !important;
+  }
+  .brand-logo {
+    height: 155px !important;
+    width: auto !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    display: block !important;
+    mix-blend-mode: lighten !important;
+  }
+  @media (max-width: 640px) {
+    .hero-inner {
+      flex-direction: column !important;
+      align-items: flex-start !important;
+      gap: 10px !important;
+    }
+    .logo-box {
+      max-width: 100% !important;
+      width: 100% !important;
+    }
+    .brand-logo {
+      height: auto !important;
+      width: 100% !important;
+      max-height: 145px !important;
+    }
+  }
 
 </style>
 <script src="https://unpkg.com"></script>
