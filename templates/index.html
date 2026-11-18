@@ -841,9 +841,12 @@ async function handleLogout() {
   showToast('Signed out');
 }
 
-sbClient.auth.getSession().then(({ data }) => {
-  if (data && data.session && data.session.user) syncCloudCards(data.session.user);
-});
+if (sbClient) {
+  sbClient.auth.getSession().then(({ data }) => {
+    if (data && data.session && data.session.user) syncCloudCards(data.session.user);
+  });
+}
+
 function closePlayerCard() { document.getElementById('player-modal').classList.remove('open'); }
 
 async function openPlayerCard(lg, pid, name) {
