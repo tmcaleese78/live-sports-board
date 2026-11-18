@@ -18,7 +18,7 @@ def api_season(lg):
     sp = paths.get(lg.lower())
     if not sp:
         return jsonify({"error": "Invalid league"}), 400
-    ck = lg.lower()
+    ck = f"v2:{lg.lower()}"
     now = time.time()
     if ck in _SEASON_CACHE and (now - _SEASON_CACHE[ck]["ts"]) < 900:
         return jsonify(_SEASON_CACHE[ck]["data"])
@@ -58,13 +58,20 @@ def api_season(lg):
             seen_t.add(t["abbr"])
             uniq_teams.append(t)
 
+    raw_ld = ld_data.get("leaders", {})
+    cats_list = raw_ld.get("categories", []) if isinstance(raw_ld, dict) else (raw_ld if isinstance(raw_ld, list) else [])
+    if not cats_list:
+        cats_list = ld_data.get("categories", [])
+
     leaders_out = []
-    for cat in ld_data.get("leaders", []):
+    for cat in cats_list:
+        if not isinstance(cat, dict):
+            continue
         c_name = cat.get("displayName") or cat.get("name", "")
         rows = []
         for ld in cat.get("leaders", [])[:15]:
             ath = ld.get("athlete", {})
-            tm = ld.get("team", {})
+            tm = ld.get("team") or ath.get("team") or {}
             rows.append({
                 "id": str(ath.get("id", "")),
                 "name": ath.get("displayName", ""),
