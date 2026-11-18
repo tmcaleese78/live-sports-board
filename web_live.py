@@ -10,6 +10,76 @@ HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
 _PLAYER_CACHE = {}
+_SEASON_CACHE = {}
+
+@app.route("/api/season/<lg>")
+def api_season(lg):
+    paths = {"nfl": "football/nfl", "nba": "basketball/nba"}
+    sp = paths.get(lg.lower())
+    if not sp:
+        return jsonify({"error": "Invalid league"}), 400
+    ck = lg.lower()
+    now = time.time()
+    if ck in _SEASON_CACHE and (now - _SEASON_CACHE[ck]["ts"]) < 900:
+        return jsonify(_SEASON_CACHE[ck]["data"])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_st = pool.submit(fetch_json, f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
+        f_ld = pool.submit(fetch_json, f"https://{HOST}/apis/site/v2/sports/{sp}/leaders", 6)
+        st_data = f_st.result()
+        ld_data = f_ld.result()
+
+    teams_out = []
+    def walk_standings(node):
+        if not isinstance(node, dict):
+            return
+        for entry in node.get("standings", {}).get("entries", []):
+            tm = entry.get("team", {})
+            st_map = {s.get("name"): s.get("displayValue", "0") for s in entry.get("stats", [])}
+            teams_out.append({
+                "name": tm.get("displayName", ""),
+                "abbr": tm.get("abbreviation", ""),
+                "bg": clean_hex(tm.get("color"), "#1e293b"),
+                "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
+                "rec": st_map.get("overall") or st_map.get("record") or f"{st_map.get('wins','0')}-{st_map.get('losses','0')}",
+                "pf": st_map.get("pointsFor", "0"),
+                "pa": st_map.get("pointsAgainst", "0"),
+                "diff": st_map.get("pointDifferential") or st_map.get("differential") or "0",
+                "pct": st_map.get("winPercent", "0")
+            })
+        for ch in node.get("children", []):
+            walk_standings(ch)
+
+    walk_standings(st_data)
+    seen_t = set()
+    uniq_teams = []
+    for t in teams_out:
+        if t["abbr"] and t["abbr"] not in seen_t:
+            seen_t.add(t["abbr"])
+            uniq_teams.append(t)
+
+    leaders_out = []
+    for cat in ld_data.get("leaders", []):
+        c_name = cat.get("displayName") or cat.get("name", "")
+        rows = []
+        for ld in cat.get("leaders", [])[:15]:
+            ath = ld.get("athlete", {})
+            tm = ld.get("team", {})
+            rows.append({
+                "id": str(ath.get("id", "")),
+                "name": ath.get("displayName", ""),
+                "pos": ath.get("position", {}).get("abbreviation", ""),
+                "team": tm.get("abbreviation", ""),
+                "bg": clean_hex(tm.get("color"), "#1e293b"),
+                "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
+                "val": ld.get("displayValue", "0")
+            })
+        if rows:
+            leaders_out.append({"category": c_name, "players": rows})
+
+    payload = {"league": lg.upper(), "teams": uniq_teams, "leaders": leaders_out}
+    _SEASON_CACHE[ck] = {"ts": now, "data": payload}
+    return jsonify(payload)
 
 @app.route("/api/player/<lg>/<pid>")
 def api_player(lg, pid):
