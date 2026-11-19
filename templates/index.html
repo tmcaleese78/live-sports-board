@@ -496,10 +496,9 @@
   <div id="view-scoreboard" style="display:none">
     <div class="filter-bar">
       <div class="filter-grp">
-        <button class="pill active" data-lg="ALL" onclick="setLg('ALL')">All Sports</button>
-        <button class="pill" data-lg="NFL" onclick="setLg('NFL')">NFL</button>
-        <button class="pill" data-lg="NBA" onclick="setLg('NBA')">NBA</button>
-        <button class="pill" data-lg="CFB" onclick="setLg('CFB')">CFB</button>
+          <button class="pill active" data-st="in" onclick="setSt('in')">Live Now</button>
+          <button class="pill" data-st="pre" onclick="setSt('pre')">Upcoming</button>
+          <button class="pill" data-st="post" onclick="setSt('post')">Final</button>
       </div>
       <div class="filter-grp">
         <button class="pill active" data-st="ALL" onclick="setSt('ALL')">All Games</button>
@@ -656,7 +655,7 @@
 <div class="toast" id="toast"></div>
   
 <script>
-let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'cards', curLg = 'ALL', curSt = 'ALL', curPlg = 'NFL', draftLegs = [];
+let liveData = {games:{NFL:[],NBA:[],CFB:[]}, players:{NFL:[],NBA:[]}}, curTab = 'cards', curLg = 'ALL', curSt = 'in', curPlg = 'NFL', draftLegs = [];
 let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]'), sortCol = 'PASS YDS', sortDir = 1;
 localStorage.removeItem('osp_theme');
 document.body.classList.remove('light');
@@ -733,27 +732,28 @@ function renderGames() {
   let html = '';
   lgs.forEach(lg => {
     const raw = (liveData.games && liveData.games[lg]) || [];
-    const list = raw.filter(g => g.state === 'in');
+    const list = raw.filter(g => g.state === curSt);
     if (!list.length) return;
-    html += `<h2>${lg} Live Games (${list.length})</h2><div class="grid">` + list.map(g => {
-      const stLabel = `<span class="sb-live-tag">● ${g.status}</span>`;
+    html += `<h2>${lg} Games (${list.length})</h2><div class="grid">` + list.map(g => {
+      const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
       const awayDisp = g.away_full || g.away, homeDisp = g.home_full || g.home;
       const safeAway = String(awayDisp).replace(/'/g, "\\'"), safeHome = String(homeDisp).replace(/'/g, "\\'");
-      return `<div class="sb-card is-live" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
+      return `<div class="sb-card ${isLive?'is-live':''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
         <div class="sb-team" style="--tm-clr:${g.bg0}">
           <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><span class="sb-score">${g.ascore}</span></div>
+          <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
         </div>
         <div class="sb-team" style="--tm-clr:${g.bg1}">
           <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><span class="sb-score">${g.hscore}</span></div>
+          <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
         ${g.odds ? `<div class="sb-foot"><span>${g.odds}</span></div>` : ''}
       </div>`;
     }).join('') + `</div>`;
   });
-  document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No live games in progress right now.</p>';
+  const emptyMsg = curSt === 'in' ? 'No live games in progress right now.' : (curSt === 'pre' ? 'No upcoming games scheduled right now.' : 'No final games to show right now.');
+  document.getElementById('games-area').innerHTML = html || `<p style="color:var(--muted)">${emptyMsg}</p>`;
 }
 
 function sortBy(col) {
