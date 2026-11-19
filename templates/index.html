@@ -479,7 +479,6 @@
     </div>
      <div style="display:flex;gap:8px;align-items:center">
      <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
-     <div class="live-pill"><span class="dot"></span><span id="sync-time">LIVE</span></div>
    </div>
   </div>
 </header>
@@ -1027,7 +1026,6 @@ async function refresh() {
     if (curTab === 'scoreboard') renderGames();
     if (curTab === 'stats') renderPlayers();
     if (curTab === 'cards') renderCards();
-    document.getElementById('sync-time').textContent = 'LIVE • ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
     if (firstLoad) {
       firstLoad = false;
       if (data.partial) setTimeout(refresh, 400);
