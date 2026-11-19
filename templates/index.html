@@ -929,7 +929,13 @@ function evalLeg(leg) {
   return {name: leg.player, stat: `${tgt} ${leg.stat}`, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
+let customSamples = [];
+const isAdminUser = () => Boolean(currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@omnistatpro.com'));
+
 function buildSampleCards() {
+  if (customSamples && customSamples.length > 0) {
+    return customSamples.map(c => ({ ...c, isSample: true }));
+  }
   const nbaP = (liveData.players && liveData.players.NBA) || [];
   const nflP = (liveData.players && liveData.players.NFL) || [];
   const samples = [];
@@ -988,31 +994,50 @@ function renderCards() {
     ? rawList.filter(c => (c.book || 'Other') === curBookFilter)
     : rawList;
 
-  let totC = 0, liveP = 0, paidP = 0;
-  const cardsHtml = activeList.map(c => {
-    const realIdx = userCards.indexOf(c);
+  const renderSingleCard = (c, idx, isSampleView) => {
     const evals = c.legs.map(evalLeg);
     const allHit = evals.length > 0 && evals.every(x => x.hit);
     const anyMiss = evals.some(x => x.miss);
-    if (!isDemo) {
-      totC += Number(c.cost) || 0;
-      if (!anyMiss) liveP += Number(c.payout) || 0;
-      if (allHit) paidP += Number(c.payout) || 0;
-    }
     const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
     const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
       <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
-    const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
+    const bk = c.book || (c.title && c.title.split('•').trim()) || 'Other';
     const lbl = c.title && !c.book ? c.title : (c.title || `${c.legs.length}-Leg Card`);
-    const delBtn = isDemo ? '' : `<button class="del-btn" style="margin:0" onclick="delCard(${realIdx})">✕</button>`;
+
+    let actionBtns = '';
+    if (isSampleView) {
+      if (isAdminUser() && customSamples.length > 0) {
+        actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
+      }
+    } else {
+      const promoteBtn = isAdminUser()
+        ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>`
+        : '';
+      actionBtns = `${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
+    }
+
     const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
-      <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${c.isSample?'<span class="sample-tag">Live Sample</span>':''}</div>
-      <div>${delBtn}</div>
+      <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${(isSampleView || c.isSample)?'<span class="sample-tag">Live Sample</span>':''}</div>
+      <div style="display:flex;align-items:center">${actionBtns}</div>
     </div>`;
     return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}</div></div>
       <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
+  };
+
+  let totC = 0, liveP = 0, paidP = 0;
+  const cardsHtml = activeList.map((c, i) => {
+    const realIdx = isDemo ? i : userCards.indexOf(c);
+    if (!isDemo) {
+      const evals = c.legs.map(evalLeg);
+      const allHit = evals.length > 0 && evals.every(x => x.hit);
+      const anyMiss = evals.some(x => x.miss);
+      totC += Number(c.cost) || 0;
+      if (!anyMiss) liveP += Number(c.payout) || 0;
+      if (allHit) paidP += Number(c.payout) || 0;
+    }
+    return renderSingleCard(c, realIdx, isDemo);
   }).join('');
 
   const heroHtml = isDemo ? `<div class="mission-hero">
@@ -1038,8 +1063,16 @@ function renderCards() {
     booksPresent.map(b => `<button class="pill ${curBookFilter===b?'active':''}" onclick="setBookFilter('${b}')">${b} (${rawList.filter(c=>(c.book||'Other')===b).length})</button>`).join('') +
   `</div>` : '';
 
+  const adminSampleSection = (isAdminUser() && !isDemo) ? `
+    <div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
+      <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
+      ${customSamples.length
+        ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),440px));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>`
+        : `<p style="color:var(--muted)">No custom daily samples published yet (currently showing automatic live player demo slips). Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
+    </div>` : '';
+
   const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards</h2>`;
-  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),440px));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`);
+  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),440px));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`) + adminSampleSection;
 }
 
 function delCard(i) {
@@ -1170,6 +1203,66 @@ async function pushCardsToCloud() {
     updated_at: new Date().toISOString()
   });
 }
+async function loadDailySamples() {
+  if (!sbClient) return;
+  const { data } = await sbClient.from('daily_samples').select('cards_json').eq('id', 1).maybeSingle();
+  if (data && Array.isArray(data.cards_json)) {
+    customSamples = data.cards_json;
+    if (curTab === 'cards') renderCards();
+  }
+}
+
+async function pushSamplesToCloud() {
+  if (!isAdminUser() || !sbClient) return;
+  await sbClient.from('daily_samples').upsert({
+    id: 1,
+    cards_json: customSamples,
+    updated_at: new Date().toISOString()
+  });
+}
+
+async function promoteCardToSample(i) {
+  if (!isAdminUser()) return;
+  const c = userCards[i];
+  if (!c) return;
+  if (!confirm(`Publish "${c.book || 'Card'} — ${c.title || c.legs.length + '-Leg Card'}" to the public Daily Sample cards?`)) return;
+  const copy = JSON.parse(JSON.stringify(c));
+  delete copy.isSample;
+  customSamples.push(copy);
+  await pushSamplesToCloud();
+  renderCards();
+  showToast('Published to Daily Sample Cards');
+}
+
+async function delSampleCard(i) {
+  if (!isAdminUser()) return;
+  if (!confirm('Remove this card from the public Daily Sample cards?')) return;
+  customSamples.splice(i, 1);
+  await pushSamplesToCloud();
+  renderCards();
+  showToast('Daily Sample card removed');
+}
+
+let editingSampleIdx = -1;
+function editSampleCard(i) {
+  const c = customSamples[i];
+  if (!c || !isAdminUser()) return;
+  editingSampleIdx = i;
+  draftLegs = JSON.parse(JSON.stringify(c.legs || []));
+  setTab('build');
+  const bookEl = document.getElementById('b-book');
+  const titleEl = document.getElementById('b-title');
+  const costEl = document.getElementById('b-cost');
+  const payEl = document.getElementById('b-pay');
+  if (bookEl) bookEl.value = c.book || 'Other';
+  if (titleEl) titleEl.value = c.title || '';
+  if (costEl) costEl.value = c.cost || '';
+  if (payEl) payEl.value = c.payout || '';
+  renderDraft();
+  showToast('Editing Daily Sample card — click Save to publish update');
+}
+
+loadDailySamples();
 
 async function syncCloudCards(user) {
   currentUser = user;
