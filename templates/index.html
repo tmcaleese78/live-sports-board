@@ -973,11 +973,15 @@ function addLeg() {
 }
 
 function renderDraft() {
-  document.getElementById('draft-cnt').textContent = draftLegs.length;
-  document.getElementById('draft-legs').innerHTML = draftLegs.map((l, i) => {
-    const txt = l.type === 'ml' ? `${l.team} (Win)` : l.type === 'spread' ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})` : l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.target} ${l.stat}`;
-    return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
-  }).join('');
+  const dc = document.getElementById('draft-cnt');
+  if (dc) dc.textContent = draftLegs.length;
+  const dl = document.getElementById('draft-legs');
+  if (dl) {
+    dl.innerHTML = draftLegs.map((l, i) => {
+      const txt = l.type === 'ml' ? `${l.team} (Win)` : l.type === 'spread' ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})` : l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.target} ${l.stat}`;
+      return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
+    }).join('');
+  }
 }
 
 function saveCard() {
