@@ -20,7 +20,7 @@ def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"fp_v2:{lg_u}"
+    ck = f"fp_v3:{lg_u}"
     now = time.time()
     if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
         return jsonify(_PROJ_CACHE[ck]["data"])
@@ -53,6 +53,12 @@ def api_projections(lg):
     fp_norm_tm = {"JAC": "JAX", "WSH": "WAS", "GBP": "GB", "KCC": "KC", "LVR": "LV", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
     hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
+    def val_at(seq, idx):
+        for i, item in enumerate(seq):
+            if i == idx:
+                return item
+        return 0.0
+
     def parse_fp_table(url):
         try:
             r = requests.get(url, headers=hdrs, timeout=8)
@@ -67,7 +73,7 @@ def api_projections(lg):
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S | re.I)
                 if len(tds) < 6:
                     continue
-                p_cell = tds[0]
+                p_cell = next(iter(tds), "")
                 m_nm = re.search(r"class=['\"]player-name['\"][^>]*>(.*?)</a>", p_cell, re.S | re.I)
                 raw_name = re.sub(r"<[^>]+>", "", m_nm.group(1) if m_nm else p_cell).strip()
                 clean_txt = re.sub(r"<[^>]+>", " ", p_cell)
@@ -75,7 +81,9 @@ def api_projections(lg):
                 tm = m_tm.group(1) if m_tm else ""
                 tm = fp_norm_tm.get(tm, tm)
                 nums = []
-                for c in tds[1:]:
+                for i, c in enumerate(tds):
+                    if i == 0:
+                        continue
                     v_str = re.sub(r"<[^>]+>", "", c).replace(",", "").strip()
                     try:
                         nums.append(float(v_str))
@@ -107,15 +115,25 @@ def api_projections(lg):
                     continue
                 seen.add((nm, tm))
                 if pos == "QB" and len(n) >= 8:
-                    py, ptd, ry, rtd = round(n[2], 1), round(n[3], 1), round(n[6], 1), round(n[7], 1)
+                    py = round(val_at(n, 2), 1)
+                    ptd = round(val_at(n, 3), 1)
+                    ry = round(val_at(n, 6), 1)
+                    rtd = round(val_at(n, 7), 1)
                     rec, recy, rectd = 0.0, 0.0, 0.0
                 elif pos == "RB" and len(n) >= 6:
                     py, ptd = 0.0, 0.0
-                    ry, rtd, rec, recy, rectd = round(n[1], 1), round(n[2], 1), round(n[3], 1), round(n[4], 1), round(n[5], 1)
+                    ry = round(val_at(n, 1), 1)
+                    rtd = round(val_at(n, 2), 1)
+                    rec = round(val_at(n, 3), 1)
+                    recy = round(val_at(n, 4), 1)
+                    rectd = round(val_at(n, 5), 1)
                 elif pos in ("WR", "TE") and len(n) >= 6:
                     py, ptd = 0.0, 0.0
-                    rec, recy, rectd = round(n[0], 1), round(n[1], 1), round(n[2], 1)
-                    ry, rtd = round(n[4], 1), round(n[5], 1)
+                    rec = round(val_at(n, 0), 1)
+                    recy = round(val_at(n, 1), 1)
+                    rectd = round(val_at(n, 2), 1)
+                    ry = round(val_at(n, 4), 1)
+                    rtd = round(val_at(n, 5), 1)
                 else:
                     continue
                 if (py + ry + recy + rec) <= 0:
@@ -142,7 +160,12 @@ def api_projections(lg):
             nm, tm, n = r["name"], r["team"], r["nums"]
             if len(n) < 8:
                 continue
-            pts, reb, ast, blk, stl, tpm = round(n[0], 1), round(n[1], 1), round(n[2], 1), round(n[3], 1), round(n[4], 1), round(n[7], 1)
+            pts = round(val_at(n, 0), 1)
+            reb = round(val_at(n, 1), 1)
+            ast = round(val_at(n, 2), 1)
+            blk = round(val_at(n, 3), 1)
+            stl = round(val_at(n, 4), 1)
+            tpm = round(val_at(n, 7), 1)
             if (pts + reb + ast) <= 0:
                 continue
             nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
@@ -165,106 +188,6 @@ def api_projections(lg):
     res_obj = {"league": lg_u, "players": out}
     _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
     return jsonify(res_obj)
-
-@app.route("/api/projections/<lg>")
-def api_season(lg):
-    paths = {"nfl": "football/nfl", "nba": "basketball/nba"}
-    sp = paths.get(lg.lower())
-    if not sp:
-        return jsonify({"error": "Invalid league"}), 400
-    ck = f"v4:{lg.lower()}"
-    now = time.time()
-    if ck in _SEASON_CACHE and (now - _SEASON_CACHE[ck]["ts"]) < 900:
-        return jsonify(_SEASON_CACHE[ck]["data"])
-
-    with ThreadPoolExecutor(max_workers=2) as pool:
-        f_st = pool.submit(fetch_json, f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
-        f_ld = pool.submit(fetch_json, f"https://espn.com{sp}/statistics/byathlete?limit=150", 8)
-        st_data = f_st.result()
-        ld_data = f_ld.result()
-
-    teams_out = []
-    def walk_standings(node):
-        if not isinstance(node, dict):
-            return
-        for entry in node.get("standings", {}).get("entries", []):
-            tm = entry.get("team", {})
-            st_map = {s.get("name"): s.get("displayValue", "0") for s in entry.get("stats", [])}
-            teams_out.append({
-                "name": tm.get("displayName", ""),
-                "abbr": tm.get("abbreviation", ""),
-                "bg": clean_hex(tm.get("color"), "#1e293b"),
-                "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
-                "rec": st_map.get("overall") or st_map.get("record") or f"{st_map.get('wins','0')}-{st_map.get('losses','0')}",
-                "pf": st_map.get("pointsFor", "0"),
-                "pa": st_map.get("pointsAgainst", "0"),
-                "diff": st_map.get("pointDifferential") or st_map.get("differential") or "0",
-                "pct": st_map.get("winPercent", "0")
-            })
-        for ch in node.get("children", []):
-            walk_standings(ch)
-
-    walk_standings(st_data)
-    seen_t = set()
-    uniq_teams = []
-    for t in teams_out:
-        if t["abbr"] and t["abbr"] not in seen_t:
-            seen_t.add(t["abbr"])
-            uniq_teams.append(t)
-
-    cat_specs = (
-        [("passing", "YDS", "Passing Yards"), ("passing", "TD", "Passing TDs"),
-         ("rushing", "YDS", "Rushing Yards"), ("rushing", "TD", "Rushing TDs"),
-         ("receiving", "YDS", "Receiving Yards"), ("receiving", "REC", "Receptions")]
-        if lg.lower() == "nfl" else
-        [("offensive", "PTS", "Points Per Game"), ("general", "REB", "Rebounds Per Game"),
-         ("offensive", "AST", "Assists Per Game"), ("offensive", "3PM", "3-Pointers Made"),
-         ("defensive", "STL", "Steals Per Game"), ("defensive", "BLK", "Blocks Per Game")]
-    )
-    buckets = {title: [] for _, _, title in cat_specs}
-    cat_meta = {}
-    for c in ld_data.get("categories", []):
-        cname = str(c.get("name", "")).lower()
-        lbls = [str(x).upper() for x in (c.get("labels") or c.get("names") or [])]
-        cat_meta[cname] = lbls
-
-    for item in ld_data.get("athletes", []):
-        ath = item.get("athlete", {})
-        tm = ath.get("team") or next(iter(ath.get("teams", [])), {})
-        pid = str(ath.get("id", ""))
-        nm = ath.get("displayName", "")
-        ab = tm.get("abbreviation", "")
-        bg = clean_hex(tm.get("color"), "#1e293b")
-        logo = next((x.get("href", "") for x in tm.get("logos", [])), "")
-        by_cat = {}
-        for c in item.get("categories", []):
-            cname = str(c.get("name", "")).lower()
-            by_cat[cname] = c.get("totals") or c.get("values") or []
-        for cname, stat_lbl, title in cat_specs:
-            lbls = cat_meta.get(cname, [])
-            vals = by_cat.get(cname, [])
-            if stat_lbl in lbls:
-                idx = lbls.index(stat_lbl)
-                if idx < len(vals):
-                    raw_v = str(vals[idx]).replace(",", "")
-                    try:
-                        num_v = float(raw_v)
-                    except ValueError:
-                        num_v = 0.0
-                    if num_v > 0:
-                        buckets[title].append({"id": pid, "name": nm, "team": ab, "bg": bg, "logo": logo, "val": str(vals[idx]), "_num": num_v})
-
-    leaders_out = []
-    for _, _, title in cat_specs:
-        rows = sorted(buckets[title], key=lambda x: x["_num"], reverse=True)[:15]
-        for r in rows:
-            r.pop("_num", None)
-        if rows:
-            leaders_out.append({"category": title, "players": rows})
-
-    payload = {"league": lg.upper(), "teams": uniq_teams, "leaders": leaders_out}
-    _SEASON_CACHE[ck] = {"ts": now, "data": payload}
-    return jsonify(payload)
 
 @app.before_request
 def upgrade_to_https():
