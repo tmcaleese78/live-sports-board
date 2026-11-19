@@ -35,7 +35,6 @@ def api_projections(lg):
             opp_map[aw] = f"@ {hm} ({st})"
             opp_map[hm] = f"vs {aw} ({st})"
 
-    # Fetch ESPN public fantasy projections (statSourceId=1 = projections)
     esp_sport = "ffl" if lg_u == "NFL" else "fba"
     season_yr = 2026
     proj_url = f"https://espn.com{esp_sport}/seasons/{season_yr}/segments/0/leaguedefaults/3?view=kona_player_info"
@@ -47,7 +46,8 @@ def api_projections(lg):
             "offset": 0
         }
     })
-       proj_by_name = {}
+
+    proj_by_name = {}
     try:
         r = requests.get(
             proj_url,
@@ -81,7 +81,6 @@ def api_projections(lg):
         if not raw_s:
             continue
         if lg_u == "NFL":
-            # ESPN FFL stat IDs: 3=PassYds, 4=PassTD, 24=RushYds, 25=RushTD, 42=RecYds, 43=RecTD, 53=Rec
             py = round(float(raw_s.get("3", 0)), 1)
             ptd = round(float(raw_s.get("4", 0)), 1)
             ry = round(float(raw_s.get("24", 0)), 1)
@@ -96,7 +95,6 @@ def api_projections(lg):
                 "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
             }
         else:
-            # ESPN FBA stat IDs: 0=PTS, 6=REB, 3=AST, 17=3PM, 2=STL, 1=BLK
             pts = round(float(raw_s.get("0", 0)), 1)
             reb = round(float(raw_s.get("6", 0)), 1)
             ast = round(float(raw_s.get("3", 0)), 1)
