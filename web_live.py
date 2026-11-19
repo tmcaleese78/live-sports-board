@@ -261,6 +261,21 @@ def get_roster(sport_path, tid):
     if out:
         _ROSTER_CACHE[key] = out
     return out
+    
+@app.before_request
+def upgrade_to_https():
+    if request.headers.get("X-Forwarded-Proto") == "http":
+        return redirect(f"https://{request.host}{request.full_path.rstrip('?')}", code=301)
+
+def fetch_json(url, timeout=6):
+    try:
+        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout).json()
+    except Exception:
+        return {}
+
+def clean_hex(val, fallback):
+    s = str(val or "").strip().lstrip("#")
+    return f"#{s}" if len(s) == 6 else fallback
 
 def parse_scoreboard(sport_path, lg_code, fast=False):
     sb = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/scoreboard", timeout=6)
