@@ -738,7 +738,15 @@ function renderGames() {
       const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
       const awayDisp = g.away_full || g.away, homeDisp = g.home_full || g.home;
       const safeAway = String(awayDisp).replace(/'/g, "\\'"), safeHome = String(homeDisp).replace(/'/g, "\\'");
-      return `<div class="sb-card ${isLive?'is-live':''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
+      const ouMatch = String(g.odds || '').match(/O\/U\s*([0-9.]+)/i);
+      const ouVal = ouMatch ? parseFloat(ouMatch[1]) : null;
+      const gameLbl = `${safeAway} @ ${safeHome}`;
+      const ouBtns = ouVal ? `
+        <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(56,189,248,0.4);color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Over',total:${ouVal}},'Over ${ouVal}')">+ O ${ouVal}</button>
+        <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(56,189,248,0.4);color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Under',total:${ouVal}},'Under ${ouVal}')">+ U ${ouVal}</button>
+      ` : '';
+
+      return `<div class="sb-card ${isLive?'is-live':''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${gameLbl}')">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
         <div class="sb-team" style="--tm-clr:${g.bg0}">
           <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
@@ -749,11 +757,21 @@ function renderGames() {
           <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
         ${g.odds ? `<div class="sb-foot"><span>${g.odds}</span></div>` : ''}
+        <div style="display:flex;gap:5px;flex-wrap:wrap;padding:7px 10px;background:rgba(15,23,42,0.85);border-top:1px solid rgba(148,163,184,0.14)">
+          <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(74,222,128,0.4);color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeAway}',spread:0},'${safeAway} Win')">+ ${g.away} Win</button>
+          <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(74,222,128,0.4);color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeHome}',spread:0},'${safeHome} Win')">+ ${g.home} Win</button>
+          ${ouBtns}
+        </div>
       </div>`;
     }).join('') + `</div>`;
   });
   const emptyMsg = curSt === 'in' ? 'No live games in progress right now.' : (curSt === 'pre' ? 'No upcoming games scheduled right now.' : 'No final games to show right now.');
   document.getElementById('games-area').innerHTML = html || `<p style="color:var(--muted)">${emptyMsg}</p>`;
+}
+function quickGameLeg(sport, legObj, label) {
+  draftLegs.push({ sport, ...legObj });
+  renderDraft();
+  showToast(`Added ${label} (${sport}) — ${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft`);
 }
 
 function sortBy(col) {
@@ -813,7 +831,7 @@ function evalLeg(leg) {
     return {name: leg.team, stat: lbl, gained: g.state==='pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1};
   }
   if (leg.type === 'total') {
-    const g = games.find(x => `${x.away} @ ${x.home}` === leg.game);
+    const g = games.find(x => `${x.away} @ ${x.home}` === leg.game || `${x.away_full} @ ${x.home_full}` === leg.game);
     const line = Number(leg.total) || 0, lbl = `${leg.ou} ${line}`;
     if (!g) return {name: leg.game, stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
     const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0);
