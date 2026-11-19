@@ -1114,14 +1114,18 @@ async function openPlayerCard(lg, pid, name) {
   document.getElementById('player-modal').classList.add('open');
   try {
     const res = await fetch(`/api/player/${lg}/${pid}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const d = await res.json();
     const bg = d.bg || '#1e293b';
+    const safeQpName = String(d.name || name).replace(/'/g, "\\'");
+    const safeQpAbbr = String(d.abbr || '').replace(/'/g, "\\'");
     let html = `<div class="pc-hero" style="--tm-clr:${bg}">
       ${d.headshot ? `<img class="pc-headshot" src="${d.headshot}" alt="${d.name}">` : ''}
       <div style="flex:1">
         <div style="font-size:20px;font-weight:900;color:#fff">${d.name || name} ${d.jersey ? `<span style="color:#38bdf8;font-size:15px">#${d.jersey}</span>` : ''}</div>
         <div style="font-size:13px;font-weight:700;color:#cbd5e1;margin-top:2px">${d.team || ''} ${d.pos ? `• ${d.pos}` : ''}</div>
       </div>
+      <button class="btn-primary" style="padding:7px 12px;font-size:12.5px" onclick="closePlayerCard();openQuickProp('${lg}','${safeQpName}','${safeQpAbbr}')">+ Prop</button>
       ${d.logo ? `<img src="${d.logo}" style="width:42px;height:42px;object-fit:contain;filter:drop-shadow(1px 0 0 #fff) drop-shadow(-1px 0 0 #fff) drop-shadow(0 1px 0 #fff) drop-shadow(0 -1px 0 #fff)">` : ''}
     </div>`;
 
@@ -1145,9 +1149,10 @@ async function openPlayerCard(lg, pid, name) {
     }
     document.getElementById('pc-body').innerHTML = html;
   } catch (e) {
-    document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card right now.</p>`;
+    document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card: ${e.message}</p>`;
   }
 }
+
 let seasonCache = {}, curSlg = 'NFL', curSmode = 'players', teamSortCol = 'pct', teamSortDir = 1;
 
 function setSeasonLg(lg) {
