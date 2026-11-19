@@ -1187,7 +1187,7 @@ async function refresh() {
     
 refresh(); setInterval(refresh, 15000);
 const sbClient = window.supabase
-  ? window.supabase.createClient('https://supabase.co', 'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh')
+  ? window.supabase.createClient('https://decjgnolcxnndpicztun.supabase.co', 'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh')
   : null;
 let currentUser = null;
 
@@ -1203,6 +1203,7 @@ async function pushCardsToCloud() {
     updated_at: new Date().toISOString()
   });
 }
+
 async function loadDailySamples() {
   if (!sbClient) return;
   const { data } = await sbClient.from('daily_samples').select('cards_json').eq('id', 1).maybeSingle();
@@ -1271,9 +1272,10 @@ async function syncCloudCards(user) {
     if (btn) btn.textContent = 'Sign In / Sign Up';
     document.getElementById('auth-logged-out').style.display = 'block';
     document.getElementById('auth-logged-in').style.display = 'none';
+    if (curTab === 'cards') renderCards();
     return;
   }
-  if (btn) btn.textContent = user.email.split('@')[0];
+  if (btn) btn.textContent = user.email.split('@');
   document.getElementById('auth-user-email').textContent = user.email;
   document.getElementById('auth-logged-out').style.display = 'none';
   document.getElementById('auth-logged-in').style.display = 'block';
@@ -1295,23 +1297,38 @@ async function handleAuth(mode) {
   const password = document.getElementById('auth-pass').value;
   const errEl = document.getElementById('auth-err');
   errEl.style.display = 'none';
+  errEl.style.color = '#f87171';
+  if (!sbClient) {
+    errEl.textContent = 'Auth service not loaded. Refresh the page and try again.';
+    errEl.style.display = 'block';
+    return;
+  }
   if (!email || password.length < 6) {
     errEl.textContent = 'Enter a valid email and a password of at least 6 characters.';
     errEl.style.display = 'block';
     return;
   }
-  const res = mode === 'signup'
-    ? await sbClient.auth.signUp({ email, password })
-    : await sbClient.auth.signInWithPassword({ email, password });
-  if (res.error) {
-    errEl.textContent = res.error.message;
+  try {
+    const res = mode === 'signup'
+      ? await sbClient.auth.signUp({ email, password })
+      : await sbClient.auth.signInWithPassword({ email, password });
+    if (res.error) {
+      errEl.textContent = res.error.message;
+      errEl.style.display = 'block';
+      return;
+    }
+    if (res.data && res.data.session && res.data.user) {
+      await syncCloudCards(res.data.user);
+      closeAuthModal();
+      showToast(mode === 'signup' ? 'Account created & synced!' : 'Signed in & cards synced!');
+    } else if (res.data && res.data.user) {
+      errEl.style.color = '#4ade80';
+      errEl.textContent = 'Account created! Check your inbox for the confirmation link, then click Sign In.';
+      errEl.style.display = 'block';
+    }
+  } catch (e) {
+    errEl.textContent = 'Connection error: ' + (e.message || 'Check Supabase URL');
     errEl.style.display = 'block';
-    return;
-  }
-  if (res.data && res.data.user) {
-    await syncCloudCards(res.data.user);
-    closeAuthModal();
-    showToast(mode === 'signup' ? 'Account created & synced!' : 'Signed in & cards synced!');
   }
 }
 
