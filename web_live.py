@@ -364,7 +364,7 @@ def api_player(lg, pid):
     sp = paths.get(lg.lower())
     if not sp or not pid:
         return jsonify({"error": "Invalid player"}), 400
-    ck = f"v3:{lg.lower()}:{pid}"
+    ck = f"v4:{lg.lower()}:{pid}"
     now = time.time()
     if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
         return jsonify(_PLAYER_CACHE[ck]["data"])
@@ -377,6 +377,11 @@ def api_player(lg, pid):
         ov = f_ov.result()
         gl = f_gl.result()
 
+    if not ov.get("statistics") and not ov.get("gamelog"):
+        ov = fetch_json(f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 6) or ov
+    if not gl.get("seasonTypes"):
+        gl = fetch_json(f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/gamelog", 6) or gl
+
     ath = bio.get("athlete") or ov.get("athlete") or {}
     tm = ath.get("team", {})
     season_stats = []
@@ -384,7 +389,7 @@ def api_player(lg, pid):
     labels = st_blk.get("labels") or st_blk.get("names") or []
     splits = st_blk.get("splits", [])
     if labels and isinstance(splits, list) and len(splits) > 0:
-        first_split = splits if isinstance(splits, dict) else {}
+        first_split = splits[0] if isinstance(splits[0], dict) else {}
         vals = first_split.get("stats", [])
         season_stats = [{"label": labels[i], "val": vals[i]} for i in range(min(len(labels), len(vals)))]
 
