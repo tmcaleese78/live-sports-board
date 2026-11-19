@@ -906,11 +906,12 @@ function renderCards() {
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
     const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
     const lbl = c.title && !c.book ? c.title : (c.title || `${c.legs.length}-Leg Card`);
+    const delBtn = isDemo ? '' : `<button class="del-btn" style="margin:0" onclick="delCard(${realIdx})">✕</button>`;
     const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
       <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${c.isSample?'<span class="sample-tag">Live Sample</span>':''}</div>
+      <div>${delBtn}</div>
     </div>`;
-    const delBtn = isDemo ? '' : `<button class="del-btn" onclick="delCard(${realIdx})">✕</button>`;
-    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}${delBtn}</div></div>
+    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}</div></div>
       <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
   }).join('');
 
