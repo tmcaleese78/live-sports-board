@@ -760,17 +760,17 @@ function renderGames() {
           }
         }
       }
-
       const fmtSp = v => (v > 0 ? `+${v}` : `${v}`);
+      const pillBase = `padding:3px 8px;font-size:11px;font-weight:800;background:#0f172a;border-radius:7px`;
       const awaySpBtn = awaySp !== null
-        ? `<button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(250,204,21,0.45);color:#facc15" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'spread',team:'${safeAway}',spread:${awaySp}},'${g.away} ${fmtSp(awaySp)}')">${g.away} ${fmtSp(awaySp)}</button>`
+        ? `<button class="pill" style="${pillBase};border-color:#eab308;color:#fde047" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'spread',team:'${safeAway}',spread:${awaySp}},'${g.away} ${fmtSp(awaySp)}')">${g.away} ${fmtSp(awaySp)}</button>`
         : '';
       const homeSpBtn = homeSp !== null
-        ? `<button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(250,204,21,0.45);color:#facc15" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'spread',team:'${safeHome}',spread:${homeSp}},'${g.home} ${fmtSp(homeSp)}')">${g.home} ${fmtSp(homeSp)}</button>`
+        ? `<button class="pill" style="${pillBase};border-color:#eab308;color:#fde047" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'spread',team:'${safeHome}',spread:${homeSp}},'${g.home} ${fmtSp(homeSp)}')">${g.home} ${fmtSp(homeSp)}</button>`
         : '';
       const ouBtns = ouVal ? `
-        <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Over',total:${ouVal}},'O ${ouVal}')">O ${ouVal}</button>
-        <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Under',total:${ouVal}},'U ${ouVal}')">U ${ouVal}</button>
+        <button class="pill" style="${pillBase};border-color:#0284c7;color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Over',total:${ouVal}},'O ${ouVal}')">O ${ouVal}</button>
+        <button class="pill" style="${pillBase};border-color:#0284c7;color:#38bdf8" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'total',game:'${gameLbl}',ou:'Under',total:${ouVal}},'U ${ouVal}')">U ${ouVal}</button>
       ` : '';
 
       return `<div class="sb-card ${isLive?'is-live':''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${gameLbl}')">
@@ -783,9 +783,9 @@ function renderGames() {
           <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
           <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
         </div>
-        <div style="display:flex;gap:5px;flex-wrap:wrap;padding:7px 10px;background:rgba(15,23,42,0.88);border-top:1px solid rgba(148,163,184,0.16)">
-          <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeAway}',spread:0},'${g.away} ML')">${g.away} ML</button>
-          <button class="pill" style="padding:3px 7px;font-size:11px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeHome}',spread:0},'${g.home} ML')">${g.home} ML</button>
+        <div class="sb-top" style="display:flex;gap:5px;flex-wrap:wrap;padding:6px 10px;border-top:1px solid rgba(15,23,42,0.2)">
+          <button class="pill" style="${pillBase};border-color:#16a34a;color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeAway}',spread:0},'${g.away} ML')">${g.away} ML</button>
+          <button class="pill" style="${pillBase};border-color:#16a34a;color:#4ade80" onclick="event.stopPropagation();quickGameLeg('${lg}',{type:'ml',team:'${safeHome}',spread:0},'${g.home} ML')">${g.home} ML</button>
           ${awaySpBtn}
           ${homeSpBtn}
           ${ouBtns}
