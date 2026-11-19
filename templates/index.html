@@ -941,7 +941,16 @@ function renderCards() {
   document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`);
 }
 
-function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); pushCardsToCloud(); renderCards(); }
+function delCard(i) {
+  const card = userCards[i];
+  const label = card ? `${card.book || 'Bet'} — ${card.title || card.legs.length + '-Leg Card'}` : 'this bet card';
+  if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
+  userCards.splice(i, 1);
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  pushCardsToCloud();
+  renderCards();
+  showToast('Bet card deleted');
+}
 
 function syncBuilderOpts() {
   const tp = document.getElementById('b-type').value, sp = document.getElementById('b-sport').value;
@@ -997,18 +1006,25 @@ function renderDraft() {
 
 function saveCard() {
   if (!draftLegs.length) return alert('Add at least 1 leg first.');
-  const cost = parseFloat(document.getElementById('b-cost').value) || 0, payout = parseFloat(document.getElementById('b-pay').value) || 0;
-   const bookEl = document.getElementById('b-book');
+  const cost = parseFloat(document.getElementById('b-cost').value) || 0;
+  const payout = parseFloat(document.getElementById('b-pay').value) || 0;
+  const bookEl = document.getElementById('b-book');
   const titleEl = document.getElementById('b-title');
   const book = bookEl ? bookEl.value : 'Other';
   const title = titleEl ? titleEl.value.trim() : '';
+  const summary = `${book}${title ? ' — ' + title : ''} (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'}, Cost: ${money(cost)}, Payout: ${money(payout)})`;
+  if (!confirm(`Save this bet card?\n\n${summary}`)) return;
+
   userCards.push({ book, title, cost, payout, legs: draftLegs });
   if (titleEl) titleEl.value = '';
-   localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
   pushCardsToCloud();
-  draftLegs = []; renderDraft();
-  document.getElementById('b-cost').value = ''; document.getElementById('b-pay').value = '';
+  draftLegs = [];
+  renderDraft();
+  document.getElementById('b-cost').value = '';
+  document.getElementById('b-pay').value = '';
   setTab('cards');
+  showToast('Bet card saved');
 }
 
 let firstLoad = true;
