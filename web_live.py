@@ -1,4 +1,5 @@
 import os
+import json
 import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -11,8 +12,119 @@ _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
 _PLAYER_CACHE = {}
 _SEASON_CACHE = {}
+_PROJ_CACHE = {}
 
-@app.route("/api/season/<lg>")
+@app.route("/api/projections/<lg>")
+def api_projections(lg):
+    lg_u = lg.upper()
+    if lg_u not in ("NFL", "NBA"):
+        return jsonify({"error": "Invalid league"}), 400
+    now = time.time()
+    if lg_u in _PROJ_CACHE and (now - _PROJ_CACHE[lg_u]["ts"]) < 900:
+        return jsonify(_PROJ_CACHE[lg_u]["data"])
+
+    payload = get_live_payload(fast=False)
+    games = payload.get("games", {}).get(lg_u, [])
+    players = payload.get("players", {}).get(lg_u, [])
+
+    opp_map = {}
+    for g in games:
+        aw, hm = g.get("away", ""), g.get("home", "")
+        st = g.get("status", "")
+        if aw and hm:
+            opp_map[aw] = f"@ {hm} ({st})"
+            opp_map[hm] = f"vs {aw} ({st})"
+
+    # Fetch ESPN public fantasy projections (statSourceId=1 = projections)
+    esp_sport = "ffl" if lg_u == "NFL" else "fba"
+    season_yr = 2026
+    proj_url = f"https://espn.com{esp_sport}/seasons/{season_yr}/segments/0/leaguedefaults/3?view=kona_player_info"
+    filt = json.dumps({
+        "players": {
+            "filterStatsForSourceIds": {"value": [1]},
+            "sortAppliedStatTotal": {"sortAsc": False, "sortPriority": 1, "value": f"10{season_yr}"},
+            "limit": 250,
+            "offset": 0
+        }
+    })
+       proj_by_name = {}
+    try:
+        r = requests.get(
+            proj_url,
+            headers={"User-Agent": "Mozilla/5.0", "x-fantasy-filter": filt},
+            timeout=7
+        )
+        pdata = r.json() if r.ok else {}
+        for entry in pdata.get("players", []):
+            pl = entry.get("player", {})
+            nm = pl.get("fullName", "").lower().strip()
+            if not nm:
+                continue
+            st_list = [s for s in pl.get("stats", []) if s.get("statSourceId") == 1]
+            wk = next((s for s in st_list if s.get("statSplitTypeId") == 1 and s.get("stats")), None)
+            chosen = wk or next((s for s in st_list if s.get("stats")), None)
+            if chosen:
+                proj_by_name[nm] = chosen.get("stats", {})
+    except Exception:
+        pass
+
+    out = []
+    for p in players:
+        tm = p.get("team", "")
+        if opp_map and tm not in opp_map:
+            continue
+        nm = p.get("name", "")
+        pos = p.get("pos", "")
+        if lg_u == "NFL" and pos not in ("QB", "RB", "WR", "TE"):
+            continue
+        raw_s = proj_by_name.get(nm.lower().strip(), {})
+        if not raw_s:
+            continue
+        if lg_u == "NFL":
+            # ESPN FFL stat IDs: 3=PassYds, 4=PassTD, 24=RushYds, 25=RushTD, 42=RecYds, 43=RecTD, 53=Rec
+            py = round(float(raw_s.get("3", 0)), 1)
+            ptd = round(float(raw_s.get("4", 0)), 1)
+            ry = round(float(raw_s.get("24", 0)), 1)
+            rtd = round(float(raw_s.get("25", 0)), 1)
+            rec = round(float(raw_s.get("53", 0)), 1)
+            recy = round(float(raw_s.get("42", 0)), 1)
+            rectd = round(float(raw_s.get("43", 0)), 1)
+            if (py + ry + recy + rec) <= 0:
+                continue
+            stats = {
+                "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
+                "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+            }
+        else:
+            # ESPN FBA stat IDs: 0=PTS, 6=REB, 3=AST, 17=3PM, 2=STL, 1=BLK
+            pts = round(float(raw_s.get("0", 0)), 1)
+            reb = round(float(raw_s.get("6", 0)), 1)
+            ast = round(float(raw_s.get("3", 0)), 1)
+            tpm = round(float(raw_s.get("17", 0)), 1)
+            stl = round(float(raw_s.get("2", 0)), 1)
+            blk = round(float(raw_s.get("1", 0)), 1)
+            if (pts + reb + ast) <= 0:
+                continue
+            stats = {
+                "PTS": pts, "REB": reb, "AST": ast, "3PM": tpm,
+                "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)
+            }
+        out.append({
+            "id": p.get("id", ""),
+            "name": nm,
+            "team": tm,
+            "pos": pos,
+            "opp": opp_map.get(tm, ""),
+            "bg": p.get("bg", "#1e293b"),
+            "logo": p.get("logo", ""),
+            "stats": stats
+        })
+
+    res_obj = {"league": lg_u, "players": out}
+    _PROJ_CACHE[lg_u] = {"ts": now, "data": res_obj}
+    return jsonify(res_obj)
+
+@app.route("/api/projections/<lg>")
 def api_season(lg):
     paths = {"nfl": "football/nfl", "nba": "basketball/nba"}
     sp = paths.get(lg.lower())
