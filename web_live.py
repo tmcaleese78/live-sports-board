@@ -22,7 +22,7 @@ def api_projections(lg):
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
     try:
-        ck = f"slp_v1:{lg_u}"
+        ck = f"slp_v2:{lg_u}"
         now = time.time()
         if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
             return jsonify(_PROJ_CACHE[ck]["data"])
@@ -62,6 +62,11 @@ def api_projections(lg):
             yr = st_info.get("season") or 2026
             slp_url = f"https://sleeper.app{yr}/{wk}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE"
             rows = fetch_json(slp_url, 8)
+            if not isinstance(rows, list) or not rows:
+                rows = fetch_json(
+                    f"https://sleeper.app{yr}/{int(wk) + 1}?season_type=regular&position[]=QB&position[]=RB&position[]=WR&position[]=TE",
+                    8,
+                )
             if not isinstance(rows, list):
                 rows = []
             norm_tm = {"JAC": "JAX", "WSH": "WAS"}
