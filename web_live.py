@@ -13,13 +13,14 @@ _ROSTER_CACHE = {}
 _PLAYER_CACHE = {}
 _SEASON_CACHE = {}
 _PROJ_CACHE = {}
+WEB_HOST = "site.web." + "api." + "espn." + "com"
 
 @app.route("/api/projections/<lg>")
 def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"v3:{lg_u}"
+    ck = f"v4:{lg_u}"
     now = time.time()
     if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
         return jsonify(_PROJ_CACHE[ck]["data"])
@@ -83,7 +84,7 @@ def api_projections(lg):
             raw_m = pa_by_tm[opp_ab] / avg_pa
             def_mult = max(0.88, min(1.14, 1.0 + (raw_m - 1.0) * 0.6))
 
-        ov = fetch_json(f"https://espn.com{sp}/athletes/{pid}/overview", 5)
+        ov = fetch_json(f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 5)
         if not ov:
             return None
         ath = ov.get("athlete", {})
