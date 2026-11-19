@@ -536,21 +536,21 @@
 
   <div id="view-build" style="display:none;margin-top:16px">
     <div class="builder">
-        <h2 style="margin-top:0">Create Custom Bet Card</h2>
-        <div class="row-flex" style="margin-bottom:10px">
-      <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
-        <option value="FanDuel">FanDuel</option>
-        <option value="DraftKings">DraftKings</option>
-        <option value="PrizePicks">PrizePicks</option>
-        <option value="Underdog">Underdog</option>
-        <option value="BetMGM">BetMGM</option>
-        <option value="Caesars">Caesars</option>
-        <option value="ESPN BET">ESPN BET</option>
-        <option value="Sleeper">Sleeper</option>
-        <option value="Other">Other Book</option>
-      </select>
-      <input id="b-title" class="search-box" placeholder="Optional slip label (e.g. TNF 4-Leg)" style="max-width:260px">
-    </div>
+      <h2 style="margin-top:0">Create Custom Bet Card</h2>
+      <div class="row-flex" style="margin-bottom:10px">
+        <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
+          <option value="FanDuel">FanDuel</option>
+          <option value="DraftKings">DraftKings</option>
+          <option value="PrizePicks">PrizePicks</option>
+          <option value="Underdog">Underdog</option>
+          <option value="BetMGM">BetMGM</option>
+          <option value="Caesars">Caesars</option>
+          <option value="ESPN BET">ESPN BET</option>
+          <option value="Sleeper">Sleeper</option>
+          <option value="Other">Other Book</option>
+        </select>
+        <input id="b-title" class="search-box" placeholder="Optional slip label (e.g. TNF 4-Leg)" style="max-width:260px">
+      </div>
       <div class="row-flex">
         <input id="b-cost" type="number" step="0.01" placeholder="Cost ($)" style="width:140px">
         <input id="b-pay" type="number" step="0.01" placeholder="Payout ($)" style="width:160px">
@@ -572,6 +572,7 @@
         <input id="b-player" list="player-datalist" placeholder="Type player name..." style="flex:1;min-width:190px">
         <datalist id="player-datalist"></datalist>
         <select id="b-stat"></select>
+        <select id="b-prop-ou"><option value="Over">Over</option><option value="Under">Under</option></select>
         <input id="b-target" type="number" step="0.5" placeholder="Target (e.g. 50)" style="width:150px">
       </div>
       <div id="ml-inputs" class="row-flex" style="display:none">
@@ -647,19 +648,20 @@
   </div>
 </div>
 <div class="modal-bg" id="qprop-modal" onclick="if(event.target===this)closeQuickProp()">
-  <div class="modal-box" style="max-width:400px">
+  <div class="modal-box" style="max-width:390px">
     <div class="modal-hdr">
       <strong style="font-size:17px">Quick-Add Player Prop</strong>
       <button class="pill" onclick="closeQuickProp()">✕ Close</button>
     </div>
-    <div style="margin-bottom:12px">
-      <div id="qp-player" style="font-size:18px;font-weight:900;color:#fff"></div>
-      <div id="qp-sub" style="font-size:12.5px;font-weight:700;color:#38bdf8;margin-top:2px"></div>
-    </div>
+    <div id="qp-player" style="font-size:16px;font-weight:900;color:#38bdf8;margin-bottom:12px"></div>
     <div style="display:flex;flex-direction:column;gap:10px">
+      <select id="qp-stat" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px"></select>
+      <select id="qp-ou" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
+        <option value="Over">Over</option>
+        <option value="Under">Under</option>
+      </select>
+      <input type="number" id="qp-target" step="0.5" placeholder="Target Line (e.g. 24.5)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:#fff;font-weight:700;font-size:14px">
       <select id="qp-dest" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px"></select>
-      <select id="qp-stat" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:14px"></select>
-      <input id="qp-target" type="number" step="0.5" placeholder="Target line (e.g. 22.5 or 250)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px">
       <button class="btn-primary" style="width:100%;padding:11px;font-size:14px;margin-top:4px" onclick="confirmQuickProp()">+ Add Prop to Card</button>
     </div>
   </div>
@@ -911,22 +913,24 @@ function evalLeg(leg) {
     const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (margin > 0 ? `+${margin}` : String(margin)));
     return {name: leg.team, stat: lbl, gained: g.state==='pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1};
   }
-  if (leg.type === 'total') {
-    const g = games.find(x => `${x.away} @ ${x.home}` === leg.game || `${x.away_full} @ ${x.home_full}` === leg.game);
-    const line = Number(leg.total) || 0, lbl = `${leg.ou} ${line}`;
-    if (!g) return {name: leg.game, stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
-    const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0);
-    const diff = Math.round((leg.ou === 'Over' ? (comb - line) : (line - comb)) * 10) / 10;
-    const hit = (leg.ou === 'Over' && comb > line) || (leg.ou === 'Under' && g.state === 'post' && comb < line);
-    const miss = (leg.ou === 'Under' && comb >= line) || (leg.ou === 'Over' && g.state === 'post' && comb <= line);
-    const pct = hit ? 100 : (line > 0 ? Math.max(0, Math.min(100, (comb / line) * 100)) : 0);
-    return {name: leg.game, stat: lbl, gained: g.state==='pre' ? 'Sched' : String(comb), needed: diff > 0 ? `+${diff}` : String(diff), hit, miss, pct, bg: g.bg1, logo: g.lg1};
-  }
   const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => x.name.toLowerCase() === leg.player.toLowerCase());
   const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
+  const isUnder = leg.ou === 'Under';
+  const lbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat}`;
+
+  if (isUnder) {
+    const cushion = Math.round((tgt - cur) * 10) / 10;
+    const busted = tgt > 0 && (Number.isInteger(tgt) ? cur > tgt : cur >= tgt);
+    const miss = busted;
+    const hit = !miss && Boolean(p && p.state === 'post');
+    const pct = miss ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
+    const needTxt = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
+    return {name: leg.player, stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+  }
+
   const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
   const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
-  return {name: leg.player, stat: `${tgt} ${leg.stat}`, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+  return {name: leg.player, stat: lbl, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
 let customSamples = [];
@@ -1111,19 +1115,28 @@ function addLeg() {
   const type = document.getElementById('b-type').value, sport = document.getElementById('b-sport').value;
   if (type === 'prop') {
     const player = document.getElementById('b-player').value.trim(), stat = document.getElementById('b-stat').value, target = parseFloat(document.getElementById('b-target').value);
-    if (!player || isNaN(target)) return alert('Enter a player name and target number.');
-    draftLegs.push({type, sport, player, stat, target});
+    const ou = document.getElementById('b-prop-ou').value || 'Over';
+    if (!player || isNaN(target)) return alert('Enter player and target.');
+    draftLegs.push({type, sport, player, stat, ou, target});
     document.getElementById('b-player').value = ''; document.getElementById('b-target').value = '';
-  } else if (type === 'ml' || type === 'spread') {
-    const team = document.getElementById('b-team').value, spread = parseFloat(document.getElementById('b-spread').value);
-    if (!team || (type === 'spread' && isNaN(spread))) return alert('Select a team and valid spread.');
-    draftLegs.push({type, sport, team, spread: type === 'spread' ? spread : 0});
-  } else {
+  } else if (type === 'total') {
     const game = document.getElementById('b-game').value, ou = document.getElementById('b-ou').value, total = parseFloat(document.getElementById('b-total').value);
-    if (!game || isNaN(total)) return alert('Select a game and enter a total.');
+    if (!game || isNaN(total)) return alert('Select game and total.');
     draftLegs.push({type, sport, game, ou, total});
+    document.getElementById('b-total').value = '';
+  } else {
+    const team = document.getElementById('b-team').value, spread = parseFloat(document.getElementById('b-spread').value) || 0;
+    if (!team) return alert('Select a team.');
+    if (type === 'spread' && spread === 0) return alert('Enter a non-zero spread.');
+    draftLegs.push({type, sport, team, spread});
+    document.getElementById('b-spread').value = '';
   }
   renderDraft();
+}
+
+function renderDraft() {
+  const legDesc = l => l.type==='prop' ? `${l.player} — ${l.ou || 'Over'} ${l.target} ${l.stat}` : (l.type==='total' ? `${l.game} — ${l.ou} ${l.total}` : `${l.team} — ${l.type==='spread'?(l.spread>0?'+'+l.spread:l.spread)+' Spread':'Win Game'}`);
+  document.getElementById('draft-area').innerHTML = draftLegs.map((l,i) => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--surface2);border-radius:10px;margin-bottom:6px"><span><strong>${l.sport}:</strong> ${legDesc(l)}</span><button class="del-btn" onclick="draftLegs.splice(${i},1);renderDraft()">✕</button></div>`).join('');
 }
 
 function renderDraft() {
@@ -1486,52 +1499,60 @@ function renderProjections() {
   area.innerHTML = `<div class="tbl-wrap"><table id="p-table">${hdr}${rows}</table></div>`;
 }
 
-let qpState = { sport: 'NFL', player: '', team: '' };
+let pendingQuickProp = null;
 
-function openQuickProp(sport, player, team) {
-  qpState = { sport, player, team };
-  document.getElementById('qp-player').textContent = player;
-  document.getElementById('qp-sub').textContent = `${sport}${team ? ' • ' + team : ''}`;
-  const destOpts = [`<option value="new">New Bet Slip (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft)</option>`]
-    .concat(userCards.map((c, idx) => `<option value="${idx}">Add to: ${c.book || 'Card'} — ${c.title || c.legs.length + '-Leg Card'}</option>`));
-  document.getElementById('qp-dest').innerHTML = destOpts.join('');
-  const stats = sport === 'NFL'
-    ? ['PASS YDS', 'PASS TD', 'COMP', 'RUSH YDS', 'RUSH TD', 'CAR', 'REC YDS', 'REC', 'REC TD', 'SCRIM YDS']
-    : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA'];
-  document.getElementById('qp-stat').innerHTML = stats.map(s => `<option value="${s}">${s}</option>`).join('');
+function openQuickProp(sport, player, team, defaultStat) {
+  pendingQuickProp = { sport, player, team };
+  const stats = sport === 'NBA'
+    ? ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']
+    : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'];
+  document.getElementById('qp-player').textContent = `${player} (${sport}${team ? ' • ' + team : ''})`;
+  document.getElementById('qp-stat').innerHTML = stats.map(s => `<option value="${s}" ${s === defaultStat ? 'selected' : ''}>${s}</option>`).join('');
+  document.getElementById('qp-ou').value = 'Over';
   document.getElementById('qp-target').value = '';
+  const opts = [`<option value="new">New Bet Slip (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft)</option>`]
+    .concat(userCards.map((c, idx) => `<option value="${idx}">Add to: ${c.book || 'Card'} — ${c.title || c.legs.length + '-Leg Card'}</option>`));
+  document.getElementById('qp-dest').innerHTML = opts.join('');
   document.getElementById('qprop-modal').classList.add('open');
-  setTimeout(() => document.getElementById('qp-target').focus(), 50);
+  setTimeout(() => document.getElementById('qp-target').focus(), 40);
 }
 
 function closeQuickProp() {
   document.getElementById('qprop-modal').classList.remove('open');
+  pendingQuickProp = null;
 }
 
 function confirmQuickProp() {
-  const dest = document.getElementById('qp-dest').value;
+  if (!pendingQuickProp) return;
   const stat = document.getElementById('qp-stat').value;
+  const ou = document.getElementById('qp-ou').value || 'Over';
   const target = parseFloat(document.getElementById('qp-target').value);
-  if (isNaN(target) || target <= 0) {
-    showToast('Enter a valid target number');
-    return;
-  }
-  const newLeg = { type: 'prop', sport: qpState.sport, player: qpState.player, stat, target };
+  const dest = document.getElementById('qp-dest').value;
+  if (isNaN(target) || target <= 0) return alert('Enter a valid target line.');
+  const newLeg = {
+    type: 'prop',
+    sport: pendingQuickProp.sport,
+    player: pendingQuickProp.player,
+    stat,
+    ou,
+    target
+  };
   closeQuickProp();
   if (dest === 'new') {
     draftLegs.push(newLeg);
     setTab('build');
-    showToast(`Added ${qpState.player} (${target} ${stat}) to new bet slip`);
+    showToast(`Added ${newLeg.player} ${ou} ${target} ${stat} to new bet slip`);
   } else {
     const idx = parseInt(dest, 10);
     if (userCards[idx]) {
       userCards[idx].legs.push(newLeg);
+      localStorage.setItem('osp_cards', JSON.stringify(userCards));
       pushCardsToCloud();
       setTab('cards');
-      showToast(`Added ${qpState.player} (${target} ${stat}) to card`);
+      showToast(`Added ${newLeg.player} ${ou} ${target} ${stat} to card`);
     }
   }
-}   
+}
 </script>
 </body>
 </html>
