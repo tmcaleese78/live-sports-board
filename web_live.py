@@ -20,7 +20,7 @@ def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"v5:{lg_u}"
+    ck = f"fp_v1:{lg_u}"
     now = time.time()
     if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
         return jsonify(_PROJ_CACHE[ck]["data"])
@@ -30,196 +30,146 @@ def api_projections(lg):
     players = payload.get("players", {}).get(lg_u, [])
 
     opp_map = {}
-    opp_abbr_map = {}
     for g in games:
         aw, hm = g.get("away", ""), g.get("home", "")
         st = g.get("status", "")
         if aw and hm:
             opp_map[aw] = f"@ {hm} ({st})"
             opp_map[hm] = f"vs {aw} ({st})"
-            opp_abbr_map[aw] = hm
-            opp_abbr_map[hm] = aw
 
-    sp = "football/nfl" if lg_u == "NFL" else "basketball/nba"
-    st_data = fetch_json(f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
-    pa_by_tm = {}
-    gp_by_tm = {}
-    def walk_pa(node):
-        if not isinstance(node, dict):
-            return
-        for entry in node.get("standings", {}).get("entries", []):
-            tm = entry.get("team", {})
-            ab = tm.get("abbreviation", "")
-            st_map = {s.get("name"): s.get("value", 0) for s in entry.get("stats", [])}
-            gp = float(st_map.get("gamesPlayed") or (float(st_map.get("wins", 0)) + float(st_map.get("losses", 0))) or 1)
-            pa = float(st_map.get("pointsAgainst") or 0)
-            if ab:
-                gp_by_tm[ab] = max(gp, 1.0)
-                if pa > 0:
-                    pa_by_tm[ab] = pa / max(gp, 1.0)
-        for ch in node.get("children", []):
-            walk_pa(ch)
-    walk_pa(st_data)
-    avg_pa = (sum(pa_by_tm.values()) / len(pa_by_tm)) if pa_by_tm else 1.0
-
-    # Keep top players per team so every team on the slate loads evenly
-    per_tm_count = {}
-    slate_players = []
+    # Lookup ESPN metadata (id, logo, bg, team) by normalized name + team
+    meta_by_name_tm = {}
+    meta_by_name = {}
+    tm_style = {}
     for p in players:
-        tm = p.get("team", "")
-        if opp_map and tm not in opp_map:
-            continue
-        if not p.get("id"):
-            continue
-        pos = p.get("pos", "")
-        if lg_u == "NFL" and pos not in ("QB", "RB", "WR", "TE"):
-            continue
-        if per_tm_count.get(tm, 0) >= 8:
-            continue
-        per_tm_count[tm] = per_tm_count.get(tm, 0) + 1
-        slate_players.append(p)
+        nm_k = re.sub(r"[^a-z0-9]", "", p.get("name", "").lower())
+        tm = p.get("team", "").upper()
+        if tm and tm not in tm_style:
+            tm_style[tm] = {"bg": p.get("bg", "#1e293b"), "logo": p.get("logo", "")}
+        if nm_k:
+            meta_by_name_tm[(nm_k, tm)] = p
+            if nm_k not in meta_by_name:
+                meta_by_name[nm_k] = p
 
-    def to_num(val):
-        s = str(val).split("/")[0].replace(",", "").strip()
+    fp_norm_tm = {"JAC": "JAX", "WSH": "WAS", "GBP": "GB", "KCC": "KC", "LVR": "LV", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
+    hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+
+    def parse_fp_table(url):
         try:
-            return float(s)
-        except ValueError:
-            return 0.0
-
-    def fetch_player_proj(p):
-        pid = p.get("id", "")
-        tm = p.get("team", "")
-        opp_ab = opp_abbr_map.get(tm, "")
-        def_mult = 1.0
-        if opp_ab and opp_ab in pa_by_tm and avg_pa > 0:
-            raw_m = pa_by_tm[opp_ab] / avg_pa
-            def_mult = max(0.88, min(1.14, 1.0 + (raw_m - 1.0) * 0.6))
-
-        ov = fetch_json(f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 5)
-        if not ov:
-            return None
-        ath = ov.get("athlete", {})
-        pos = p.get("pos") or ath.get("position", {}).get("abbreviation", "")
-        if lg_u == "NFL" and pos not in ("QB", "RB", "WR", "TE"):
-            return None
-
-        gl = ov.get("gamelog", {})
-        base_labels = [str(x).upper() for x in (gl.get("labels") or gl.get("names") or [])]
-
-        if lg_u == "NBA":
-            game_rows = []
-            for st_type in gl.get("seasonTypes", []):
-                for cat in st_type.get("categories", []):
-                    lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
-                    for ev in cat.get("events", []):
-                        if ev.get("stats"):
-                            game_rows.append((lbls, ev["stats"]))
-            recent = game_rows[:6]
-            def nba_avg(col):
+            r = requests.get(url, headers=hdrs, timeout=8)
+            if not r.ok:
+                return []
+            html = r.text
+            m_tbl = re.search(r"<table[^>]*id=['\"]data['\"][^>]*>(.*?)</table>", html, re.S | re.I)
+            if not m_tbl:
+                return []
+            rows_out = []
+            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", m_tbl.group(1), re.S | re.I):
+                tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S | re.I)
+                if len(tds) < 6:
+                    continue
+                p_cell = tds
+                m_nm = re.search(r"class=['\"]player-name['\"][^>]*>(.*?)</a>", p_cell, re.S | re.I)
+                raw_name = re.sub(r"<[^>]+>", "", m_nm.group(1) if m_nm else p_cell).strip()
+                clean_txt = re.sub(r"<[^>]+>", " ", p_cell)
+                m_tm = re.search(r"\b([A-Z]{2,3})\b\s*(?:\(|$)", clean_txt.strip())
+                tm = m_tm.group(1) if m_tm else ""
+                tm = fp_norm_tm.get(tm, tm)
                 nums = []
-                for lbls, r in recent:
-                    if col in lbls and lbls.index(col) < len(r):
-                        nums.append(to_num(r[lbls.index(col)]))
-                return (sum(nums) / len(nums)) if nums else 0.0
+                for c in tds[1:]:
+                    v_str = re.sub(r"<[^>]+>", "", c).replace(",", "").strip()
+                    try:
+                        nums.append(float(v_str))
+                    except ValueError:
+                        nums.append(0.0)
+                if raw_name:
+                    rows_out.append({"name": raw_name, "team": tm, "nums": nums})
+            return rows_out
+        except Exception:
+            return []
 
-            if not recent:
-                st_blk = ov.get("statistics", {})
-                s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
-                splits = st_blk.get("splits", [])
-                s_vals = splits[0].get("stats", []) if (isinstance(splits, list) and splits and isinstance(splits[0], dict)) else []
-                def nba_avg(col):
-                    return to_num(s_vals[s_lbls.index(col)]) if (col in s_lbls and s_lbls.index(col) < len(s_vals)) else 0.0
-
-            pts = round(nba_avg("PTS") * def_mult, 1)
-            reb = round(nba_avg("REB") * def_mult, 1)
-            ast = round(nba_avg("AST") * def_mult, 1)
-            tpm = round(nba_avg("3PM") * def_mult, 1)
-            stl = round(nba_avg("STL") * def_mult, 1)
-            blk = round(nba_avg("BLK") * def_mult, 1)
-            if (pts + reb + ast) <= 0:
-                return None
-            stats = {"PTS": pts, "REB": reb, "AST": ast, "3PM": tpm, "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)}
-        else:
-            # Parse NFL game logs cleanly by stat group (passing vs rushing vs receiving)
-            pass_rows, rush_rows, rec_rows = [], [], []
-            for st_type in gl.get("seasonTypes", []):
-                for cat in st_type.get("categories", []):
-                    lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
-                    cname = str(cat.get("name", "")).lower()
-                    evs = [ev["stats"] for ev in cat.get("events", []) if ev.get("stats")][:6]
-                    if not evs or not lbls:
-                        continue
-                    if "pass" in cname or ("CMP" in lbls and "ATT" in lbls):
-                        pass_rows.extend((lbls, r) for r in evs)
-                    elif "rush" in cname or ("CAR" in lbls and "REC" not in lbls):
-                        rush_rows.extend((lbls, r) for r in evs)
-                    elif "receiv" in cname or "REC" in lbls:
-                        rec_rows.extend((lbls, r) for r in evs)
-
-            def grp_avg(rows, col_names):
-                for cn in col_names:
-                    nums = [to_num(r[lbls.index(cn)]) for lbls, r in rows if cn in lbls and lbls.index(cn) < len(r)]
-                    if nums:
-                        return sum(nums) / len(nums)
-                return 0.0
-
-            py = round(grp_avg(pass_rows, ["YDS"]) * def_mult, 1) if pos == "QB" else 0.0
-            ptd = round(grp_avg(pass_rows, ["TD"]) * def_mult, 1) if pos == "QB" else 0.0
-            ry = round(grp_avg(rush_rows, ["RUSH YDS", "YDS"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
-            rtd = round(grp_avg(rush_rows, ["RUSH TD", "TD"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
-            rec = round(grp_avg(rec_rows, ["REC"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-            recy = round(grp_avg(rec_rows, ["REC YDS", "YDS"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-            rectd = round(grp_avg(rec_rows, ["REC TD", "TD"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-
-            # Fallback to season stats divided by team games played if game logs are empty
-            if (py + ry + recy + rec) <= 0:
-                st_blk = ov.get("statistics", {})
-                s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
-                splits = st_blk.get("splits", [])
-                s_vals = splits[0].get("stats", []) if (isinstance(splits, list) and splits and isinstance(splits[0], dict)) else []
-                tm_gp = gp_by_tm.get(tm, 10.0)
-                if "GP" in s_lbls and s_lbls.index("GP") < len(s_vals):
-                    gp_cand = to_num(s_vals[s_lbls.index("GP")])
-                    if gp_cand > 0:
-                        tm_gp = gp_cand
-                def season_pg(col_names):
-                    for cn in col_names:
-                        if cn in s_lbls and s_lbls.index(cn) < len(s_vals):
-                            return to_num(s_vals[s_lbls.index(cn)]) / tm_gp
-                    return 0.0
-                if pos == "QB":
-                    py = round(season_pg(["YDS"]) * def_mult, 1)
-                    ptd = round(season_pg(["TD"]) * def_mult, 1)
-                elif pos == "RB":
-                    ry = round(season_pg(["YDS"]) * def_mult, 1)
-                    rtd = round(season_pg(["TD"]) * def_mult, 1)
-                else:
-                    rec = round(season_pg(["REC"]) * def_mult, 1)
-                    recy = round(season_pg(["YDS"]) * def_mult, 1)
-                    rectd = round(season_pg(["TD"]) * def_mult, 1)
-
-            if (py + ry + recy + rec) <= 0:
-                return None
-            stats = {
-                "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
-                "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
-            }
-
-        return {
-            "id": pid,
-            "name": p.get("name", ""),
-            "team": tm,
-            "pos": pos,
-            "opp": opp_map.get(tm, ""),
-            "bg": p.get("bg", "#1e293b"),
-            "logo": p.get("logo", ""),
-            "stats": stats
+    out = []
+    if lg_u == "NFL":
+        urls = {
+            "QB": "https://fantasypros.com",
+            "RB": "https://fantasypros.com",
+            "WR": "https://fantasypros.com",
+            "TE": "https://fantasypros.com",
         }
+        # Remove ?week=draft so FantasyPros always serves the current active NFL week
+        urls = {k: v.replace("?week=draft", "") for k, v in urls.items()}
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futs = {pos: pool.submit(parse_fp_table, u) for pos, u in urls.items()}
+            parsed = {pos: fut.result() for pos, fut in futs.items()}
 
-    with ThreadPoolExecutor(max_workers=24) as pool:
-        results = list(pool.map(fetch_player_proj, slate_players[:240]))
+        seen = set()
+        for pos, rows in parsed.items():
+            for r in rows:
+                nm, tm, n = r["name"], r["team"], r["nums"]
+                if (nm, tm) in seen:
+                    continue
+                seen.add((nm, tm))
+                # FantasyPros NFL column layouts:
+                # QB: [ATT, CMP, YDS, TDS, INTS, RUSH_ATT, RUSH_YDS, RUSH_TDS, FL, FPTS]
+                # RB: [RUSH_ATT, RUSH_YDS, RUSH_TDS, REC, REC_YDS, REC_TDS, FL, FPTS]
+                # WR/TE: [REC, REC_YDS, REC_TDS, RUSH_ATT, RUSH_YDS, RUSH_TDS, FL, FPTS]
+                if pos == "QB" and len(n) >= 8:
+                    py, ptd, ry, rtd = round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+                    rec, recy, rectd = 0.0, 0.0, 0.0
+                elif pos == "RB" and len(n) >= 6:
+                    py, ptd = 0.0, 0.0
+                    ry, rtd, rec, recy, rectd = round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+                elif pos in ("WR", "TE") and len(n) >= 6:
+                    py, ptd = 0.0, 0.0
+                    rec, recy, rectd = round(n, 1), round(n, 1), round(n, 1)
+                    ry, rtd = round(n, 1), round(n, 1)
+                else:
+                    continue
+                if (py + ry + recy + rec) <= 0:
+                    continue
+                nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
+                p_meta = meta_by_name_tm.get((nm_k, tm)) or meta_by_name.get(nm_k) or {}
+                st_clr = tm_style.get(tm, {})
+                out.append({
+                    "id": p_meta.get("id", ""),
+                    "name": p_meta.get("name") or nm,
+                    "team": tm,
+                    "pos": pos,
+                    "opp": opp_map.get(tm, ""),
+                    "bg": p_meta.get("bg") or st_clr.get("bg", "#1e293b"),
+                    "logo": p_meta.get("logo") or st_clr.get("logo", ""),
+                    "stats": {
+                        "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
+                        "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+                    }
+                })
+    else:
+        # FantasyPros NBA Daily Overall Projections: [PTS, REB, AST, BLK, STL, FG%, FT%, 3PM, GP/MIN, TO, FPTS]
+        rows = parse_fp_table("https://fantasypros.com")
+        for r in rows:
+            nm, tm, n = r["name"], r["team"], r["nums"]
+            if len(n) < 8:
+                continue
+            pts, reb, ast, blk, stl, tpm = round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+            if (pts + reb + ast) <= 0:
+                continue
+            nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
+            p_meta = meta_by_name_tm.get((nm_k, tm)) or meta_by_name.get(nm_k) or {}
+            st_clr = tm_style.get(tm, {})
+            out.append({
+                "id": p_meta.get("id", ""),
+                "name": p_meta.get("name") or nm,
+                "team": tm,
+                "pos": p_meta.get("pos", ""),
+                "opp": opp_map.get(tm, ""),
+                "bg": p_meta.get("bg") or st_clr.get("bg", "#1e293b"),
+                "logo": p_meta.get("logo") or st_clr.get("logo", ""),
+                "stats": {
+                    "PTS": pts, "REB": reb, "AST": ast, "3PM": tpm,
+                    "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)
+                }
+            })
 
-    out = [r for r in results if r is not None]
     res_obj = {"league": lg_u, "players": out}
     _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
     return jsonify(res_obj)
