@@ -797,10 +797,50 @@ function renderGames() {
   document.getElementById('games-area').innerHTML = html || `<p style="color:var(--muted)">${emptyMsg}</p>`;
 }
 
+let pendingGameLeg = null;
+
 function quickGameLeg(sport, legObj, label) {
-  draftLegs.push({ sport, ...legObj });
-  renderDraft();
-  showToast(`Added ${label} (${sport}) — ${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft`);
+  const newLeg = { sport, ...legObj };
+  if (!userCards.length) {
+    draftLegs.push(newLeg);
+    setTab('build');
+    showToast(`Added ${label} (${sport}) to new bet slip`);
+    return;
+  }
+  pendingGameLeg = { leg: newLeg, label };
+  const opts = [`<option value="new">New Bet Slip (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft)</option>`]
+    .concat(userCards.map((c, idx) => `<option value="${idx}">Add to: ${c.book || 'Card'} — ${c.title || c.legs.length + '-Leg Card'}</option>`));
+  document.getElementById('qg-label').textContent = `${sport} • ${label}`;
+  document.getElementById('qg-dest').innerHTML = opts.join('');
+  document.getElementById('qgame-modal').classList.add('open');
+}
+
+function closeQuickGame() {
+  document.getElementById('qgame-modal').classList.remove('open');
+  pendingGameLeg = null;
+}
+
+function confirmQuickGame() {
+  if (!pendingGameLeg) return;
+  const dest = document.getElementById('qg-dest').value;
+  const { leg, label } = pendingGameLeg;
+  closeQuickGame();
+  if (dest === 'new') {
+    draftLegs.push(leg);
+    setTab('build');
+    showToast(`Added ${label} (${leg.sport}) to new bet slip`);
+  } else {
+    const idx = parseInt(dest, 10);
+    if (userCards[idx]) {
+      userCards[idx].legs.push(leg);
+      localStorage.setItem('osp_cards', JSON.stringify(userCards));
+      pushCardsToCloud();
+      setTab('cards');
+      showToast(`Added ${label} (${leg.sport}) to card`);
+    }
+  }
+}
+
 }
 
 function sortBy(col) {
