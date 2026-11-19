@@ -631,12 +631,10 @@
       <div id="qp-sub" style="font-size:12.5px;font-weight:700;color:#38bdf8;margin-top:2px"></div>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px">
+      <select id="qp-dest" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px"></select>
       <select id="qp-stat" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:14px"></select>
       <input id="qp-target" type="number" step="0.5" placeholder="Target line (e.g. 22.5 or 250)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px">
-      <div style="display:flex;gap:8px;margin-top:4px">
-        <button class="btn-primary" style="flex:1;padding:10px" onclick="confirmQuickProp(false)">+ Add to Slip</button>
-        <button class="pill" style="flex:1;padding:10px;text-align:center;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="confirmQuickProp(true)">Add & View Slip →</button>
-      </div>
+      <button class="btn-primary" style="width:100%;padding:11px;font-size:14px;margin-top:4px" onclick="confirmQuickProp()">+ Add Prop to Card</button>
     </div>
   </div>
 </div>
@@ -1245,6 +1243,9 @@ function openQuickProp(sport, player, team) {
   qpState = { sport, player, team };
   document.getElementById('qp-player').textContent = player;
   document.getElementById('qp-sub').textContent = `${sport}${team ? ' • ' + team : ''}`;
+  const destOpts = [`<option value="new">New Bet Slip (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft)</option>`]
+    .concat(userCards.map((c, idx) => `<option value="${idx}">Add to: ${c.book || 'Card'} — ${c.title || c.legs.length + '-Leg Card'}</option>`));
+  document.getElementById('qp-dest').innerHTML = destOpts.join('');
   const stats = sport === 'NFL'
     ? ['PASS YDS', 'PASS TD', 'COMP', 'RUSH YDS', 'RUSH TD', 'CAR', 'REC YDS', 'REC', 'REC TD', 'SCRIM YDS']
     : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA'];
@@ -1258,23 +1259,30 @@ function closeQuickProp() {
   document.getElementById('qprop-modal').classList.remove('open');
 }
 
-function confirmQuickProp(goToBuild) {
+function confirmQuickProp() {
+  const dest = document.getElementById('qp-dest').value;
   const stat = document.getElementById('qp-stat').value;
   const target = parseFloat(document.getElementById('qp-target').value);
   if (isNaN(target) || target <= 0) {
     showToast('Enter a valid target number');
     return;
   }
-  draftLegs.push({ type: 'prop', sport: qpState.sport, player: qpState.player, stat, target });
+  const newLeg = { type: 'prop', sport: qpState.sport, player: qpState.player, stat, target };
   closeQuickProp();
-  if (goToBuild) {
+  if (dest === 'new') {
+    draftLegs.push(newLeg);
     setTab('build');
-    showToast(`Added ${qpState.player} (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in slip)`);
+    showToast(`Added ${qpState.player} (${target} ${stat}) to new bet slip`);
   } else {
-    renderDraft();
-    showToast(`Added ${qpState.player} ${target} ${stat} (${draftLegs.length} in slip)`);
+    const idx = parseInt(dest, 10);
+    if (userCards[idx]) {
+      userCards[idx].legs.push(newLeg);
+      pushCardsToCloud();
+      setTab('cards');
+      showToast(`Added ${qpState.player} (${target} ${stat}) to card`);
+    }
   }
-}    
+}   
 </script>
 </body>
 </html>
