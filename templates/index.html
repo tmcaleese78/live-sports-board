@@ -903,7 +903,7 @@ function renderCards() {
     const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
       <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
-      <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div>`).join('');
+      <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
     const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
     const lbl = c.title && !c.book ? c.title : (c.title || `${c.legs.length}-Leg Card`);
     const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
@@ -938,7 +938,7 @@ function renderCards() {
   `</div>` : '';
 
   const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards</h2>`;
-  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`);
+  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`);
 }
 
 function delCard(i) { userCards.splice(i, 1); localStorage.setItem('osp_cards', JSON.stringify(userCards)); pushCardsToCloud(); renderCards(); }
