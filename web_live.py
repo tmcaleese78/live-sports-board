@@ -19,7 +19,7 @@ def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"v2:{lg_u}"
+    ck = f"v3:{lg_u}"
     now = time.time()
     if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
         return jsonify(_PROJ_CACHE[ck]["data"])
@@ -39,7 +39,6 @@ def api_projections(lg):
             opp_abbr_map[aw] = hm
             opp_abbr_map[hm] = aw
 
-    # Fetch team standings to compute opponent defensive multiplier (PA vs league avg)
     sp = "football/nfl" if lg_u == "NFL" else "basketball/nba"
     st_data = fetch_json(f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
     pa_by_tm = {}
@@ -59,20 +58,22 @@ def api_projections(lg):
     walk_pa(st_data)
     avg_pa = (sum(pa_by_tm.values()) / len(pa_by_tm)) if pa_by_tm else 1.0
 
-    # Filter slate players to relevant positions
     slate_players = []
     for p in players:
         tm = p.get("team", "")
         if opp_map and tm not in opp_map:
             continue
-        pos = p.get("pos", "")
-        if lg_u == "NFL" and pos not in ("QB", "RB", "WR", "TE"):
-            continue
         if not p.get("id"):
             continue
         slate_players.append(p)
 
-    # Fetch season/recent game averages in parallel for up to 90 top slate players
+    def to_num(val):
+        s = str(val).split("/")[0].replace(",", "").strip()
+        try:
+            return float(s)
+        except ValueError:
+            return 0.0
+
     def fetch_player_proj(p):
         pid = p.get("id", "")
         tm = p.get("team", "")
@@ -82,7 +83,15 @@ def api_projections(lg):
             raw_m = pa_by_tm[opp_ab] / avg_pa
             def_mult = max(0.88, min(1.14, 1.0 + (raw_m - 1.0) * 0.6))
 
-        gl = fetch_json(f"https://espn.com{sp}/athletes/{pid}/gamelog", 5)
+        ov = fetch_json(f"https://espn.com{sp}/athletes/{pid}/overview", 5)
+        if not ov:
+            return None
+        ath = ov.get("athlete", {})
+        pos = p.get("pos") or ath.get("position", {}).get("abbreviation", "")
+        if lg_u == "NFL" and pos not in ("QB", "RB", "WR", "TE"):
+            return None
+
+        gl = ov.get("gamelog", {})
         labels = [str(x).upper() for x in (gl.get("labels") or gl.get("names") or [])]
         game_rows = []
         for st_type in gl.get("seasonTypes", []):
@@ -93,28 +102,33 @@ def api_projections(lg):
                     vals = ev.get("stats", [])
                     if vals:
                         game_rows.append(vals)
-        if not labels or not game_rows:
-            return None
 
         recent = game_rows[:6]
         def avg_col(col_names):
             for cn in col_names:
                 if cn in labels:
                     idx = labels.index(cn)
-                    nums = []
-                    for r in recent:
-                        if idx < len(r):
-                            raw_v = str(r[idx]).split("/")[0].replace(",", "")
-                            try:
-                                nums.append(float(raw_v))
-                            except ValueError:
-                                pass
+                    nums = [to_num(r[idx]) for r in recent if idx < len(r)]
                     if nums:
                         return sum(nums) / len(nums)
             return 0.0
 
+        if not recent:
+            st_blk = ov.get("statistics", {})
+            s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
+            splits = st_blk.get("splits", [])
+            s_vals = splits[0].get("stats", []) if (isinstance(splits, list) and splits and isinstance(splits[0], dict)) else []
+            gp_val = 1.0
+            if "GP" in s_lbls and s_lbls.index("GP") < len(s_vals):
+                gp_val = max(1.0, to_num(s_vals[s_lbls.index("GP")]))
+            def avg_col(col_names):
+                for cn in col_names:
+                    if cn in s_lbls and s_lbls.index(cn) < len(s_vals):
+                        v = to_num(s_vals[s_lbls.index(cn)])
+                        return v if lg_u == "NBA" else (v / gp_val)
+                return 0.0
+
         if lg_u == "NFL":
-            pos = p.get("pos", "")
             py = round(avg_col(["YDS"]) * def_mult, 1) if pos == "QB" else 0.0
             ptd = round(avg_col(["TD"]) * def_mult, 1) if pos == "QB" else 0.0
             ry = round(avg_col(["RUSH YDS", "YDS"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
@@ -148,7 +162,7 @@ def api_projections(lg):
             "id": pid,
             "name": p.get("name", ""),
             "team": tm,
-            "pos": p.get("pos", ""),
+            "pos": pos,
             "opp": opp_map.get(tm, ""),
             "bg": p.get("bg", "#1e293b"),
             "logo": p.get("logo", ""),
