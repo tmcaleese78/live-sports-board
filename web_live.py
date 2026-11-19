@@ -16,6 +16,170 @@ _SEASON_CACHE = {}
 _PROJ_CACHE = {}
 WEB_HOST = "site.web." + "api." + "espn." + "com"
 
+def _to_num(val):
+    first_part = next(iter(str(val).split("/")), "")
+    s = first_part.replace(",", "").strip()
+    try:
+        return float(s)
+    except ValueError:
+        return 0.0
+
+def _walk_pa(node, pa_by_tm, gp_by_tm):
+    if not isinstance(node, dict):
+        return
+    for entry in node.get("standings", {}).get("entries", []):
+        tm = entry.get("team", {})
+        ab = tm.get("abbreviation", "")
+        st_map = {s.get("name"): s.get("value", 0) for s in entry.get("stats", [])}
+        gp = float(st_map.get("gamesPlayed") or (float(st_map.get("wins", 0)) + float(st_map.get("losses", 0))) or 1)
+        pa = float(st_map.get("pointsAgainst") or 0)
+        if ab:
+            gp_by_tm[ab] = max(gp, 1.0)
+            if pa > 0:
+                pa_by_tm[ab] = pa / max(gp, 1.0)
+    for ch in node.get("children", []):
+        _walk_pa(ch, pa_by_tm, gp_by_tm)
+
+def _load_team_candidates(args):
+    sp, lg_u, t_info = args
+    ros = get_roster(sp, t_info["id"])
+    picks = []
+    if lg_u == "NFL":
+        for want_pos, limit in (("QB", 1), ("RB", 2), ("WR", 2), ("TE", 1)):
+            cnt = 0
+            for r in ros:
+                if r.get("pos") == want_pos and r.get("id"):
+                    picks.append({**r, "team": t_info["abbr"], "bg": t_info["bg"], "logo": t_info["logo"]})
+                    cnt += 1
+                    if cnt >= limit:
+                        break
+    else:
+        for r in ros[:6]:
+            if r.get("id"):
+                picks.append({**r, "team": t_info["abbr"], "bg": t_info["bg"], "logo": t_info["logo"]})
+    return picks
+def _fetch_espn_proj(args):
+    p, sp, lg_u, opp_abbr_map, opp_map, pa_by_tm, gp_by_tm, avg_pa = args
+    pid = p.get("id", "")
+    tm = p.get("team", "")
+    pos = p.get("pos", "")
+    opp_ab = opp_abbr_map.get(tm, "")
+    def_mult = 1.0
+    if opp_ab and opp_ab in pa_by_tm and avg_pa > 0:
+        raw_m = pa_by_tm[opp_ab] / avg_pa
+        def_mult = max(0.88, min(1.14, 1.0 + (raw_m - 1.0) * 0.6))
+
+    ov = fetch_json(f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 5)
+    if not ov:
+        return None
+    gl = ov.get("gamelog", {})
+    base_labels = [str(x).upper() for x in (gl.get("labels") or gl.get("names") or [])]
+
+    if lg_u == "NBA":
+        game_rows = []
+        for st_type in gl.get("seasonTypes", []):
+            for cat in st_type.get("categories", []):
+                lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
+                for ev in cat.get("events", []):
+                    if ev.get("stats"):
+                        game_rows.append((lbls, ev["stats"]))
+        recent = game_rows[:6]
+        if recent:
+            def nba_avg(col):
+                nums = [_to_num(r[lbls.index(col)]) for lbls, r in recent if col in lbls and lbls.index(col) < len(r)]
+                return (sum(nums) / len(nums)) if nums else 0.0
+        else:
+            st_blk = ov.get("statistics", {})
+            s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
+            splits = st_blk.get("splits", [])
+            first_sp = next(iter(splits), {}) if isinstance(splits, list) else {}
+            s_vals = first_sp.get("stats", []) if isinstance(first_sp, dict) else []
+            def nba_avg(col):
+                return _to_num(s_vals[s_lbls.index(col)]) if (col in s_lbls and s_lbls.index(col) < len(s_vals)) else 0.0
+        pts = round(nba_avg("PTS") * def_mult, 1)
+        reb = round(nba_avg("REB") * def_mult, 1)
+        ast = round(nba_avg("AST") * def_mult, 1)
+        tpm = round(nba_avg("3PM") * def_mult, 1)
+        stl = round(nba_avg("STL") * def_mult, 1)
+        blk = round(nba_avg("BLK") * def_mult, 1)
+        if (pts + reb + ast) <= 0:
+            return None
+        stats = {"PTS": pts, "REB": reb, "AST": ast, "3PM": tpm, "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)}
+    else:
+        pass_rows, rush_rows, rec_rows = [], [], []
+        for st_type in gl.get("seasonTypes", []):
+            for cat in st_type.get("categories", []):
+                lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
+                cname = str(cat.get("name", "")).lower()
+                evs = [ev["stats"] for ev in cat.get("events", []) if ev.get("stats")][:6]
+                if not evs or not lbls:
+                    continue
+                if "pass" in cname or ("CMP" in lbls and "ATT" in lbls):
+                    pass_rows.extend((lbls, r) for r in evs)
+                elif "rush" in cname or ("CAR" in lbls and "REC" not in lbls):
+                    rush_rows.extend((lbls, r) for r in evs)
+                elif "receiv" in cname or "REC" in lbls:
+                    rec_rows.extend((lbls, r) for r in evs)
+
+        def grp_avg(rows_grp, col_names):
+            for cn in col_names:
+                nums = [_to_num(r[lbls.index(cn)]) for lbls, r in rows_grp if cn in lbls and lbls.index(cn) < len(r)]
+                if nums:
+                    return sum(nums) / len(nums)
+            return 0.0
+
+        py = round(grp_avg(pass_rows, ["YDS"]) * def_mult, 1) if pos == "QB" else 0.0
+        ptd = round(grp_avg(pass_rows, ["TD"]) * def_mult, 1) if pos == "QB" else 0.0
+        ry = round(grp_avg(rush_rows, ["RUSH YDS", "YDS"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
+        rtd = round(grp_avg(rush_rows, ["RUSH TD", "TD"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
+        rec = round(grp_avg(rec_rows, ["REC"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
+        recy = round(grp_avg(rec_rows, ["REC YDS", "YDS"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
+        rectd = round(grp_avg(rec_rows, ["REC TD", "TD"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
+
+        if (py + ry + recy + rec) <= 0:
+            st_blk = ov.get("statistics", {})
+            s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
+            splits = st_blk.get("splits", [])
+            first_sp = next(iter(splits), {}) if isinstance(splits, list) else {}
+            s_vals = first_sp.get("stats", []) if isinstance(first_sp, dict) else []
+            tm_gp = gp_by_tm.get(tm, 10.0)
+            if "GP" in s_lbls and s_lbls.index("GP") < len(s_vals):
+                gp_cand = _to_num(s_vals[s_lbls.index("GP")])
+                if gp_cand > 0:
+                    tm_gp = gp_cand
+            def season_pg(col_names):
+                for cn in col_names:
+                    if cn in s_lbls and s_lbls.index(cn) < len(s_vals):
+                        return _to_num(s_vals[s_lbls.index(cn)]) / tm_gp
+                return 0.0
+            if pos == "QB":
+                py = round(season_pg(["YDS"]) * def_mult, 1)
+                ptd = round(season_pg(["TD"]) * def_mult, 1)
+            elif pos == "RB":
+                ry = round(season_pg(["YDS"]) * def_mult, 1)
+                rtd = round(season_pg(["TD"]) * def_mult, 1)
+            else:
+                rec = round(season_pg(["REC"]) * def_mult, 1)
+                recy = round(season_pg(["YDS"]) * def_mult, 1)
+                rectd = round(season_pg(["TD"]) * def_mult, 1)
+
+        if (py + ry + recy + rec) <= 0:
+            return None
+        stats = {
+            "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
+            "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+        }
+
+    return {
+        "id": pid,
+        "name": p.get("name", ""),
+        "team": tm,
+        "pos": pos,
+        "opp": opp_map.get(tm, "Next Game"),
+        "bg": p.get("bg", "#1e293b"),
+        "logo": p.get("logo", ""),
+        "stats": stats
+    }
 @app.route("/api/projections/<lg>")
 def api_projections(lg):
     lg_u = lg.upper()
@@ -59,176 +223,16 @@ def api_projections(lg):
         st_data = fetch_json(f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
         pa_by_tm = {}
         gp_by_tm = {}
-        def walk_pa(node):
-            if not isinstance(node, dict):
-                return
-            for entry in node.get("standings", {}).get("entries", []):
-                tm = entry.get("team", {})
-                ab = tm.get("abbreviation", "")
-                st_map = {s.get("name"): s.get("value", 0) for s in entry.get("stats", [])}
-                gp = float(st_map.get("gamesPlayed") or (float(st_map.get("wins", 0)) + float(st_map.get("losses", 0))) or 1)
-                pa = float(st_map.get("pointsAgainst") or 0)
-                if ab:
-                    gp_by_tm[ab] = max(gp, 1.0)
-                    if pa > 0:
-                        pa_by_tm[ab] = pa / max(gp, 1.0)
-            for ch in node.get("children", []):
-                walk_pa(ch)
-        walk_pa(st_data)
+        _walk_pa(st_data, pa_by_tm, gp_by_tm)
         avg_pa = (sum(pa_by_tm.values()) / len(pa_by_tm)) if pa_by_tm else 1.0
 
-        def load_team_candidates(t_info):
-            ros = get_roster(sp, t_info["id"])
-            picks = []
-            if lg_u == "NFL":
-                for want_pos, limit in (("QB", 1), ("RB", 2), ("WR", 2), ("TE", 1)):
-                    cnt = 0
-                    for r in ros:
-                        if r.get("pos") == want_pos and r.get("id"):
-                            picks.append({**r, "team": t_info["abbr"], "bg": t_info["bg"], "logo": t_info["logo"]})
-                            cnt += 1
-                            if cnt >= limit:
-                                break
-            else:
-                for r in ros[:6]:
-                    if r.get("id"):
-                        picks.append({**r, "team": t_info["abbr"], "bg": t_info["bg"], "logo": t_info["logo"]})
-            return picks
-
         with ThreadPoolExecutor(max_workers=16) as pool:
-            nested = list(pool.map(load_team_candidates, team_objs))
+            nested = list(pool.map(_load_team_candidates, [(sp, lg_u, t) for t in team_objs]))
         candidates = [item for sub in nested for item in sub]
 
-        def to_num(val):
-            first_part = next(iter(str(val).split("/")), "")
-            s = first_part.replace(",", "").strip()
-            try:
-                return float(s)
-            except ValueError:
-                return 0.0
-
-              def fetch_espn_proj(p):
-            pid = p.get("id", "")
-            tm = p.get("team", "")
-            pos = p.get("pos", "")
-            opp_ab = opp_abbr_map.get(tm, "")
-            def_mult = 1.0
-            if opp_ab and opp_ab in pa_by_tm and avg_pa > 0:
-                raw_m = pa_by_tm[opp_ab] / avg_pa
-                def_mult = max(0.88, min(1.14, 1.0 + (raw_m - 1.0) * 0.6))
-
-            ov = fetch_json(f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 5)
-            if not ov:
-                return None
-            gl = ov.get("gamelog", {})
-            base_labels = [str(x).upper() for x in (gl.get("labels") or gl.get("names") or [])]
-
-            if lg_u == "NBA":
-                game_rows = []
-                for st_type in gl.get("seasonTypes", []):
-                    for cat in st_type.get("categories", []):
-                        lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
-                        for ev in cat.get("events", []):
-                            if ev.get("stats"):
-                                game_rows.append((lbls, ev["stats"]))
-                recent = game_rows[:6]
-                def nba_avg(col):
-                    nums = [to_num(r[lbls.index(col)]) for lbls, r in recent if col in lbls and lbls.index(col) < len(r)]
-                    return (sum(nums) / len(nums)) if nums else 0.0
-                if not recent:
-                    st_blk = ov.get("statistics", {})
-                    s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
-                    splits = st_blk.get("splits", [])
-                    first_sp = next(iter(splits), {}) if isinstance(splits, list) else {}
-                    s_vals = first_sp.get("stats", []) if isinstance(first_sp, dict) else []
-                    def nba_avg(col):
-                        return to_num(s_vals[s_lbls.index(col)]) if (col in s_lbls and s_lbls.index(col) < len(s_vals)) else 0.0
-                pts = round(nba_avg("PTS") * def_mult, 1)
-                reb = round(nba_avg("REB") * def_mult, 1)
-                ast = round(nba_avg("AST") * def_mult, 1)
-                tpm = round(nba_avg("3PM") * def_mult, 1)
-                stl = round(nba_avg("STL") * def_mult, 1)
-                blk = round(nba_avg("BLK") * def_mult, 1)
-                if (pts + reb + ast) <= 0:
-                    return None
-                stats = {"PTS": pts, "REB": reb, "AST": ast, "3PM": tpm, "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)}
-            else:
-                pass_rows, rush_rows, rec_rows = [], [], []
-                for st_type in gl.get("seasonTypes", []):
-                    for cat in st_type.get("categories", []):
-                        lbls = [str(x).upper() for x in (cat.get("labels") or cat.get("names") or base_labels)]
-                        cname = str(cat.get("name", "")).lower()
-                        evs = [ev["stats"] for ev in cat.get("events", []) if ev.get("stats")][:6]
-                        if not evs or not lbls:
-                            continue
-                        if "pass" in cname or ("CMP" in lbls and "ATT" in lbls):
-                            pass_rows.extend((lbls, r) for r in evs)
-                        elif "rush" in cname or ("CAR" in lbls and "REC" not in lbls):
-                            rush_rows.extend((lbls, r) for r in evs)
-                        elif "receiv" in cname or "REC" in lbls:
-                            rec_rows.extend((lbls, r) for r in evs)
-
-                def grp_avg(rows_grp, col_names):
-                    for cn in col_names:
-                        nums = [to_num(r[lbls.index(cn)]) for lbls, r in rows_grp if cn in lbls and lbls.index(cn) < len(r)]
-                        if nums:
-                            return sum(nums) / len(nums)
-                    return 0.0
-                py = round(grp_avg(pass_rows, ["YDS"]) * def_mult, 1) if pos == "QB" else 0.0
-                ptd = round(grp_avg(pass_rows, ["TD"]) * def_mult, 1) if pos == "QB" else 0.0
-                ry = round(grp_avg(rush_rows, ["RUSH YDS", "YDS"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
-                rtd = round(grp_avg(rush_rows, ["RUSH TD", "TD"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
-                rec = round(grp_avg(rec_rows, ["REC"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-                recy = round(grp_avg(rec_rows, ["REC YDS", "YDS"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-                rectd = round(grp_avg(rec_rows, ["REC TD", "TD"]) * def_mult, 1) if pos in ("RB", "WR", "TE") else 0.0
-
-                if (py + ry + recy + rec) <= 0:
-                    st_blk = ov.get("statistics", {})
-                    s_lbls = [str(x).upper() for x in (st_blk.get("labels") or st_blk.get("names") or [])]
-                    splits = st_blk.get("splits", [])
-                    first_sp = next(iter(splits), {}) if isinstance(splits, list) else {}
-                    s_vals = first_sp.get("stats", []) if isinstance(first_sp, dict) else []
-                    tm_gp = gp_by_tm.get(tm, 10.0)
-                    if "GP" in s_lbls and s_lbls.index("GP") < len(s_vals):
-                        gp_cand = to_num(s_vals[s_lbls.index("GP")])
-                        if gp_cand > 0:
-                            tm_gp = gp_cand
-                    def season_pg(col_names):
-                        for cn in col_names:
-                            if cn in s_lbls and s_lbls.index(cn) < len(s_vals):
-                                return to_num(s_vals[s_lbls.index(cn)]) / tm_gp
-                        return 0.0
-                    if pos == "QB":
-                        py = round(season_pg(["YDS"]) * def_mult, 1)
-                        ptd = round(season_pg(["TD"]) * def_mult, 1)
-                    elif pos == "RB":
-                        ry = round(season_pg(["YDS"]) * def_mult, 1)
-                        rtd = round(season_pg(["TD"]) * def_mult, 1)
-                    else:
-                        rec = round(season_pg(["REC"]) * def_mult, 1)
-                        recy = round(season_pg(["YDS"]) * def_mult, 1)
-                        rectd = round(season_pg(["TD"]) * def_mult, 1)
-
-                if (py + ry + recy + rec) <= 0:
-                    return None
-                stats = {
-                    "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
-                    "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
-                }
-
-            return {
-                "id": pid,
-                "name": p.get("name", ""),
-                "team": tm,
-                "pos": pos,
-                "opp": opp_map.get(tm, "Next Game"),
-                "bg": p.get("bg", "#1e293b"),
-                "logo": p.get("logo", ""),
-                "stats": stats
-            }
-
+        task_args = [(p, sp, lg_u, opp_abbr_map, opp_map, pa_by_tm, gp_by_tm, avg_pa) for p in candidates]
         with ThreadPoolExecutor(max_workers=24) as pool:
-            out = [r for r in pool.map(fetch_espn_proj, candidates) if r is not None]
+            out = [r for r in pool.map(_fetch_espn_proj, task_args) if r is not None]
 
         res_obj = {"league": lg_u, "players": out}
         _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
