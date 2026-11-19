@@ -1063,7 +1063,7 @@ function renderCards() {
     booksPresent.map(b => `<button class="pill ${curBookFilter===b?'active':''}" onclick="setBookFilter('${b}')">${b} (${rawList.filter(c=>(c.book||'Other')===b).length})</button>`).join('') +
   `</div>` : '';
 
-  const adminSampleSection = (isAdminUser() && !isDemo) ? `
+  const adminSampleSection = isAdminUser() ? `
     <div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
       <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
       ${customSamples.length
@@ -1275,7 +1275,7 @@ async function syncCloudCards(user) {
     if (curTab === 'cards') renderCards();
     return;
   }
-  if (btn) btn.textContent = user.email.split('@');
+  if (btn) btn.textContent = user.email.split('@')[0];
   document.getElementById('auth-user-email').textContent = user.email;
   document.getElementById('auth-logged-out').style.display = 'none';
   document.getElementById('auth-logged-in').style.display = 'block';
