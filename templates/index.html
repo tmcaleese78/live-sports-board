@@ -494,17 +494,17 @@
 </div>
 <div class="main-wrap">
   <div id="view-scoreboard" style="display:none">
-    <div class="filter-bar">
-      <div class="filter-grp">
-          <button class="pill active" data-st="in" onclick="setSt('in')">Live Now</button>
-          <button class="pill" data-st="pre" onclick="setSt('pre')">Upcoming</button>
-          <button class="pill" data-st="post" onclick="setSt('post')">Final</button>
-      </div>
-      <div class="filter-grp">
-        <button class="pill active" data-st="ALL" onclick="setSt('ALL')">All Games</button>
-        <button class="pill" data-st="in" onclick="setSt('in')">Live Now</button>
+       <div class="row-flex" style="justify-content:space-between">
+      <div class="row-flex" style="margin:0">
+        <button class="pill active" data-st="in" onclick="setSt('in')">Live Now</button>
         <button class="pill" data-st="pre" onclick="setSt('pre')">Upcoming</button>
         <button class="pill" data-st="post" onclick="setSt('post')">Final</button>
+      </div>
+      <div class="row-flex" style="margin:0">
+        <button class="pill active" data-lg="ALL" onclick="setLg('ALL')">All Games</button>
+        <button class="pill" data-lg="NFL" onclick="setLg('NFL')">NFL</button>
+        <button class="pill" data-lg="NBA" onclick="setLg('NBA')">NBA</button>
+        <button class="pill" data-lg="CFB" onclick="setLg('CFB')">CFB</button>
       </div>
     </div>
     <div id="games-area">Loading live games...</div>
