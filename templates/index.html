@@ -600,6 +600,19 @@
     <div id="box-body">Loading box score...</div>
   </div>
 </div>
+<div class="modal-bg" id="qgame-modal" onclick="if(event.target===this)closeQuickGame()">
+  <div class="modal-box" style="max-width:390px">
+    <div class="modal-hdr">
+      <strong style="font-size:17px">Add Game Pick</strong>
+      <button class="pill" onclick="closeQuickGame()">✕ Close</button>
+    </div>
+    <div id="qg-label" style="font-size:16px;font-weight:900;color:#38bdf8;margin-bottom:12px"></div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <select id="qg-dest" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px"></select>
+      <button class="btn-primary" style="width:100%;padding:11px;font-size:14px;margin-top:4px" onclick="confirmQuickGame()">+ Add Pick to Card</button>
+    </div>
+  </div>
+</div>    
 <div class="modal-bg" id="auth-modal" onclick="if(event.target===this)closeAuthModal()">
   <div class="modal-box" style="max-width:420px">
     <div class="modal-hdr">
