@@ -42,7 +42,6 @@ def api_projections(lg):
                 opp_abbr_map[aw] = hm
                 opp_abbr_map[hm] = aw
 
-        # Fetch all 32 NFL / 30 NBA teams directly so every team loads
         tms_json = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sp}/teams?limit=40", 6)
         team_objs = []
         for s_item in tms_json.get("sports", []):
@@ -57,7 +56,6 @@ def api_projections(lg):
                             "logo": next((x.get("href", "") for x in t.get("logos", [])), "")
                         })
 
-        # Fetch team standings for opponent defensive multiplier
         st_data = fetch_json(f"https://{HOST}/apis/v2/sports/{sp}/standings", 6)
         pa_by_tm = {}
         gp_by_tm = {}
@@ -79,7 +77,6 @@ def api_projections(lg):
         walk_pa(st_data)
         avg_pa = (sum(pa_by_tm.values()) / len(pa_by_tm)) if pa_by_tm else 1.0
 
-        # Fetch rosters for all teams in parallel & pick top candidates per team
         def load_team_candidates(t_info):
             ros = get_roster(sp, t_info["id"])
             picks = []
@@ -110,7 +107,7 @@ def api_projections(lg):
             except ValueError:
                 return 0.0
 
-        def fetch_espn_proj(p):
+              def fetch_espn_proj(p):
             pid = p.get("id", "")
             tm = p.get("team", "")
             pos = p.get("pos", "")
@@ -177,7 +174,6 @@ def api_projections(lg):
                         if nums:
                             return sum(nums) / len(nums)
                     return 0.0
-
                 py = round(grp_avg(pass_rows, ["YDS"]) * def_mult, 1) if pos == "QB" else 0.0
                 ptd = round(grp_avg(pass_rows, ["TD"]) * def_mult, 1) if pos == "QB" else 0.0
                 ry = round(grp_avg(rush_rows, ["RUSH YDS", "YDS"]) * def_mult, 1) if pos in ("QB", "RB") else 0.0
@@ -205,7 +201,7 @@ def api_projections(lg):
                     if pos == "QB":
                         py = round(season_pg(["YDS"]) * def_mult, 1)
                         ptd = round(season_pg(["TD"]) * def_mult, 1)
-                                       elif pos == "RB":
+                    elif pos == "RB":
                         ry = round(season_pg(["YDS"]) * def_mult, 1)
                         rtd = round(season_pg(["TD"]) * def_mult, 1)
                     else:
@@ -239,7 +235,6 @@ def api_projections(lg):
         return jsonify(res_obj)
     except Exception as exc:
         return jsonify({"league": lg_u, "players": [], "err": str(exc)}), 200
-
 
 def get_roster(sport_path, tid):
     key = f"{sport_path}:{tid}"
