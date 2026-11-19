@@ -20,7 +20,7 @@ def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"fp_v1:{lg_u}"
+    ck = f"fp_v2:{lg_u}"
     now = time.time()
     if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
         return jsonify(_PROJ_CACHE[ck]["data"])
@@ -37,7 +37,6 @@ def api_projections(lg):
             opp_map[aw] = f"@ {hm} ({st})"
             opp_map[hm] = f"vs {aw} ({st})"
 
-    # Lookup ESPN metadata (id, logo, bg, team) by normalized name + team
     meta_by_name_tm = {}
     meta_by_name = {}
     tm_style = {}
@@ -68,7 +67,7 @@ def api_projections(lg):
                 tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S | re.I)
                 if len(tds) < 6:
                     continue
-                p_cell = tds
+                p_cell = tds[0]
                 m_nm = re.search(r"class=['\"]player-name['\"][^>]*>(.*?)</a>", p_cell, re.S | re.I)
                 raw_name = re.sub(r"<[^>]+>", "", m_nm.group(1) if m_nm else p_cell).strip()
                 clean_txt = re.sub(r"<[^>]+>", " ", p_cell)
@@ -96,8 +95,6 @@ def api_projections(lg):
             "WR": "https://fantasypros.com",
             "TE": "https://fantasypros.com",
         }
-        # Remove ?week=draft so FantasyPros always serves the current active NFL week
-        urls = {k: v.replace("?week=draft", "") for k, v in urls.items()}
         with ThreadPoolExecutor(max_workers=4) as pool:
             futs = {pos: pool.submit(parse_fp_table, u) for pos, u in urls.items()}
             parsed = {pos: fut.result() for pos, fut in futs.items()}
@@ -109,20 +106,16 @@ def api_projections(lg):
                 if (nm, tm) in seen:
                     continue
                 seen.add((nm, tm))
-                # FantasyPros NFL column layouts:
-                # QB: [ATT, CMP, YDS, TDS, INTS, RUSH_ATT, RUSH_YDS, RUSH_TDS, FL, FPTS]
-                # RB: [RUSH_ATT, RUSH_YDS, RUSH_TDS, REC, REC_YDS, REC_TDS, FL, FPTS]
-                # WR/TE: [REC, REC_YDS, REC_TDS, RUSH_ATT, RUSH_YDS, RUSH_TDS, FL, FPTS]
                 if pos == "QB" and len(n) >= 8:
-                    py, ptd, ry, rtd = round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+                    py, ptd, ry, rtd = round(n[2], 1), round(n[3], 1), round(n[6], 1), round(n[7], 1)
                     rec, recy, rectd = 0.0, 0.0, 0.0
                 elif pos == "RB" and len(n) >= 6:
                     py, ptd = 0.0, 0.0
-                    ry, rtd, rec, recy, rectd = round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+                    ry, rtd, rec, recy, rectd = round(n[1], 1), round(n[2], 1), round(n[3], 1), round(n[4], 1), round(n[5], 1)
                 elif pos in ("WR", "TE") and len(n) >= 6:
                     py, ptd = 0.0, 0.0
-                    rec, recy, rectd = round(n, 1), round(n, 1), round(n, 1)
-                    ry, rtd = round(n, 1), round(n, 1)
+                    rec, recy, rectd = round(n[0], 1), round(n[1], 1), round(n[2], 1)
+                    ry, rtd = round(n[4], 1), round(n[5], 1)
                 else:
                     continue
                 if (py + ry + recy + rec) <= 0:
@@ -144,13 +137,12 @@ def api_projections(lg):
                     }
                 })
     else:
-        # FantasyPros NBA Daily Overall Projections: [PTS, REB, AST, BLK, STL, FG%, FT%, 3PM, GP/MIN, TO, FPTS]
         rows = parse_fp_table("https://fantasypros.com")
         for r in rows:
             nm, tm, n = r["name"], r["team"], r["nums"]
             if len(n) < 8:
                 continue
-            pts, reb, ast, blk, stl, tpm = round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1), round(n, 1)
+            pts, reb, ast, blk, stl, tpm = round(n[0], 1), round(n[1], 1), round(n[2], 1), round(n[3], 1), round(n[4], 1), round(n[7], 1)
             if (pts + reb + ast) <= 0:
                 continue
             nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
