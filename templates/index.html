@@ -733,29 +733,27 @@ function renderGames() {
   let html = '';
   lgs.forEach(lg => {
     const raw = (liveData.games && liveData.games[lg]) || [];
-       const list = curSt === 'ALL'
-      ? raw.filter(g => !(lg === 'NFL' && g.state === 'post'))
-      : raw.filter(g => g.state === curSt);
+    const list = raw.filter(g => g.state === 'in');
     if (!list.length) return;
-    html += `<h2>${lg} Games (${list.length})</h2><div class="grid">` + list.map(g => {
-      const isLive = g.state === 'in', stLabel = isLive ? `<span class="sb-live-tag">● ${g.status}</span>` : g.status;
+    html += `<h2>${lg} Live Games (${list.length})</h2><div class="grid">` + list.map(g => {
+      const stLabel = `<span class="sb-live-tag">● ${g.status}</span>`;
       const awayDisp = g.away_full || g.away, homeDisp = g.home_full || g.home;
       const safeAway = String(awayDisp).replace(/'/g, "\\'"), safeHome = String(homeDisp).replace(/'/g, "\\'");
-      return `<div class="sb-card ${isLive?'is-live':''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
+      return `<div class="sb-card is-live" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${safeAway} @ ${safeHome}')">
         <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
         <div class="sb-team" style="--tm-clr:${g.bg0}">
           <div class="sb-left">${g.lg0?`<img src="${g.lg0}">`:''}<span class="sb-name">${awayDisp}${g.arec?`<span class="sb-rec">(${g.arec})</span>`:''}</span>${g.aposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.ascore}</span></div>
+          <div class="sb-right"><span class="sb-score">${g.ascore}</span></div>
         </div>
         <div class="sb-team" style="--tm-clr:${g.bg1}">
           <div class="sb-left">${g.lg1?`<img src="${g.lg1}">`:''}<span class="sb-name">${homeDisp}${g.hrec?`<span class="sb-rec">(${g.hrec})</span>`:''}</span>${g.hposs?'<span class="sb-poss" title="Possession"></span>':''}</div>
-          <div class="sb-right"><span class="sb-score">${g.state==='pre'?'—':g.hscore}</span></div>
+          <div class="sb-right"><span class="sb-score">${g.hscore}</span></div>
         </div>
         ${g.odds ? `<div class="sb-foot"><span>${g.odds}</span></div>` : ''}
       </div>`;
     }).join('') + `</div>`;
   });
-  document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No games match this filter right now.</p>';
+  document.getElementById('games-area').innerHTML = html || '<p style="color:var(--muted)">No live games in progress right now.</p>';
 }
 
 function sortBy(col) {
