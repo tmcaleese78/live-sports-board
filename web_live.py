@@ -205,51 +205,41 @@ def api_projections(lg):
                     if pos == "QB":
                         py = round(season_pg(["YDS"]) * def_mult, 1)
                         ptd = round(season_pg(["TD"]) * def_mult, 1)
-                    elif pos == "RB":
-ry = round(season_pg(["YDS"]) * def_mult, 1)
-rtd = round(season_pg(["TD"]) * def_mult, 1)
-else:
-rec = round(season_pg(["REC"]) * def_mult, 1)
-recy = round(season_pg(["YDS"]) * def_mult, 1)
-rectd = round(season_pg(["TD"]) * def_mult, 1)
-if (py + ry + recy + rec) <= 0:
-return None
-stats = {
-"PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
-"REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
-}
-return {
-"id": pid,
-"name": p.get("name", ""),
-"team": tm,
-"pos": pos,
-"opp": opp_map.get(tm, "Next Game"),
-"bg": p.get("bg", "#1e293b"),
-"logo": p.get("logo", ""),
-"stats": stats
-}
-with ThreadPoolExecutor(max_workers=24) as pool:
-out = [r for r in pool.map(fetch_espn_proj, candidates) if r is not None]
-res_obj = {"league": lg_u, "players": out}
-_PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
-return jsonify(res_obj)
-except Exception as exc:
-return jsonify({"league": lg_u, "players": [], "err": str(exc)}), 200
+                                       elif pos == "RB":
+                        ry = round(season_pg(["YDS"]) * def_mult, 1)
+                        rtd = round(season_pg(["TD"]) * def_mult, 1)
+                    else:
+                        rec = round(season_pg(["REC"]) * def_mult, 1)
+                        recy = round(season_pg(["YDS"]) * def_mult, 1)
+                        rectd = round(season_pg(["TD"]) * def_mult, 1)
 
-@app.before_request
-def upgrade_to_https():
-    if request.headers.get("X-Forwarded-Proto") == "http":
-        return redirect(f"https://{request.host}{request.full_path.rstrip('?')}", code=301)
+                if (py + ry + recy + rec) <= 0:
+                    return None
+                stats = {
+                    "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
+                    "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+                }
 
-def fetch_json(url, timeout=6):
-    try:
-        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout).json()
-    except Exception:
-        return {}
+            return {
+                "id": pid,
+                "name": p.get("name", ""),
+                "team": tm,
+                "pos": pos,
+                "opp": opp_map.get(tm, "Next Game"),
+                "bg": p.get("bg", "#1e293b"),
+                "logo": p.get("logo", ""),
+                "stats": stats
+            }
 
-def clean_hex(val, fallback):
-    s = str(val or "").strip().lstrip("#")
-    return f"#{s}" if len(s) == 6 else fallback
+        with ThreadPoolExecutor(max_workers=24) as pool:
+            out = [r for r in pool.map(fetch_espn_proj, candidates) if r is not None]
+
+        res_obj = {"league": lg_u, "players": out}
+        _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
+        return jsonify(res_obj)
+    except Exception as exc:
+        return jsonify({"league": lg_u, "players": [], "err": str(exc)}), 200
+
 
 def get_roster(sport_path, tid):
     key = f"{sport_path}:{tid}"
