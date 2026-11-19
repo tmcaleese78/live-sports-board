@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import threading
@@ -20,123 +21,155 @@ def api_projections(lg):
     lg_u = lg.upper()
     if lg_u not in ("NFL", "NBA"):
         return jsonify({"error": "Invalid league"}), 400
-    ck = f"fp_v3:{lg_u}"
-    now = time.time()
-    if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
-        return jsonify(_PROJ_CACHE[ck]["data"])
+    try:
+        ck = f"fp_v4:{lg_u}"
+        now = time.time()
+        if ck in _PROJ_CACHE and (now - _PROJ_CACHE[ck]["ts"]) < 900:
+            return jsonify(_PROJ_CACHE[ck]["data"])
 
-    payload = get_live_payload(fast=False)
-    games = payload.get("games", {}).get(lg_u, [])
-    players = payload.get("players", {}).get(lg_u, [])
+        payload = get_live_payload(fast=False)
+        games = payload.get("games", {}).get(lg_u, [])
+        players = payload.get("players", {}).get(lg_u, [])
 
-    opp_map = {}
-    for g in games:
-        aw, hm = g.get("away", ""), g.get("home", "")
-        st = g.get("status", "")
-        if aw and hm:
-            opp_map[aw] = f"@ {hm} ({st})"
-            opp_map[hm] = f"vs {aw} ({st})"
+        opp_map = {}
+        for g in games:
+            aw, hm = g.get("away", ""), g.get("home", "")
+            st = g.get("status", "")
+            if aw and hm:
+                opp_map[aw] = f"@ {hm} ({st})"
+                opp_map[hm] = f"vs {aw} ({st})"
 
-    meta_by_name_tm = {}
-    meta_by_name = {}
-    tm_style = {}
-    for p in players:
-        nm_k = re.sub(r"[^a-z0-9]", "", p.get("name", "").lower())
-        tm = p.get("team", "").upper()
-        if tm and tm not in tm_style:
-            tm_style[tm] = {"bg": p.get("bg", "#1e293b"), "logo": p.get("logo", "")}
-        if nm_k:
-            meta_by_name_tm[(nm_k, tm)] = p
-            if nm_k not in meta_by_name:
-                meta_by_name[nm_k] = p
+        meta_by_name_tm = {}
+        meta_by_name = {}
+        tm_style = {}
+        for p in players:
+            nm_k = re.sub(r"[^a-z0-9]", "", p.get("name", "").lower())
+            tm = p.get("team", "").upper()
+            if tm and tm not in tm_style:
+                tm_style[tm] = {"bg": p.get("bg", "#1e293b"), "logo": p.get("logo", "")}
+            if nm_k:
+                meta_by_name_tm[(nm_k, tm)] = p
+                if nm_k not in meta_by_name:
+                    meta_by_name[nm_k] = p
 
-    fp_norm_tm = {"JAC": "JAX", "WSH": "WAS", "GBP": "GB", "KCC": "KC", "LVR": "LV", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
-    hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+        fp_norm_tm = {"JAC": "JAX", "WSH": "WAS", "GBP": "GB", "KCC": "KC", "LVR": "LV", "NEP": "NE", "NOS": "NO", "SFO": "SF", "TBB": "TB"}
+        hdrs = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
-    def val_at(seq, idx):
-        for i, item in enumerate(seq):
-            if i == idx:
-                return item
-        return 0.0
+        def val_at(seq, idx):
+            for i, item in enumerate(seq):
+                if i == idx:
+                    return item
+            return 0.0
 
-    def parse_fp_table(url):
-        try:
-            r = requests.get(url, headers=hdrs, timeout=8)
-            if not r.ok:
-                return []
-            html = r.text
-            m_tbl = re.search(r"<table[^>]*id=['\"]data['\"][^>]*>(.*?)</table>", html, re.S | re.I)
-            if not m_tbl:
-                return []
-            rows_out = []
-            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", m_tbl.group(1), re.S | re.I):
-                tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S | re.I)
-                if len(tds) < 6:
-                    continue
-                p_cell = next(iter(tds), "")
-                m_nm = re.search(r"class=['\"]player-name['\"][^>]*>(.*?)</a>", p_cell, re.S | re.I)
-                raw_name = re.sub(r"<[^>]+>", "", m_nm.group(1) if m_nm else p_cell).strip()
-                clean_txt = re.sub(r"<[^>]+>", " ", p_cell)
-                m_tm = re.search(r"\b([A-Z]{2,3})\b\s*(?:\(|$)", clean_txt.strip())
-                tm = m_tm.group(1) if m_tm else ""
-                tm = fp_norm_tm.get(tm, tm)
-                nums = []
-                for i, c in enumerate(tds):
-                    if i == 0:
+        def parse_fp_table(url):
+            try:
+                r = requests.get(url, headers=hdrs, timeout=8)
+                if not r.ok:
+                    return []
+                html = r.text
+                m_tbl = re.search(r"<table[^>]*id=['\"]data['\"][^>]*>(.*?)</table>", html, re.S | re.I)
+                if not m_tbl:
+                    return []
+                rows_out = []
+                for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", m_tbl.group(1), re.S | re.I):
+                    tds = re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S | re.I)
+                    if len(tds) < 6:
                         continue
-                    v_str = re.sub(r"<[^>]+>", "", c).replace(",", "").strip()
-                    try:
-                        nums.append(float(v_str))
-                    except ValueError:
-                        nums.append(0.0)
-                if raw_name:
-                    rows_out.append({"name": raw_name, "team": tm, "nums": nums})
-            return rows_out
-        except Exception:
-            return []
+                    p_cell = next(iter(tds), "")
+                    m_nm = re.search(r"class=['\"]player-name['\"][^>]*>(.*?)</a>", p_cell, re.S | re.I)
+                    raw_name = re.sub(r"<[^>]+>", "", m_nm.group(1) if m_nm else p_cell).strip()
+                    clean_txt = re.sub(r"<[^>]+>", " ", p_cell)
+                    m_tm = re.search(r"\b([A-Z]{2,3})\b\s*(?:\(|$)", clean_txt.strip())
+                    tm = m_tm.group(1) if m_tm else ""
+                    tm = fp_norm_tm.get(tm, tm)
+                    nums = []
+                    for i, c in enumerate(tds):
+                        if i == 0:
+                            continue
+                        v_str = re.sub(r"<[^>]+>", "", c).replace(",", "").strip()
+                        try:
+                            nums.append(float(v_str))
+                        except ValueError:
+                            nums.append(0.0)
+                    if raw_name:
+                        rows_out.append({"name": raw_name, "team": tm, "nums": nums})
+                return rows_out
+            except Exception:
+                return []
 
-    out = []
-    if lg_u == "NFL":
-        urls = {
-            "QB": "https://fantasypros.com",
-            "RB": "https://fantasypros.com",
-            "WR": "https://fantasypros.com",
-            "TE": "https://fantasypros.com",
-        }
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            futs = {pos: pool.submit(parse_fp_table, u) for pos, u in urls.items()}
-            parsed = {pos: fut.result() for pos, fut in futs.items()}
+        fp_base = "https://www.fantasypros" + ".com"
+        out = []
+        if lg_u == "NFL":
+            urls = {
+                "QB": fp_base + "/nfl/projections/qb.php",
+                "RB": fp_base + "/nfl/projections/rb.php",
+                "WR": fp_base + "/nfl/projections/wr.php",
+                "TE": fp_base + "/nfl/projections/te.php",
+            }
+            with ThreadPoolExecutor(max_workers=4) as pool:
+                futs = {pos: pool.submit(parse_fp_table, u) for pos, u in urls.items()}
+                parsed = {pos: fut.result() for pos, fut in futs.items()}
 
-        seen = set()
-        for pos, rows in parsed.items():
+            seen = set()
+            for pos, rows in parsed.items():
+                for r in rows:
+                    nm, tm, n = r["name"], r["team"], r["nums"]
+                    if (nm, tm) in seen:
+                        continue
+                    seen.add((nm, tm))
+                    if pos == "QB" and len(n) >= 8:
+                        py = round(val_at(n, 2), 1)
+                        ptd = round(val_at(n, 3), 1)
+                        ry = round(val_at(n, 6), 1)
+                        rtd = round(val_at(n, 7), 1)
+                        rec, recy, rectd = 0.0, 0.0, 0.0
+                    elif pos == "RB" and len(n) >= 6:
+                        py, ptd = 0.0, 0.0
+                        ry = round(val_at(n, 1), 1)
+                        rtd = round(val_at(n, 2), 1)
+                        rec = round(val_at(n, 3), 1)
+                        recy = round(val_at(n, 4), 1)
+                        rectd = round(val_at(n, 5), 1)
+                    elif pos in ("WR", "TE") and len(n) >= 6:
+                        py, ptd = 0.0, 0.0
+                        rec = round(val_at(n, 0), 1)
+                        recy = round(val_at(n, 1), 1)
+                        rectd = round(val_at(n, 2), 1)
+                        ry = round(val_at(n, 4), 1)
+                        rtd = round(val_at(n, 5), 1)
+                    else:
+                        continue
+                    if (py + ry + recy + rec) <= 0:
+                        continue
+                    nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
+                    p_meta = meta_by_name_tm.get((nm_k, tm)) or meta_by_name.get(nm_k) or {}
+                    st_clr = tm_style.get(tm, {})
+                    out.append({
+                        "id": p_meta.get("id", ""),
+                        "name": p_meta.get("name") or nm,
+                        "team": tm,
+                        "pos": pos,
+                        "opp": opp_map.get(tm, ""),
+                        "bg": p_meta.get("bg") or st_clr.get("bg", "#1e293b"),
+                        "logo": p_meta.get("logo") or st_clr.get("logo", ""),
+                        "stats": {
+                            "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
+                            "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+                        }
+                    })
+        else:
+            rows = parse_fp_table(fp_base + "/nba/projections/overall.php")
             for r in rows:
                 nm, tm, n = r["name"], r["team"], r["nums"]
-                if (nm, tm) in seen:
+                if len(n) < 8:
                     continue
-                seen.add((nm, tm))
-                if pos == "QB" and len(n) >= 8:
-                    py = round(val_at(n, 2), 1)
-                    ptd = round(val_at(n, 3), 1)
-                    ry = round(val_at(n, 6), 1)
-                    rtd = round(val_at(n, 7), 1)
-                    rec, recy, rectd = 0.0, 0.0, 0.0
-                elif pos == "RB" and len(n) >= 6:
-                    py, ptd = 0.0, 0.0
-                    ry = round(val_at(n, 1), 1)
-                    rtd = round(val_at(n, 2), 1)
-                    rec = round(val_at(n, 3), 1)
-                    recy = round(val_at(n, 4), 1)
-                    rectd = round(val_at(n, 5), 1)
-                elif pos in ("WR", "TE") and len(n) >= 6:
-                    py, ptd = 0.0, 0.0
-                    rec = round(val_at(n, 0), 1)
-                    recy = round(val_at(n, 1), 1)
-                    rectd = round(val_at(n, 2), 1)
-                    ry = round(val_at(n, 4), 1)
-                    rtd = round(val_at(n, 5), 1)
-                else:
-                    continue
-                if (py + ry + recy + rec) <= 0:
+                pts = round(val_at(n, 0), 1)
+                reb = round(val_at(n, 1), 1)
+                ast = round(val_at(n, 2), 1)
+                blk = round(val_at(n, 3), 1)
+                stl = round(val_at(n, 4), 1)
+                tpm = round(val_at(n, 7), 1)
+                if (pts + reb + ast) <= 0:
                     continue
                 nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
                 p_meta = meta_by_name_tm.get((nm_k, tm)) or meta_by_name.get(nm_k) or {}
@@ -145,49 +178,21 @@ def api_projections(lg):
                     "id": p_meta.get("id", ""),
                     "name": p_meta.get("name") or nm,
                     "team": tm,
-                    "pos": pos,
+                    "pos": p_meta.get("pos", ""),
                     "opp": opp_map.get(tm, ""),
                     "bg": p_meta.get("bg") or st_clr.get("bg", "#1e293b"),
                     "logo": p_meta.get("logo") or st_clr.get("logo", ""),
                     "stats": {
-                        "PASS YDS": py, "PASS TD": ptd, "RUSH YDS": ry, "RUSH TD": rtd,
-                        "REC": rec, "REC YDS": recy, "REC TD": rectd, "SCRIM YDS": round(ry + recy, 1)
+                        "PTS": pts, "REB": reb, "AST": ast, "3PM": tpm,
+                        "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)
                     }
                 })
-    else:
-        rows = parse_fp_table("https://fantasypros.com")
-        for r in rows:
-            nm, tm, n = r["name"], r["team"], r["nums"]
-            if len(n) < 8:
-                continue
-            pts = round(val_at(n, 0), 1)
-            reb = round(val_at(n, 1), 1)
-            ast = round(val_at(n, 2), 1)
-            blk = round(val_at(n, 3), 1)
-            stl = round(val_at(n, 4), 1)
-            tpm = round(val_at(n, 7), 1)
-            if (pts + reb + ast) <= 0:
-                continue
-            nm_k = re.sub(r"[^a-z0-9]", "", nm.lower())
-            p_meta = meta_by_name_tm.get((nm_k, tm)) or meta_by_name.get(nm_k) or {}
-            st_clr = tm_style.get(tm, {})
-            out.append({
-                "id": p_meta.get("id", ""),
-                "name": p_meta.get("name") or nm,
-                "team": tm,
-                "pos": p_meta.get("pos", ""),
-                "opp": opp_map.get(tm, ""),
-                "bg": p_meta.get("bg") or st_clr.get("bg", "#1e293b"),
-                "logo": p_meta.get("logo") or st_clr.get("logo", ""),
-                "stats": {
-                    "PTS": pts, "REB": reb, "AST": ast, "3PM": tpm,
-                    "STL": stl, "BLK": blk, "PRA": round(pts + reb + ast, 1)
-                }
-            })
 
-    res_obj = {"league": lg_u, "players": out}
-    _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
-    return jsonify(res_obj)
+        res_obj = {"league": lg_u, "players": out}
+        _PROJ_CACHE[ck] = {"ts": now, "data": res_obj}
+        return jsonify(res_obj)
+    except Exception as exc:
+        return jsonify({"league": lg_u, "players": [], "err": str(exc)}), 200
 
 @app.before_request
 def upgrade_to_https():
