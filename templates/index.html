@@ -1095,6 +1095,35 @@ function renderCards() {
   const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards (${activeList.length})</h2>`;
   document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`) + adminSampleSection;
 }
+    
+function syncBuilderOpts() {
+  const type = document.getElementById('b-type').value;
+  const sport = document.getElementById('b-sport').value;
+  document.getElementById('prop-inputs').style.display = type === 'prop' ? 'flex' : 'none';
+  document.getElementById('ml-inputs').style.display = (type === 'ml' || type === 'spread') ? 'flex' : 'none';
+  document.getElementById('b-spread').style.display = type === 'spread' ? 'block' : 'none';
+  document.getElementById('total-inputs').style.display = type === 'total' ? 'flex' : 'none';
+
+  const stats = sport === 'NBA'
+    ? ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']
+    : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'];
+  document.getElementById('b-stat').innerHTML = stats.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  const pList = (liveData.players && liveData.players[sport]) || [];
+  document.getElementById('player-datalist').innerHTML = pList.map(p => `<option value="${p.name}">`).join('');
+
+  const gList = (liveData.games && liveData.games[sport]) || [];
+  const teams = new Set();
+  gList.forEach(g => {
+    if (g.away_full || g.away) teams.add(g.away_full || g.away);
+    if (g.home_full || g.home) teams.add(g.home_full || g.home);
+  });
+  document.getElementById('b-team').innerHTML = [...teams].sort().map(t => `<option value="${t}">${t}</option>`).join('');
+  document.getElementById('b-game').innerHTML = gList.map(g => {
+    const lbl = `${g.away_full || g.away} @ ${g.home_full || g.home}`;
+    return `<option value="${lbl}">${lbl}</option>`;
+  }).join('');
+}
 
 function addLeg() {
   const type = document.getElementById('b-type').value, sport = document.getElementById('b-sport').value;
