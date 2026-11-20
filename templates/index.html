@@ -913,7 +913,8 @@ function evalLeg(leg) {
     const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (margin > 0 ? `+${margin}` : String(margin)));
     return {name: leg.team, stat: lbl, gained: g.state==='pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1};
   }
-  const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => x.name.toLowerCase() === leg.player.toLowerCase());
+  const targetName = String(leg.player || '').trim().toLowerCase();
+  const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
   const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
   const isUnder = leg.ou === 'Under';
   const lbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat}`;
@@ -925,12 +926,12 @@ function evalLeg(leg) {
     const hit = !miss && Boolean(p && p.state === 'post');
     const pct = miss ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
     const needTxt = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
-    return {name: leg.player, stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+    return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
   }
 
   const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
   const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
-  return {name: leg.player, stat: lbl, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+  return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
 let customSamples = [];
