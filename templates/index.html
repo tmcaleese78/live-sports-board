@@ -998,8 +998,10 @@ function renderCards() {
     ? rawList.filter(c => (c.book || 'Other') === curBookFilter)
     : rawList;
 
+  const parseAmt = v => parseFloat(String(v ?? 0).replace(/[^0-9.-]/g, '')) || 0;
+
   const renderSingleCard = (c, idx, isSampleView) => {
-    const evals = c.legs.map(evalLeg);
+    const evals = (c.legs || []).map(evalLeg);
     const allHit = evals.length > 0 && evals.every(x => x.hit);
     const anyMiss = evals.some(x => x.miss);
     const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
@@ -1008,7 +1010,7 @@ function renderCards() {
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
     const bk = c.book || (c.title && c.title.split('•').trim()) || 'Other';
-    const lbl = c.title && !c.book ? c.title : (c.title || `${c.legs.length}-Leg Card`);
+    const lbl = c.title && !c.book ? c.title : (c.title || `${(c.legs || []).length}-Leg Card`);
 
     let actionBtns = '';
     if (isSampleView) {
@@ -1026,7 +1028,7 @@ function renderCards() {
       <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${(isSampleView || c.isSample)?'<span class="sample-tag">Live Sample</span>':''}</div>
       <div style="display:flex;align-items:center">${actionBtns}</div>
     </div>`;
-    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(c.cost)}</div><div>Payout: ${money(c.payout)}</div></div>
+    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
       <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
   };
 
@@ -1034,12 +1036,14 @@ function renderCards() {
   const cardsHtml = activeList.map((c, i) => {
     const realIdx = isDemo ? i : userCards.indexOf(c);
     if (!isDemo) {
-      const evals = c.legs.map(evalLeg);
+      const evals = (c.legs || []).map(evalLeg);
       const allHit = evals.length > 0 && evals.every(x => x.hit);
       const anyMiss = evals.some(x => x.miss);
-      totC += Number(c.cost) || 0;
-      if (!anyMiss) liveP += Number(c.payout) || 0;
-      if (allHit) paidP += Number(c.payout) || 0;
+      const cCost = parseAmt(c.cost);
+      const cPay = parseAmt(c.payout);
+      totC += cCost;
+      if (!anyMiss) liveP += cPay;
+      if (allHit) paidP += cPay;
     }
     return renderSingleCard(c, realIdx, isDemo);
   }).join('');
@@ -1071,44 +1075,12 @@ function renderCards() {
     <div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
       <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
       ${customSamples.length
-        ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),440px));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>`
+        ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>`
         : `<p style="color:var(--muted)">No custom daily samples published yet (currently showing automatic live player demo slips). Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
     </div>` : '';
 
-  const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards</h2>`;
-  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,380px),440px));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`) + adminSampleSection;
-}
-
-function delCard(i) {
-  const card = userCards[i];
-  const label = card ? `${card.book || 'Bet'} — ${card.title || card.legs.length + '-Leg Card'}` : 'this bet card';
-  if (!confirm(`Delete "${label}"? This cannot be undone.`)) return;
-  userCards.splice(i, 1);
-  localStorage.setItem('osp_cards', JSON.stringify(userCards));
-  pushCardsToCloud();
-  renderCards();
-  showToast('Bet card deleted');
-}
-
-function syncBuilderOpts() {
-  const tp = document.getElementById('b-type').value, sp = document.getElementById('b-sport').value;
-  document.getElementById('prop-inputs').style.display = tp === 'prop' ? 'flex' : 'none';
-  document.getElementById('ml-inputs').style.display = (tp === 'ml' || tp === 'spread') ? 'flex' : 'none';
-  document.getElementById('b-spread').style.display = tp === 'spread' ? 'inline-block' : 'none';
-  document.getElementById('total-inputs').style.display = tp === 'total' ? 'flex' : 'none';
-  if (tp === 'prop') {
-    const opts = sp === 'NBA' ? ['PTS','REB','AST','3PM','PRA','PR','PA','RA','STL','BLK'] : ['PASS YDS','RUSH YDS','REC YDS','SCRIM YDS','REC','PASS TD','RUSH TD','REC TD','COMP','CAR'];
-    document.getElementById('b-stat').innerHTML = opts.map(o => `<option value="${o}">${o}</option>`).join('');
-    document.getElementById('player-datalist').innerHTML = ((liveData.players && liveData.players[sp]) || []).map(p => `<option value="${p.name}">`).join('');
-  } else if (tp === 'ml' || tp === 'spread') {
-    const teams = []; ((liveData.games && liveData.games[sp]) || []).forEach(g => { teams.push(g.away_full || g.away, g.home_full || g.home); });
-    document.getElementById('b-team').innerHTML = teams.map(t => `<option value="${t}">${t}</option>`).join('');
-  } else {
-    document.getElementById('b-game').innerHTML = ((liveData.games && liveData.games[sp]) || []).map(g => {
-      const lbl = `${g.away_full || g.away} @ ${g.home_full || g.home}`;
-      return `<option value="${lbl}">${lbl}</option>`;
-    }).join('');
-  }
+  const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards (${activeList.length})</h2>`;
+  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`) + adminSampleSection;
 }
 
 function addLeg() {
@@ -1153,8 +1125,8 @@ function renderDraft() {
 
 function saveCard() {
   if (!draftLegs.length) return alert('Add at least 1 leg first.');
-  const cost = parseFloat(document.getElementById('b-cost').value) || 0;
-  const payout = parseFloat(document.getElementById('b-pay').value) || 0;
+  const cost = parseFloat(String(document.getElementById('b-cost').value).replace(/[^0-9.-]/g, '')) || 0;
+  const payout = parseFloat(String(document.getElementById('b-pay').value).replace(/[^0-9.-]/g, '')) || 0;
   const bookEl = document.getElementById('b-book');
   const titleEl = document.getElementById('b-title');
   const book = bookEl ? bookEl.value : 'Other';
