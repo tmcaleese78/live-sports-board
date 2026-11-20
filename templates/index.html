@@ -1009,7 +1009,7 @@ function renderCards() {
       <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
       <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
       <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
-    const bk = c.book || (c.title && c.title.split('•').trim()) || 'Other';
+    const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
     const lbl = c.title && !c.book ? c.title : (c.title || `${(c.legs || []).length}-Leg Card`);
 
     let actionBtns = '';
