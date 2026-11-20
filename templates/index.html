@@ -988,6 +988,18 @@ function bookClass(b) {
   const k = String(b || '').toLowerCase().replace(/[^a-z]/g, '');
   return ['fanduel','draftkings','prizepicks','underdog','betmgm','caesars','espnbet'].includes(k) ? `book-${k}` : '';
 }
+    
+function delCard(i) {
+  const c = userCards[i];
+  if (!c) return;
+  const label = `${c.book || 'Bet'} — ${c.title || (c.legs || []).length + '-Leg Card'}`;
+  if (!confirm(`Delete this bet card?\n\n${label}`)) return;
+  userCards.splice(i, 1);
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  pushCardsToCloud();
+  renderCards();
+  showToast('Bet card deleted');
+}
 
 function renderCards() {
   document.getElementById('card-cnt').textContent = userCards.length;
