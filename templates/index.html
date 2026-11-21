@@ -548,17 +548,19 @@
         </div>
       </div>
       <div class="row-flex" style="margin-bottom:10px">
-        <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
-          <option value="FanDuel">FanDuel</option>
-          <option value="DraftKings">DraftKings</option>
-          <option value="PrizePicks">PrizePicks</option>
-          <option value="Underdog">Underdog</option>
-          <option value="BetMGM">BetMGM</option>
-          <option value="Caesars">Caesars</option>
-          <option value="ESPN BET">ESPN BET</option>
-          <option value="Sleeper">Sleeper</option>
-          <option value="Other">Other Book</option>
-        </select>
+      <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
+        <option value="FanDuel">FanDuel</option>
+        <option value="FanDuel Predicts">FanDuel Predicts</option>
+        <option value="DraftKings">DraftKings</option>
+        <option value="DraftKings Predictions">DraftKings Predictions</option>
+        <option value="PrizePicks">PrizePicks</option>
+        <option value="Underdog">Underdog</option>
+        <option value="BetMGM">BetMGM</option>
+        <option value="Caesars">Caesars</option>
+        <option value="ESPN BET">ESPN BET</option>
+        <option value="Sleeper">Sleeper</option>
+        <option value="Other">Other Book</option>
+      </select>
         <input id="b-title" class="search-box" placeholder="Optional slip label (e.g. TNF 4-Leg)" style="max-width:260px">
       </div>
       <div class="row-flex">
@@ -1395,11 +1397,17 @@ function parseSlipText(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
   const fullLower = text.toLowerCase();
 
-  // 1. Detect Sportsbook (including FanDuel Predicts / Combo slips)
+  // 1. Detect Sportsbook / Prediction Platform
+  const isPredictFormat = /\b(bought:|pick combo|to pay:)\b/i.test(text);
   const bookMap = [
-    ['prizepicks', 'PrizePicks'], ['underdog', 'Underdog'], ['fanduel', 'FanDuel'],
-    ['draftkings', 'DraftKings'], ['betmgm', 'BetMGM'], ['caesars', 'Caesars'],
-    ['espn bet', 'ESPN BET'], ['sleeper', 'Sleeper'], ['bought:', 'FanDuel']
+    ['prizepicks', 'PrizePicks'],
+    ['underdog', 'Underdog'],
+    ['fanduel', isPredictFormat ? 'FanDuel Predicts' : 'FanDuel'],
+    ['draftkings', isPredictFormat ? 'DraftKings Predictions' : 'DraftKings'],
+    ['betmgm', 'BetMGM'],
+    ['caesars', 'Caesars'],
+    ['espn bet', 'ESPN BET'],
+    ['sleeper', 'Sleeper']
   ];
   const foundBook = bookMap.find(([k]) => fullLower.includes(k));
   if (foundBook && document.getElementById('b-book')) {
