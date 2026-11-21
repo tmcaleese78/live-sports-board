@@ -542,9 +542,9 @@
           <div style="font-weight:800;font-size:13.5px;color:#38bdf8">1-Click Screenshot Slip Importer</div>
           <div id="ocr-status" style="font-size:12px;color:var(--muted)">Upload a slip screenshot or press <strong>Ctrl+V / Cmd+V</strong> anywhere on this tab to auto-fill legs.</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
-         <input type="file" id="slip-file" accept="image/*" style="display:none" onchange="handleSlipImage(this.files[0])">
-          <button type="button" class="pill" style="border-color:rgba(56,189,248,0.5);color:#f8fafc;font-weight:800" onclick="document.getElementById('slip-file').click()">Upload Screenshot</button>
+          <div style="display:flex;gap:8px;align-items:center;position:relative">
+          <input type="file" id="slip-file" accept="image/*" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden" onchange="handleSlipImage(this)">
+          <label for="slip-file" class="pill" style="border-color:rgba(56,189,248,0.5);color:#f8fafc;font-weight:800;cursor:pointer;margin:0;display:inline-block">Upload Screenshot</label>
         </div>
       </div>
       <div class="row-flex" style="margin-bottom:10px">
@@ -1368,6 +1368,26 @@ function ensureTesseract() {
     tryLoad();
   });
   return tesseractPromise;
+}
+async function handleSlipImage(input) {
+  let file = input;
+  if (input && input.files) {
+    file = input.files.item(0);
+    input.value = '';
+  } else if (input && typeof input.item === 'function') {
+    file = input.item(0);
+  }
+  if (!file) return;
+  const statusEl = document.getElementById('ocr-status');
+  if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Scanning "${file.name || 'screenshot'}"... (~2–4 seconds)</span>`;
+  try {
+    const T = await ensureTesseract();
+    const res = await T.recognize(file, 'eng');
+    const text = (res && res.data && res.data.text) || '';
+    parseSlipText(text);
+  } catch (err) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Could not read image: ${err.message}</span>`;
+  }
 }
 
 function parseSlipText(text) {
