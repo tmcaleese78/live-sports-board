@@ -1484,7 +1484,7 @@ function parseSlipText(text) {
         return game.awayFull.toLowerCase().includes(fullTarget) ? game.awayFull : game.homeFull;
       }
     }
-    const firstWord = raw.replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/);
+    const [firstWord = ''] = raw.replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/);
     const awayStr = `${game.away} ${game.awayFull}`.toLowerCase();
     return (firstWord && awayStr.includes(firstWord)) ? game.awayFull : game.homeFull;
   };
@@ -1492,18 +1492,17 @@ function parseSlipText(text) {
   const nbaStats = new Set(['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']);
   let added = 0;
 
-  // 4. Scan Lines for Totals, Spreads, Moneylines / Winners, and Player Props
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineLow = line.toLowerCase();
     const windowTxt = [lines[i], lines[i + 1] || '', lines[i + 2] || ''].join(' ');
 
-    // Pattern A: Game Total like "Under 60.5, Miami FL" or "Over 47.5 Chiefs @ Bills"
     const totalLine = line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
     if (totalLine) {
-      const ou = totalLine.toUpperCase() + totalLine.slice(1).toLowerCase();
-      const total = parseFloat(totalLine);
-      const hint = `${totalLine || ''} ${lines[i + 1] || ''}`;
+      const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
+      const ou = ouRaw.charAt(0).toUpperCase() + ouRaw.slice(1).toLowerCase();
+      const total = parseFloat(totalRaw);
+      const hint = `${hintRaw} ${lines[i + 1] || ''}`;
       const matchedGame = findGameByTeamHint(hint);
       if (matchedGame && total > 20) {
         draftLegs.push({ type: 'total', sport: matchedGame.sport, game: matchedGame.gameLbl, ou, total });
@@ -1512,7 +1511,6 @@ function parseSlipText(text) {
       }
     }
 
-    // Pattern B: Matched Player Prop from liveData
     const stat = mapOcrStat(windowTxt);
     const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower) || (p.short && lineLow.includes(p.short)));
     if (matchedPlayer) {
@@ -1528,14 +1526,13 @@ function parseSlipText(text) {
       }
     }
 
-    // Pattern C: Direct Player Prop Pattern even if player isn't in today's live feed
     const directProp = line.match(/^([A-Z][a-zA-Z'.-]+(?:\s+[A-Z][a-zA-Z'.-]+){1,2})\s+(?:(Over|Under|More|Less|Higher|Lower)\s+)?(\d{1,3}(?:\.\d)?)\+?\s+(.+)$/i);
     if (directProp) {
-      const pName = directProp.trim();
-      const rawOu = (directProp || 'Over').toLowerCase();
-      const ou = /under|less|lower/.test(rawOu) ? 'Under' : 'Over';
-      const target = parseFloat(directProp);
-      const detectedStat = mapOcrStat(directProp);
+      const [, pNameRaw = '', rawOuStr = 'Over', targetRaw = '0', statRaw = ''] = directProp;
+      const pName = pNameRaw.trim();
+      const ou = /under|less|lower/i.test(rawOuStr) ? 'Under' : 'Over';
+      const target = parseFloat(targetRaw);
+      const detectedStat = mapOcrStat(statRaw);
       if (detectedStat && target > 0 && target < 600) {
         const sport = nbaStats.has(detectedStat) ? 'NBA' : 'NFL';
         draftLegs.push({ type: 'prop', sport, player: pName, stat: detectedStat, ou, target });
@@ -1544,23 +1541,22 @@ function parseSlipText(text) {
       }
     }
 
-    // Pattern D: Team Spread or Explicit Moneyline like "Miami FL -6.5" or "Chiefs ML"
     const teamPick = line.match(/^([A-Za-z0-9 .&'()-]{3,30})\s+([+-]\d{1,2}(?:\.\d)?|ML|Moneyline|to\s+Win)\b/i);
     if (teamPick) {
-      const matchedGame = findGameByTeamHint(teamPick);
+      const [, teamHintRaw = '', pickTypeRaw = ''] = teamPick;
+      const matchedGame = findGameByTeamHint(teamHintRaw);
       if (matchedGame) {
-        const teamName = resolveTeamSide(matchedGame, teamPick);
-        if (/ml|moneyline|to\s+win/i.test(teamPick)) {
+        const teamName = resolveTeamSide(matchedGame, teamHintRaw);
+        if (/ml|moneyline|to\s+win/i.test(pickTypeRaw)) {
           draftLegs.push({ type: 'ml', sport: matchedGame.sport, team: teamName, spread: 0 });
         } else {
-          draftLegs.push({ type: 'spread', sport: matchedGame.sport, team: teamName, spread: parseFloat(teamPick) });
+          draftLegs.push({ type: 'spread', sport: matchedGame.sport, team: teamName, spread: parseFloat(pickTypeRaw) });
         }
         added++;
         continue;
       }
     }
 
-    // Pattern E: Standalone Team Winner Line on Combo/Predict Slips (e.g., "Miami FL" or "Winner: Miami FL")
     if (!/\b(over|under|bought|to pay|to win|wager|combo|pick|open|@|vs)\b/i.test(line)) {
       const cleanedWinner = line.replace(/^(winner|moneyline|ml)\s*[:|-]?\s*/i, '').trim();
       if (cleanedWinner.length >= 3 && cleanedWinner.length <= 32) {
