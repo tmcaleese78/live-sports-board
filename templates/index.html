@@ -468,6 +468,7 @@
 
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://jsdelivr.net"></script>   
 </head>
 <body>
 <div class="arena-bg"><div class="arena-beams"></div><div class="arena-floor"></div><div class="arena-orb"></div><div class="arena-orb r"></div></div>
@@ -537,6 +538,16 @@
   <div id="view-build" style="display:none;margin-top:16px">
     <div class="builder">
       <h2 style="margin-top:0">Create Custom Bet Card</h2>
+          <div id="slip-dropzone" style="border:1.5px dashed rgba(56,189,248,0.45);background:rgba(15,23,42,0.65);border-radius:12px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
+        <div>
+          <div style="font-weight:800;font-size:13.5px;color:#38bdf8">1-Click Screenshot Slip Importer</div>
+          <div id="ocr-status" style="font-size:12px;color:var(--muted)">Upload a slip screenshot or press <strong>Ctrl+V / Cmd+V</strong> anywhere on this tab to auto-fill legs.</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="file" id="slip-file" accept="image/*" style="display:none" onchange="handleSlipImage(this.files[0])">
+          <button type="button" class="pill" style="border-color:rgba(56,189,248,0.5);color:#f8fafc;font-weight:800" onclick="document.getElementById('slip-file').click()">Upload Screenshot</button>
+        </div>
+      </div>
       <div class="row-flex" style="margin-bottom:10px">
         <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
           <option value="FanDuel">FanDuel</option>
@@ -1297,6 +1308,124 @@ function renderDraft() {
       const txt = l.type === 'ml' ? `${l.team} (Win)` : l.type === 'spread' ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})` : l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.target} ${l.stat}`;
       return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
     }).join('');
+  }
+}
+document.addEventListener('paste', e => {
+  if (curTab !== 'build') return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
+  for (const item of items) {
+    if (item.type && item.type.startsWith('image/')) {
+      const file = item.getAsFile();
+      if (file) {
+        e.preventDefault();
+        handleSlipImage(file);
+        break;
+      }
+    }
+  }
+});
+
+function mapOcrStat(raw) {
+  const s = raw.toLowerCase();
+  if (/pts\s*\+\s*rebs\s*\+\s*asts|pra|points\s*\+\s*rebounds\s*\+\s*assists/.test(s)) return 'PRA';
+  if (/passing\s*yards|pass\s*yds|pass\s*yards/.test(s)) return 'PASS YDS';
+  if (/passing\s*td|pass\s*td|passing\s*touchdowns/.test(s)) return 'PASS TD';
+  if (/rushing\s*yards|rush\s*yds|rush\s*yards/.test(s)) return 'RUSH YDS';
+  if (/rushing\s*td|rush\s*td|rushing\s*touchdowns/.test(s)) return 'RUSH TD';
+  if (/receiving\s*yards|rec\s*yds|rec\s*yards/.test(s)) return 'REC YDS';
+  if (/receiving\s*td|rec\s*td|receiving\s*touchdowns/.test(s)) return 'REC TD';
+  if (/rush\s*\+\s*rec|scrimmage/.test(s)) return 'SCRIM YDS';
+  if (/receptions|catches|\brec\b/.test(s)) return 'REC';
+  if (/3-pt|3pm|three\s*pointers|threes/.test(s)) return '3PM';
+  if (/rebounds|\breb\b/.test(s)) return 'REB';
+  if (/assists|\bast\b/.test(s)) return 'AST';
+  if (/steals|\bstl\b/.test(s)) return 'STL';
+  if (/blocks|\bblk\b/.test(s)) return 'BLK';
+  if (/points|\bpts\b/.test(s)) return 'PTS';
+  return null;
+}
+
+async function handleSlipImage(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('ocr-status');
+  if (!window.Tesseract) {
+    if (statusEl) statusEl.textContent = 'OCR engine still loading — wait 2 seconds and try again.';
+    return;
+  }
+  if (statusEl) statusEl.innerHTML = '<span style="color:#facc15;font-weight:700">Scanning slip screenshot... (takes ~2–4 seconds)</span>';
+  try {
+    const res = await Tesseract.recognize(file, 'eng');
+    const text = (res && res.data && res.data.text) || '';
+    parseSlipText(text);
+  } catch (err) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Could not read image: ${err.message}</span>`;
+  }
+}
+
+function parseSlipText(text) {
+  const statusEl = document.getElementById('ocr-status');
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const fullLower = text.toLowerCase();
+
+  // 1. Detect Sportsbook
+  const bookMap = [
+    ['prizepicks', 'PrizePicks'], ['underdog', 'Underdog'], ['fanduel', 'FanDuel'],
+    ['draftkings', 'DraftKings'], ['betmgm', 'BetMGM'], ['caesars', 'Caesars'],
+    ['espn bet', 'ESPN BET'], ['sleeper', 'Sleeper']
+  ];
+  const foundBook = bookMap.find(([k]) => fullLower.includes(k));
+  if (foundBook && document.getElementById('b-book')) {
+    document.getElementById('b-book').value = foundBook;
+  }
+
+  // 2. Detect Wager / Entry Cost & Payout
+  const costMatch = text.match(/(?:wager|entry|risk|bet|stake)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const payMatch = text.match(/(?:to\s*win|payout|potential\s*win|returns?)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  if (costMatch && document.getElementById('b-cost')) document.getElementById('b-cost').value = costMatch;
+  if (payMatch && document.getElementById('b-pay')) document.getElementById('b-pay').value = payMatch;
+
+  // 3. Build Player Lookup Index from liveData
+  const allPlayers = [];
+  ['NFL', 'NBA', 'CFB'].forEach(sp => {
+    ((liveData.players && liveData.players[sp]) || []).forEach(p => {
+      if (p && p.name) allPlayers.push({ sport: sp, name: p.name, lower: p.name.toLowerCase() });
+    });
+  });
+
+  // 4. Match Player Props Line-by-Line
+  let added = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineLow = line.toLowerCase();
+    const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower));
+    if (!matchedPlayer) continue;
+
+    // Look at current line + next 2 lines for Over/Under, target number, and stat
+    const windowTxt = [lines[i], lines[i + 1] || '', lines[i + 2] || ''].join(' ');
+    const ou = /\b(under|less|lower)\b/i.test(windowTxt) ? 'Under' : 'Over';
+    const stat = mapOcrStat(windowTxt) || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
+    const numMatches = windowTxt.match(/\b(\d{1,3}(?:\.\d)?)\b/g) || [];
+    const target = numMatches.map(Number).find(n => n > 0 && n < 600);
+
+    if (target) {
+      draftLegs.push({
+        type: 'prop',
+        sport: matchedPlayer.sport,
+        player: matchedPlayer.name,
+        stat,
+        ou,
+        target
+      });
+      added++;
+    }
+  }
+
+  renderDraft();
+  if (added > 0) {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${added} leg${added === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
+    showToast(`Imported ${added} leg${added === 1 ? '' : 's'} from screenshot!`);
+  } else {
+    if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">Slip scanned (${foundBook ? foundBook : 'book detected'}), but no active game players matched automatically—add legs manually below.</span>`;
   }
 }
 
