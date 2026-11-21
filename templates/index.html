@@ -1510,18 +1510,26 @@ function parseSlipText(text) {
         continue;
       }
     }
-
-    const stat = mapOcrStat(windowTxt);
+       // Pattern B: Matched Player Prop from liveData (checks line above + current + line below)
+    const prevLine = lines[i - 1] || '';
+    const nextLine = lines[i + 1] || '';
+    const propContext = `${prevLine} ${line} ${nextLine}`;
+    const stat = mapOcrStat(propContext);
     const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower) || (p.short && lineLow.includes(p.short)));
     if (matchedPlayer) {
-      const ou = /\b(under|less|lower)\b/i.test(windowTxt) ? 'Under' : 'Over';
+      // Prioritize header right above player (e.g., "Under 233.5" or "50+") before falling back to full context
+      const headerTxt = /\b(over|under|more|less|higher|lower|\d+\+)\b/i.test(prevLine) ? `${prevLine} ${line}` : propContext;
+      const ou = /\b(under|less|lower)\b/i.test(headerTxt) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
-      const numMatches = windowTxt.match(/\b(\d{1,3}(?:\.\d)?)\b/g) || [];
-      const target = numMatches.map(Number).find(n => n > 0 && n < 600);
+      // Strip clock times (e.g. 10:00 AM), dates, and percentages so only real prop lines remain
+      const cleanedNumsTxt = headerTxt
+        .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
+        .replace(/\b\d+(?:\.\d+)?%/g, ' ');
+      const numMatches = cleanedNumsTxt.match(/\b(\d{1,3}(?:\.\d)?)\+?\b/g) || [];
+      const target = numMatches.map(n => parseFloat(n)).find(n => n > 0 && n < 600);
       if (target) {
         draftLegs.push({ type: 'prop', sport: matchedPlayer.sport, player: matchedPlayer.name, stat: resolvedStat, ou, target });
         added++;
-        i += 1;
         continue;
       }
     }
