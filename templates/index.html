@@ -1089,7 +1089,7 @@ function toggleArchiveCard(i) {
   localStorage.setItem('osp_cards', JSON.stringify(userCards));
   pushCardsToCloud();
   renderCards();
-  showToast(c.archived ? 'Card moved to Settled History' : 'Card restored to Active Sweats');
+  showToast(c.archived ? 'Card moved to Settled History' : 'Card restored to Active Cards');
 }
 
 function renderCards() {
@@ -1190,7 +1190,7 @@ function renderCards() {
     </div>` : '';
 
     const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px">
-      <button class="pill ${curCardView==='active'?'active':''}" style="font-weight:800" onclick="setCardView('active')">Active Sweats (${activeAll.length})</button>
+      <button class="pill ${curCardView==='active'?'active':''}" style="font-weight:800" onclick="setCardView('active')">Active Cards (${activeAll.length})</button>
       <button class="pill ${curCardView==='history'?'active':''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
     </div>`;
 
