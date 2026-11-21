@@ -1103,6 +1103,16 @@ function toggleArchiveCard(i) {
   renderCards();
   showToast(c.archived ? 'Card moved to Settled History' : 'Card restored to Active Cards');
 }
+function bookClass(bk) {
+  const s = String(bk || '').toLowerCase();
+  if (s.includes('fanduel')) return 'bk-fd';
+  if (s.includes('draftkings')) return 'bk-dk';
+  if (s.includes('prizepicks')) return 'bk-pp';
+  if (s.includes('underdog')) return 'bk-ud';
+  if (s.includes('betmgm')) return 'bk-mgm';
+  if (s.includes('caesars')) return 'bk-czr';
+  return 'bk-oth';
+}
 
 function renderCards() {
   const container = document.getElementById('view-cards');
@@ -1410,8 +1420,13 @@ function parseSlipText(text) {
     ['sleeper', 'Sleeper']
   ];
   const foundBook = bookMap.find(([k]) => fullLower.includes(k));
-  if (foundBook && document.getElementById('b-book')) {
-    document.getElementById('b-book').value = foundBook[1];
+  const bookEl = document.getElementById('b-book');
+  if (bookEl) {
+    if (foundBook) {
+      bookEl.value = foundBook;
+    } else if (isPredictFormat && /\b(sell|trade|combo)\b/i.test(text)) {
+      bookEl.value = 'DraftKings Predictions';
+    }
   }
 
   // 2. Detect Wager / Bought Cost & To Pay / Payout
