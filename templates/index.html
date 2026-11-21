@@ -1564,8 +1564,9 @@ function parseSlipText(text) {
         continue;
       }
     }
-
-    if (!/\b(over|under|bought|to pay|to win|wager|combo|pick|open|@|vs)\b/i.test(line)) {
+     // Pattern E: Standalone Team Winner Line (skips matchup schedule banners like "TB Sun 10:00 AM DET")
+    const isScheduleBanner = /\b(\d{1,2}:\d{2}|am|pm|sun|mon|tue|wed|thu|fri|sat|today|tomorrow|final|live|q[1-4]|half|ot)\b/i.test(line);
+    if (!isScheduleBanner && !/\b(over|under|bought|to pay|to win|wager|combo|pick|open|sell|share|hide|trade|placed|@|vs)\b/i.test(line)) {
       const cleanedWinner = line.replace(/^(winner|moneyline|ml)\s*[:|-]?\s*/i, '').trim();
       if (cleanedWinner.length >= 3 && cleanedWinner.length <= 32) {
         const matchedGame = findGameByTeamHint(cleanedWinner);
