@@ -1348,28 +1348,26 @@ let tesseractPromise = null;
 function ensureTesseract() {
   if (window.Tesseract) return Promise.resolve(window.Tesseract);
   if (tesseractPromise) return tesseractPromise;
+  const cdns = [
+    'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+    'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
+  ];
   tesseractPromise = new Promise((resolve, reject) => {
-    const s = document.createElement('script');
-    s.src = 'https://jsdelivr.net';
-    s.onload = () => resolve(window.Tesseract);
-    s.onerror = () => reject(new Error('Failed to load OCR scanner'));
-    document.head.appendChild(s);
+    let idx = 0;
+    const tryLoad = () => {
+      if (idx >= cdns.length) {
+        tesseractPromise = null;
+        return reject(new Error('Failed to load OCR scanner'));
+      }
+      const s = document.createElement('script');
+      s.src = cdns[idx++];
+      s.onload = () => window.Tesseract ? resolve(window.Tesseract) : tryLoad();
+      s.onerror = tryLoad;
+      document.head.appendChild(s);
+    };
+    tryLoad();
   });
   return tesseractPromise;
-}
-
-async function handleSlipImage(file) {
-  if (!file) return;
-  const statusEl = document.getElementById('ocr-status');
-  if (statusEl) statusEl.innerHTML = '<span style="color:#facc15;font-weight:700">Loading scanner & reading slip... (~2–4 seconds)</span>';
-  try {
-    const T = await ensureTesseract();
-    const res = await T.recognize(file, 'eng');
-    const text = (res && res.data && res.data.text) || '';
-    parseSlipText(text);
-  } catch (err) {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Could not read image: ${err.message}</span>`;
-  }
 }
 
 function parseSlipText(text) {
