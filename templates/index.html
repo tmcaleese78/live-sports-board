@@ -1407,44 +1407,65 @@ function parseSlipText(text) {
   }
 
   // 2. Detect Wager / Entry Cost & Payout
-  const costMatch = text.match(/(?:wager|entry|risk|bet|stake)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
-  const payMatch = text.match(/(?:to\s*win|payout|potential\s*win|returns?)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const costMatch = text.match(/(?:wager|entry|risk|bet|stake|total\s*wager)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const payMatch = text.match(/(?:to\s*win|payout|potential\s*win|returns?|est\.?\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
   if (costMatch && document.getElementById('b-cost')) document.getElementById('b-cost').value = costMatch[1];
   if (payMatch && document.getElementById('b-pay')) document.getElementById('b-pay').value = payMatch[1];
 
-  // 3. Build Player Lookup Index from liveData
+  // 3. Build Player Lookup Index (Full Name + Initial. LastName)
   const allPlayers = [];
   ['NFL', 'NBA', 'CFB'].forEach(sp => {
     ((liveData.players && liveData.players[sp]) || []).forEach(p => {
-      if (p && p.name) allPlayers.push({ sport: sp, name: p.name, lower: p.name.toLowerCase() });
+      if (!p || !p.name) return;
+      const parts = p.name.trim().split(/\s+/);
+      const shortForm = parts.length >= 2 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}`.toLowerCase() : '';
+      allPlayers.push({
+        sport: sp,
+        name: p.name,
+        lower: p.name.toLowerCase(),
+        short: shortForm
+      });
     });
   });
 
-  // 4. Match Player Props Line-by-Line
+  const nbaStats = new Set(['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']);
   let added = 0;
+
+  // 4. Scan Lines for Player Props (Matched Roster OR Direct OCR Prop Pattern)
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const lineLow = line.toLowerCase();
-    const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower));
-    if (!matchedPlayer) continue;
-
-    // Look at current line + next 2 lines for Over/Under, target number, and stat
     const windowTxt = [lines[i], lines[i + 1] || '', lines[i + 2] || ''].join(' ');
-    const ou = /\b(under|less|lower)\b/i.test(windowTxt) ? 'Under' : 'Over';
-    const stat = mapOcrStat(windowTxt) || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
-    const numMatches = windowTxt.match(/\b(\d{1,3}(?:\.\d)?)\b/g) || [];
-    const target = numMatches.map(Number).find(n => n > 0 && n < 600);
+    const stat = mapOcrStat(windowTxt);
+    const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower) || (p.short && lineLow.includes(p.short)));
 
-    if (target) {
-      draftLegs.push({
-        type: 'prop',
-        sport: matchedPlayer.sport,
-        player: matchedPlayer.name,
-        stat,
-        ou,
-        target
-      });
-      added++;
+    if (matchedPlayer) {
+      const ou = /\b(under|less|lower)\b/i.test(windowTxt) ? 'Under' : 'Over';
+      const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
+      const numMatches = windowTxt.match(/\b(\d{1,3}(?:\.\d)?)\b/g) || [];
+      const target = numMatches.map(Number).find(n => n > 0 && n < 600);
+      if (target) {
+        draftLegs.push({ type: 'prop', sport: matchedPlayer.sport, player: matchedPlayer.name, stat: resolvedStat, ou, target });
+        added++;
+        i += 1;
+        continue;
+      }
+    }
+
+    // Fallback: Direct Prop Pattern even if player isn't in today's live feed yet
+    // Matches lines like "Josh Allen Over 245.5 Passing Yards" or "J. Tatum 25+ Points"
+    const directProp = line.match(/^([A-Z][a-zA-Z'.-]+(?:\s+[A-Z][a-zA-Z'.-]+){1,2})\s+(?:(Over|Under|More|Less|Higher|Lower)\s+)?(\d{1,3}(?:\.\d)?)\+?\s+(.+)$/i);
+    if (directProp) {
+      const pName = directProp[1].trim();
+      const rawOu = (directProp[2] || 'Over').toLowerCase();
+      const ou = /under|less|lower/.test(rawOu) ? 'Under' : 'Over';
+      const target = parseFloat(directProp[3]);
+      const detectedStat = mapOcrStat(directProp[4]);
+      if (detectedStat && target > 0 && target < 600) {
+        const sport = nbaStats.has(detectedStat) ? 'NBA' : 'NFL';
+        draftLegs.push({ type: 'prop', sport, player: pName, stat: detectedStat, ou, target });
+        added++;
+      }
     }
   }
 
@@ -1453,7 +1474,8 @@ function parseSlipText(text) {
     if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${added} leg${added === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
     showToast(`Imported ${added} leg${added === 1 ? '' : 's'} from screenshot!`);
   } else {
-    if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">Slip scanned (${foundBook ? foundBook : 'book detected'}), but no active game players matched automatically—add legs manually below.</span>`;
+    const preview = lines.slice(0, 4).join(' | ').slice(0, 140);
+    if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">Scanned (${foundBook ? foundBook[1] : 'Slip'}), no legs matched. OCR saw: <em>"${preview || 'blank text'}"</em></span>`;
   }
 }
 
