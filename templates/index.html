@@ -1075,101 +1075,160 @@ function delCard(i) {
   renderCards();
   showToast('Bet card deleted');
 }
+let curCardView = 'active';
+
+function setCardView(v) {
+  curCardView = v;
+  renderCards();
+}
+
+function toggleArchiveCard(i) {
+  const c = userCards[i];
+  if (!c) return;
+  c.archived = !c.archived;
+  localStorage.setItem('osp_cards', JSON.stringify(userCards));
+  pushCardsToCloud();
+  renderCards();
+  showToast(c.archived ? 'Card moved to Settled History' : 'Card restored to Active Sweats');
+}
 
 function renderCards() {
-  document.getElementById('card-cnt').textContent = userCards.length;
-  const isDemo = userCards.length === 0;
-  const rawList = isDemo ? buildSampleCards() : userCards;
-  const booksPresent = [...new Set(rawList.map(c => c.book || 'Other'))];
-  if (curBookFilter !== 'ALL' && !booksPresent.includes(curBookFilter)) curBookFilter = 'ALL';
-  const activeList = (!isDemo && curBookFilter !== 'ALL')
-    ? rawList.filter(c => (c.book || 'Other') === curBookFilter)
-    : rawList;
+  const container = document.getElementById('view-cards');
+  if (!container) return;
+  try {
+    document.getElementById('card-cnt').textContent = userCards.length;
+    const isDemo = userCards.length === 0;
+    const parseAmt = v => parseFloat(String(v ?? 0).replace(/[^0-9.-]/g, '')) || 0;
 
-  const parseAmt = v => parseFloat(String(v ?? 0).replace(/[^0-9.-]/g, '')) || 0;
-
-  const renderSingleCard = (c, idx, isSampleView) => {
-    const evals = (c.legs || []).map(evalLeg);
-    const allHit = evals.length > 0 && evals.every(x => x.hit);
-    const anyMiss = evals.some(x => x.miss);
-    const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-    const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
-      <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
-      <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
-      <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
-    const bk = c.book || (c.title && c.title.split('•')[0].trim()) || 'Other';
-    const lbl = c.title && !c.book ? c.title : (c.title || `${(c.legs || []).length}-Leg Card`);
-
-    let actionBtns = '';
-    if (isSampleView) {
-      if (isAdminUser() && customSamples.length > 0) {
-        actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
-      }
-       } else {
-      const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
-      const promoteBtn = isAdminUser()
-        ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>`
-        : '';
-      actionBtns = `${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
-    }
-
-    const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
-      <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${(isSampleView || c.isSample)?'<span class="sample-tag">Live Sample</span>':''}</div>
-      <div style="display:flex;align-items:center">${actionBtns}</div>
-    </div>`;
-    return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
-      <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
-  };
-
-  let totC = 0, liveP = 0, paidP = 0;
-  const cardsHtml = activeList.map((c, i) => {
-    const realIdx = isDemo ? i : userCards.indexOf(c);
-    if (!isDemo) {
+    const getCardOutcome = c => {
       const evals = (c.legs || []).map(evalLeg);
       const allHit = evals.length > 0 && evals.every(x => x.hit);
       const anyMiss = evals.some(x => x.miss);
-      const cCost = parseAmt(c.cost);
-      const cPay = parseAmt(c.payout);
-      totC += cCost;
-      if (!anyMiss) liveP += cPay;
-      if (allHit) paidP += cPay;
-    }
-    return renderSingleCard(c, realIdx, isDemo);
-  }).join('');
+      const isSettled = Boolean(c.archived) || allHit || anyMiss;
+      return { evals, allHit, anyMiss, isSettled };
+    };
 
-  const heroHtml = isDemo ? `<div class="mission-hero">
-    <div>
-      <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
-      <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog & more in real time.</div>
-    </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="setTab('build')">+ Build Your First Bet Card</button>
-      <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="openAuthModal()">Sign In to Sync</button>
-    </div>
-  </div>` : '';
+    const rawList = isDemo ? buildSampleCards() : userCards;
+    const activeAll = isDemo ? rawList : rawList.filter(c => !getCardOutcome(c).isSettled);
+    const historyAll = isDemo ? [] : rawList.filter(c => getCardOutcome(c).isSettled);
+    const viewPool = isDemo ? rawList : (curCardView === 'history' ? historyAll : activeAll);
 
-  const stripHtml = isDemo ? '' : `<div class="sweat-strip">
-    <div class="sweat-box"><div class="sweat-lbl">Active Slips</div><div class="sweat-val">${activeList.length}</div></div>
-    <div class="sweat-box"><div class="sweat-lbl">Total Risked</div><div class="sweat-val">${money(totC)}</div></div>
-    <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(liveP)}</div></div>
-    <div class="sweat-box"><div class="sweat-lbl">Paid Out</div><div class="sweat-val" style="color:#4ade80">${money(paidP)}</div></div>
-  </div>`;
+    const booksPresent = [...new Set(viewPool.map(c => c.book || 'Other'))];
+    if (curBookFilter !== 'ALL' && !booksPresent.includes(curBookFilter)) curBookFilter = 'ALL';
+    const activeList = (!isDemo && curBookFilter !== 'ALL')
+      ? viewPool.filter(c => (c.book || 'Other') === curBookFilter)
+      : viewPool;
 
-  const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
-    <button class="pill ${curBookFilter==='ALL'?'active':''}" onclick="setBookFilter('ALL')">All Platforms (${rawList.length})</button>` +
-    booksPresent.map(b => `<button class="pill ${curBookFilter===b?'active':''}" onclick="setBookFilter('${b}')">${b} (${rawList.filter(c=>(c.book||'Other')===b).length})</button>`).join('') +
-  `</div>` : '';
+    const renderSingleCard = (c, idx, isSampleView) => {
+      const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
+      const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
+      const rows = evals.map(e => `<div class="p-wrap ${e.hit?'hit':(e.miss?'miss':'')}" style="--tm-clr:${e.bg}">
+        <div class="p-main"><div class="logo-cell">${e.logo?`<img src="${e.logo}">`:''}</div>
+        <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
+        <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss?'#ef4444':'#22c55e'}"></div></div></div>`).join('');
+      const bk = c.book || 'Other';
+      const lbl = c.title || `${(c.legs || []).length}-Leg Card`;
 
-  const adminSampleSection = isAdminUser() ? `
-    <div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
-      <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
-      ${customSamples.length
-        ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>`
-        : `<p style="color:var(--muted)">No custom daily samples published yet (currently showing automatic live player demo slips). Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
+      let actionBtns = '';
+      if (isSampleView) {
+        if (isAdminUser() && customSamples.length > 0) {
+          actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
+        }
+      } else {
+        const archBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(148,163,184,0.4);color:#cbd5e1" onclick="toggleArchiveCard(${idx})">${isSettled ? 'Reopen' : 'Archive'}</button>`;
+        const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
+        const promoteBtn = isAdminUser()
+          ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>`
+          : '';
+        actionBtns = `${archBtn}${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
+      }
+
+      const statusBadge = !isSampleView && isSettled
+        ? (allHit
+            ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(34,197,94,0.2);color:#4ade80">WON</span>`
+            : (anyMiss ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(239,68,68,0.2);color:#f87171">LOST</span>` : `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(148,163,184,0.2);color:#cbd5e1">ARCHIVED</span>`))
+        : '';
+
+      const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
+        <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${statusBadge}${(isSampleView || c.isSample)?'<span class="sample-tag">Live Sample</span>':''}</div>
+        <div style="display:flex;align-items:center">${actionBtns}</div>
+      </div>`;
+      return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
+        <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
+    };
+
+    let actRisk = 0, actPot = 0;
+    activeAll.forEach(c => {
+      actRisk += parseAmt(c.cost);
+      actPot += parseAmt(c.payout);
+    });
+
+    let wins = 0, losses = 0, histRisk = 0, histPaid = 0;
+    historyAll.forEach(c => {
+      const { allHit, anyMiss } = getCardOutcome(c);
+      histRisk += parseAmt(c.cost);
+      if (allHit) { wins++; histPaid += parseAmt(c.payout); }
+      else if (anyMiss) { losses++; }
+    });
+    const netPL = Math.round((histPaid - histRisk) * 100) / 100;
+    const winPct = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
+
+    const cardsHtml = activeList.map((c, i) => {
+      const realIdx = isDemo ? i : userCards.indexOf(c);
+      return renderSingleCard(c, realIdx, isDemo);
+    }).join('');
+
+    const heroHtml = isDemo ? `<div class="mission-hero">
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
+        <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog & more in real time.</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="setTab('build')">+ Build Your First Bet Card</button>
+        <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="openAuthModal()">Sign In to Sync</button>
+      </div>
     </div>` : '';
 
-  const secTitle = isDemo ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>` : `<h2>My Bet Cards (${activeList.length})</h2>`;
-  document.getElementById('view-cards').innerHTML = heroHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">No bet cards match this platform filter.</p>`) + adminSampleSection;
+    const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px">
+      <button class="pill ${curCardView==='active'?'active':''}" style="font-weight:800" onclick="setCardView('active')">Active Sweats (${activeAll.length})</button>
+      <button class="pill ${curCardView==='history'?'active':''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
+    </div>`;
+
+    const stripHtml = isDemo ? '' : (curCardView === 'history'
+      ? `<div class="sweat-strip">
+          <div class="sweat-box"><div class="sweat-lbl">Settled Record</div><div class="sweat-val">${wins}W - ${losses}L (${winPct}%)</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Settled Risked</div><div class="sweat-val">${money(histRisk)}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Total Paid Out</div><div class="sweat-val" style="color:#4ade80">${money(histPaid)}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Net Profit / Loss</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div>
+        </div>`
+      : `<div class="sweat-strip">
+          <div class="sweat-box"><div class="sweat-lbl">Active Slips</div><div class="sweat-val">${activeAll.length}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Active Risked</div><div class="sweat-val">${money(actRisk)}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(actPot)}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Settled Net P&L</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div>
+        </div>`);
+
+    const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
+      <button class="pill ${curBookFilter==='ALL'?'active':''}" onclick="setBookFilter('ALL')">All Platforms (${viewPool.length})</button>` +
+      booksPresent.map(b => `<button class="pill ${curBookFilter===b?'active':''}" onclick="setBookFilter('${b}')">${b} (${viewPool.filter(c=>(c.book||'Other')===b).length})</button>`).join('') +
+    `</div>` : '';
+
+    const adminSampleSection = isAdminUser() ? `
+      <div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
+        <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
+        ${customSamples.length
+          ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>`
+          : `<p style="color:var(--muted)">No custom daily samples published yet. Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
+      </div>` : '';
+
+    const emptyText = curCardView === 'history' ? 'No settled or archived bet cards yet.' : 'No active bet cards right now. Build a new card or check Settled History!';
+    const secTitle = isDemo
+      ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates automatically as games play — disappears once you build your first card)</span></h2>`
+      : `<h2>${curCardView === 'history' ? 'Settled History' : 'Active Bet Cards'} (${activeList.length})</h2>`;
+    container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + (cardsHtml ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${cardsHtml}</div>` : `<p style="color:var(--muted)">${emptyText}</p>`) + adminSampleSection;
+  } catch (err) {
+    container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
+  }
 }
     
 function syncBuilderOpts() {
