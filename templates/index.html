@@ -584,9 +584,10 @@
         <select id="b-ou"><option value="Over">Over</option><option value="Under">Under</option></select>
         <input id="b-total" type="number" step="0.5" placeholder="Total (e.g. 48.5)" style="width:150px">
       </div>
-      <div class="row-flex">
+        <div class="row-flex">
         <button class="pill" onclick="addLeg()">+ Add Leg to Card</button>
         <button class="btn-primary" onclick="saveCard()">Save Card to Tracker</button>
+        <button id="b-cancel-edit" class="pill" style="display:none;border-color:rgba(248,113,113,0.45);color:#f87171" onclick="cancelEdit()">Cancel Edit</button>
       </div>
       <div id="draft-legs"></div>
     </div>
@@ -1017,6 +1018,51 @@ function bookClass(b) {
   const k = String(b || '').toLowerCase().replace(/[^a-z]/g, '');
   return ['fanduel','draftkings','prizepicks','underdog','betmgm','caesars','espnbet'].includes(k) ? `book-${k}` : '';
 }
+let editingCardIdx = -1;
+
+function setBuilderEditUI(isEditing) {
+  const hdr = document.querySelector('#view-build h2');
+  const saveBtn = document.querySelector('#view-build .btn-primary');
+  const cancelBtn = document.getElementById('b-cancel-edit');
+  if (hdr) hdr.textContent = isEditing ? 'Edit Saved Bet Card' : 'Create Custom Bet Card';
+  if (saveBtn) saveBtn.textContent = isEditing ? 'Update Bet Card' : 'Save Card to Tracker';
+  if (cancelBtn) cancelBtn.style.display = isEditing ? 'inline-block' : 'none';
+}
+
+function editCard(i) {
+  const c = userCards[i];
+  if (!c) return;
+  editingCardIdx = i;
+  editingSampleIdx = -1;
+  draftLegs = JSON.parse(JSON.stringify(c.legs || []));
+  setTab('build');
+  const bookEl = document.getElementById('b-book');
+  const titleEl = document.getElementById('b-title');
+  const costEl = document.getElementById('b-cost');
+  const payEl = document.getElementById('b-pay');
+  if (bookEl) bookEl.value = c.book || 'FanDuel';
+  if (titleEl) titleEl.value = c.title || '';
+  if (costEl) costEl.value = c.cost || '';
+  if (payEl) payEl.value = c.payout || '';
+  setBuilderEditUI(true);
+  renderDraft();
+  showToast(`Editing ${c.book || 'Bet'} card — update legs or amounts and click Update`);
+}
+
+function cancelEdit() {
+  editingCardIdx = -1;
+  editingSampleIdx = -1;
+  draftLegs = [];
+  const titleEl = document.getElementById('b-title');
+  const costEl = document.getElementById('b-cost');
+  const payEl = document.getElementById('b-pay');
+  if (titleEl) titleEl.value = '';
+  if (costEl) costEl.value = '';
+  if (payEl) payEl.value = '';
+  setBuilderEditUI(false);
+  renderDraft();
+  setTab('cards');
+}
     
 function delCard(i) {
   const c = userCards[i];
@@ -1059,11 +1105,12 @@ function renderCards() {
       if (isAdminUser() && customSamples.length > 0) {
         actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
       }
-    } else {
+       } else {
+      const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
       const promoteBtn = isAdminUser()
         ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>`
         : '';
-      actionBtns = `${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
+      actionBtns = `${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
     }
 
     const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
@@ -1202,19 +1249,44 @@ function saveCard() {
   const titleEl = document.getElementById('b-title');
   const book = bookEl ? bookEl.value : 'Other';
   const title = titleEl ? titleEl.value.trim() : '';
-  const summary = `${book}${title ? ' — ' + title : ''} (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'}, Cost: ${money(cost)}, Payout: ${money(payout)})`;
-  if (!confirm(`Save this bet card?\n\n${summary}`)) return;
 
-  userCards.push({ book, title, cost, payout, legs: draftLegs });
+  if (editingSampleIdx >= 0 && isAdminUser()) {
+    customSamples[editingSampleIdx] = { book, title, cost, payout, legs: draftLegs };
+    editingSampleIdx = -1;
+    pushSamplesToCloud();
+    if (titleEl) titleEl.value = '';
+    draftLegs = [];
+    setBuilderEditUI(false);
+    renderDraft();
+    document.getElementById('b-cost').value = '';
+    document.getElementById('b-pay').value = '';
+    setTab('cards');
+    showToast('Daily Sample card updated');
+    return;
+  }
+
+  const isEdit = editingCardIdx >= 0 && userCards[editingCardIdx];
+  const actionWord = isEdit ? 'Update' : 'Save';
+  const summary = `${book}${title ? ' — ' + title : ''} (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'}, Cost: ${money(cost)}, Payout: ${money(payout)})`;
+  if (!confirm(`${actionWord} this bet card?\n\n${summary}`)) return;
+
+  if (isEdit) {
+    userCards[editingCardIdx] = { ...userCards[editingCardIdx], book, title, cost, payout, legs: draftLegs };
+    editingCardIdx = -1;
+  } else {
+    userCards.push({ book, title, cost, payout, legs: draftLegs });
+  }
+
   if (titleEl) titleEl.value = '';
   localStorage.setItem('osp_cards', JSON.stringify(userCards));
   pushCardsToCloud();
   draftLegs = [];
+  setBuilderEditUI(false);
   renderDraft();
   document.getElementById('b-cost').value = '';
   document.getElementById('b-pay').value = '';
   setTab('cards');
-  showToast('Bet card saved');
+  showToast(isEdit ? 'Bet card updated' : 'Bet card saved');
 }
 
 let firstLoad = true;
