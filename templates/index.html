@@ -1412,9 +1412,8 @@ function preprocessSlipImage(file) {
           gray = 255 - gray;
           gray = gray < 155 ? Math.max(0, gray * 0.65) : Math.min(255, 255 - (255 - gray) * 0.4);
         } else {
-          // Use green channel on light UI so pink/magenta "NO" text renders dark and sharp
           const lightGray = 0.25 * d[i] + 0.65 * d[i + 1] + 0.10 * d[i + 2];
-          gray = lightGray < 215 ? Math.max(0, lightGray * 0.72) : 255;
+          gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
         }
         d[i] = d[i + 1] = d[i + 2] = gray;
       }
@@ -1561,17 +1560,20 @@ function parseSlipText(text) {
       return words.some(w => a.includes(w) || h.includes(w));
     });
   };
-
   const resolveTeamSide = (game, hint) => {
-    const raw = String(hint || '').toLowerCase();
+    const raw = String(hint || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
     for (const [alias, fullTarget] of Object.entries(teamAliases)) {
       if (raw.includes(alias)) {
         return game.awayFull.toLowerCase().includes(fullTarget) ? game.awayFull : game.homeFull;
       }
     }
-    const [firstWord = ''] = raw.replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/);
-    const awayStr = `${game.away} ${game.awayFull}`.toLowerCase();
-    return (firstWord && awayStr.includes(firstWord)) ? game.awayFull : game.homeFull;
+    const awayTokens = `${game.away} ${game.awayFull}`.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+    const homeTokens = `${game.home} ${game.homeFull}`.toLowerCase().split(/\s+/).filter(w => w.length >= 3);
+    const awayHit = awayTokens.some(w => new RegExp(`\\b${w}\\b`).test(raw));
+    const homeHit = homeTokens.some(w => new RegExp(`\\b${w}\\b`).test(raw));
+    if (homeHit && !awayHit) return game.homeFull;
+    if (awayHit && !homeHit) return game.awayFull;
+    return game.homeFull;
   };
 
   const summaryPicks = [];
