@@ -1668,6 +1668,7 @@ function parseSlipText(text) {
       }
     }
 
+    // Pattern C: Direct Player Prop Pattern even if player isn't in today's live feed
     const directProp = line.match(/^([A-Z][a-zA-Z'.-]+(?:\s+[A-Z][a-zA-Z'.-]+){1,2})\s+(?:(Over|Under|More|Less|Higher|Lower)\s+)?(\d{1,3}(?:\.\d)?)\+?\s+(.+)$/i);
     if (directProp) {
       const [, pNameRaw = '', rawOuStr = 'Over', targetRaw = '0', statRaw = ''] = directProp;
@@ -1683,6 +1684,7 @@ function parseSlipText(text) {
       }
     }
 
+    // Pattern D: Team Spread or Explicit Moneyline like "Miami FL -6.5" or "Chiefs ML"
     const teamPick = line.match(/^([A-Za-z0-9 .&'()-]{3,30})\s+([+-]\d{1,2}(?:\.\d)?|ML|Moneyline|to\s+Win)\b/i);
     if (teamPick) {
       const [, teamHintRaw = '', pickTypeRaw = ''] = teamPick;
@@ -1698,7 +1700,8 @@ function parseSlipText(text) {
         continue;
       }
     }
-     // Pattern E: Standalone Team Winner Line (skips matchup schedule banners like "TB Sun 10:00 AM DET")
+
+    // Pattern E: Standalone Team Winner Line (skips matchup schedule banners like "TB Sun 10:00 AM DET")
     const isScheduleBanner = /\b(\d{1,2}:\d{2}|am|pm|sun|mon|tue|wed|thu|fri|sat|today|tomorrow|final|live|q[1-4]|half|ot)\b/i.test(line);
     if (!isScheduleBanner && !/\b(over|under|bought|to pay|to win|wager|combo|pick|open|sell|share|hide|trade|placed|@|vs)\b/i.test(line)) {
       const cleanedWinner = line.replace(/^(winner|moneyline|ml)\s*[:|-]?\s*/i, '').trim();
@@ -1719,7 +1722,7 @@ function parseSlipText(text) {
     showToast(`Imported ${added} leg${added === 1 ? '' : 's'} from screenshot!`);
   } else {
     const preview = lines.slice(0, 6).join(' | ').slice(0, 180);
-    if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">Scanned (${foundBook ? foundBook[1] : 'Slip'}), no legs matched. OCR saw: <em>"${preview || 'blank text'}"</em></span>`;
+    if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">Scanned (${foundBook ? foundBook.at(1) : 'Slip'}), no legs matched. OCR saw: <em>"${preview || 'blank text'}"</em></span>`;
   }
 }
 
