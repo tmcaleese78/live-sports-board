@@ -1471,8 +1471,12 @@ function parseSlipText(text) {
     }
   }
 
-  const costMatch = text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
-  const payMatch = text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
+  const costMatch =
+    text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
+    text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
+  const payMatch =
+    text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
+    text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
   if (costMatch && document.getElementById('b-cost')) document.getElementById('b-cost').value = costMatch.at(1);
   if (payMatch && document.getElementById('b-pay')) document.getElementById('b-pay').value = payMatch.at(1);
 
@@ -1561,7 +1565,7 @@ function parseSlipText(text) {
     return (firstWord && awayStr.includes(firstWord)) ? game.awayFull : game.homeFull;
   };
 
-   const summaryPicks = [];
+  const summaryPicks = [];
   const summaryRegex = /\b(Over|Under)\s+(\d{1,3}(?:\.\d)?)\b/gi;
   const headerBlock = lines.slice(0, 5).join(' ');
   if ((headerBlock.match(summaryRegex) || []).length >= 2) {
@@ -1582,7 +1586,8 @@ function parseSlipText(text) {
     const lineLow = line.toLowerCase();
     const windowTxt = [lines[i], lines[i + 1] || '', lines[i + 2] || ''].join(' ');
 
-    const totalLine = line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
+    const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage)\b/i.test(line);
+    const totalLine = !hasPlayerStatWord && line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
     if (totalLine) {
       const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
       const ou = ouRaw.charAt(0).toUpperCase() + ouRaw.slice(1).toLowerCase();
@@ -1595,11 +1600,10 @@ function parseSlipText(text) {
         continue;
       }
     }
-
+    // Pattern B: Matched Player Prop from liveData
     const prevLine = lines[i - 1] || '';
+    const prevLine2 = lines[i - 2] || '';
     const nextLine = lines[i + 1] || '';
-    const propContext = `${prevLine} ${line} ${nextLine}`;
-    const stat = mapOcrStat(propContext);
     const lineCleanLow = stripSuffix(lineLow);
     const matchedPlayer = allPlayers.find(p =>
       lineLow.includes(p.lower) ||
@@ -1607,13 +1611,16 @@ function parseSlipText(text) {
       (p.short && lineCleanLow.includes(p.short))
     );
     if (matchedPlayer) {
-            const prevLine2 = lines[i - 2] || '';
       const isPropHeader = s => /\b(over|under|more|less|higher|lower)\b|\d+\+|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
-      const dirLine = isPropHeader(prevLine)
-        ? prevLine
-        : (isPropHeader(prevLine2)
-            ? prevLine2
-            : (isPropHeader(line) ? line : (isPredictFormat ? '' : nextLine)));
+      // FanDuel/DraftKings Sportsbook puts "OVER 39.5 RUSHING YARDS" on nextLine; Predicts puts it on prevLine
+      const dirLine = (!isPredictFormat && isPropHeader(nextLine))
+        ? nextLine
+        : (isPropHeader(prevLine)
+            ? prevLine
+            : (isPropHeader(prevLine2)
+                ? prevLine2
+                : (isPropHeader(line) ? line : (isPredictFormat ? '' : nextLine))));
+      const stat = mapOcrStat(`${dirLine} ${line} ${prevLine}`);
       const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
 
