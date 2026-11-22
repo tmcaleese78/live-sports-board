@@ -1436,15 +1436,25 @@ function parseSlipText(text) {
   if (costMatch && document.getElementById('b-cost')) document.getElementById('b-cost').value = costMatch[1];
   if (payMatch && document.getElementById('b-pay')) document.getElementById('b-pay').value = payMatch[1];
 
-  // 3. Build Player & Game/Team Lookup Indexes from liveData
+   // 3. Build Player & Game/Team Lookup Indexes (strips Jr./Sr./II/III/IV suffixes automatically)
+  const stripSuffix = s => String(s || '').replace(/\b(jr\.?|sr\.?|ii|iii|iv|v)\b/gi, '').replace(/\s+/g, ' ').trim();
   const allPlayers = [];
   const allGames = [];
   ['NFL', 'NBA', 'CFB'].forEach(sp => {
     ((liveData.players && liveData.players[sp]) || []).forEach(p => {
       if (!p || !p.name) return;
-      const parts = p.name.trim().split(/\s+/);
-      const shortForm = parts.length >= 2 ? `${parts[0][0]}. ${parts.slice(1).join(' ')}`.toLowerCase() : '';
-      allPlayers.push({ sport: sp, name: p.name, lower: p.name.toLowerCase(), short: shortForm });
+      const baseName = stripSuffix(p.name);
+      const parts = baseName.split(/\s+/);
+      const first = parts.at(0) || '';
+      const last = parts.slice(1).join(' ');
+      const shortForm = (first && last) ? `${first.charAt(0)}. ${last}`.toLowerCase() : '';
+      allPlayers.push({
+        sport: sp,
+        name: p.name,
+        lower: p.name.toLowerCase(),
+        baseLower: baseName.toLowerCase(),
+        short: shortForm
+      });
     });
     ((liveData.games && liveData.games[sp]) || []).forEach(g => {
       const awayFull = g.away_full || g.away || '';
@@ -1534,23 +1544,40 @@ function parseSlipText(text) {
         continue;
       }
     }
-       // Pattern B: Matched Player Prop from liveData (checks line above + current + line below)
+      // Pattern B: Matched Player Prop from liveData
     const prevLine = lines[i - 1] || '';
     const nextLine = lines[i + 1] || '';
     const propContext = `${prevLine} ${line} ${nextLine}`;
     const stat = mapOcrStat(propContext);
-    const matchedPlayer = allPlayers.find(p => lineLow.includes(p.lower) || (p.short && lineLow.includes(p.short)));
+    const lineCleanLow = stripSuffix(lineLow);
+    const matchedPlayer = allPlayers.find(p =>
+      lineLow.includes(p.lower) ||
+      (p.baseLower.length >= 5 && lineCleanLow.includes(p.baseLower)) ||
+      (p.short && lineCleanLow.includes(p.short))
+    );
     if (matchedPlayer) {
-      // Prioritize header right above player (e.g., "Under 233.5" or "50+") before falling back to full context
-      const headerTxt = /\b(over|under|more|less|higher|lower|\d+\+)\b/i.test(prevLine) ? `${prevLine} ${line}` : propContext;
-      const ou = /\b(under|less|lower)\b/i.test(headerTxt) ? 'Under' : 'Over';
+      // Find the line containing Over/Under/More/Less or a milestone like 50+
+      const dirLine = [prevLine, line, nextLine].find(l => /\b(over|under|more|less|higher|lower)\b|\d+\+/i.test(l)) || propContext;
+      const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
-      // Strip clock times (e.g. 10:00 AM), dates, and percentages so only real prop lines remain
-      const cleanedNumsTxt = headerTxt
+
+      // Strip clock times (10:00 AM) and percentages (1%) before extracting target line
+      const cleanedNumsTxt = dirLine
         .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
         .replace(/\b\d+(?:\.\d+)?%/g, ' ');
-      const numMatches = cleanedNumsTxt.match(/\b(\d{1,3}(?:\.\d)?)\+?\b/g) || [];
-      const target = numMatches.map(n => parseFloat(n)).find(n => n > 0 && n < 600);
+
+      // 1st priority: explicit "Over/Under/More/Less 244.5" pattern
+      const explicitDirNum = cleanedNumsTxt.match(/\b(?:over|under|more|less|higher|lower)\s+(\d{1,3}(?:\.\d)?)\b/i);
+      // 2nd priority: milestone "50+" pattern
+      const milestoneNum = cleanedNumsTxt.match(/\b(\d{2,3})\+/);
+      // 3rd priority: any decimal number (e.g. 244.5) or multi-digit number
+      const fallbackNums = (cleanedNumsTxt.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
+      const decimalFirst = fallbackNums.find(n => !Number.isInteger(n)) || fallbackNums.find(n => n >= 10) || fallbackNums.at(0);
+
+      const target = explicitDirNum
+        ? parseFloat(explicitDirNum.at(1))
+        : (milestoneNum ? parseFloat(milestoneNum.at(1)) : decimalFirst);
+
       if (target) {
         draftLegs.push({ type: 'prop', sport: matchedPlayer.sport, player: matchedPlayer.name, stat: resolvedStat, ou, target });
         added++;
