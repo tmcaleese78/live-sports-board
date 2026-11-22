@@ -1484,7 +1484,10 @@ function parseSlipText(text) {
     text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
 
   const finalCost = dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '');
-  const finalPay = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
+  let finalPay = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
+  if (finalCost && finalPay && /^\d{3,4}$/.test(finalPay) && parseFloat(finalPay) > parseFloat(finalCost) * 25) {
+    finalPay = (parseInt(finalPay, 10) / 100).toFixed(2);
+  }
   if (finalCost && document.getElementById('b-cost')) document.getElementById('b-cost').value = finalCost;
   if (finalPay && document.getElementById('b-pay')) document.getElementById('b-pay').value = finalPay;
 
