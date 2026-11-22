@@ -1607,9 +1607,13 @@ function parseSlipText(text) {
       (p.short && lineCleanLow.includes(p.short))
     );
     if (matchedPlayer) {
-      const dirLine = /\b(over|under|more|less|higher|lower)\b|\d+\+/i.test(prevLine)
+      const prevLine2 = lines[i - 2] || '';
+      const hasPrevProp = /\b(over|under|more|less|higher|lower)\b|\d+\+|\b\d{1,3}\.\d\b/i.test(prevLine);
+      const dirLine = hasPrevProp
         ? prevLine
-        : (/\b(over|under|more|less|higher|lower)\b|\d+\+/i.test(line) ? line : nextLine);
+        : (/\b(over|under|more|less|higher|lower)\b|\d+\+|\b\d{1,3}\.\d\b/i.test(prevLine2)
+            ? prevLine2
+            : (/\b(over|under|more|less|higher|lower)\b|\d+\+/i.test(line) ? line : nextLine));
       const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
 
