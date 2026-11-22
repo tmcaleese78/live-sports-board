@@ -1623,7 +1623,7 @@ function parseSlipText(text) {
             : (isPropHeader(prevLine2)
                 ? prevLine2
                 : (isPropHeader(line) ? line : (isPredictFormat ? '' : nextLine))));
-      const stat = mapOcrStat(`${dirLine} ${line} ${nextLine} ${prevLine}`);
+      const stat = mapOcrStat(dirLine) || mapOcrStat(line) || mapOcrStat(nextLine) || mapOcrStat(prevLine);
       const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
 
