@@ -1471,14 +1471,18 @@ function parseSlipText(text) {
     }
   }
 
+  const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
   const costMatch =
     text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
     text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
   const payMatch =
     text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
     text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
-  if (costMatch && document.getElementById('b-cost')) document.getElementById('b-cost').value = costMatch.at(1);
-  if (payMatch && document.getElementById('b-pay')) document.getElementById('b-pay').value = payMatch.at(1);
+
+  const finalCost = dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '');
+  const finalPay = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
+  if (finalCost && document.getElementById('b-cost')) document.getElementById('b-cost').value = finalCost;
+  if (finalPay && document.getElementById('b-pay')) document.getElementById('b-pay').value = finalPay;
 
   const stripSuffix = s => String(s || '').replace(/\b(jr\.?|sr\.?|ii|iii|iv|v)\b/gi, '').replace(/\s+/g, ' ').trim();
   const allPlayers = [];
@@ -1612,7 +1616,6 @@ function parseSlipText(text) {
     );
     if (matchedPlayer) {
       const isPropHeader = s => /\b(over|under|more|less|higher|lower)\b|\d+\+|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
-      // FanDuel/DraftKings Sportsbook puts "OVER 39.5 RUSHING YARDS" on nextLine; Predicts puts it on prevLine
       const dirLine = (!isPredictFormat && isPropHeader(nextLine))
         ? nextLine
         : (isPropHeader(prevLine)
@@ -1620,7 +1623,7 @@ function parseSlipText(text) {
             : (isPropHeader(prevLine2)
                 ? prevLine2
                 : (isPropHeader(line) ? line : (isPredictFormat ? '' : nextLine))));
-      const stat = mapOcrStat(`${dirLine} ${line} ${prevLine}`);
+      const stat = mapOcrStat(`${dirLine} ${line} ${nextLine} ${prevLine}`);
       const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
       const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
 
