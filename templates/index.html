@@ -930,10 +930,10 @@ function evalLeg(leg) {
     return {name: leg.team, stat: lbl, gained: g.state==='pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1};
   }
 
-  if (leg.type === 'total' || (leg.game && !leg.player)) {
+    if (leg.type === 'total' || (leg.game && !leg.player)) {
     const line = Number(leg.total) || 0;
     const ou = leg.ou === 'Under' ? 'Under' : 'Over';
-    const lbl = line > 0 ? `${ou} ${line}` : `${ou} Total`;
+    const totLbl = line > 0 ? `${ou} ${line}` : `${ou} Total`;
     const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
     const targetGame = norm(leg.game);
     const g = games.find(x =>
@@ -942,40 +942,40 @@ function evalLeg(leg) {
       (targetGame && targetGame.includes(norm(x.away_full || x.away)) && targetGame.includes(norm(x.home_full || x.home)))
     );
     if (!g || line <= 0) {
-      return {name: leg.game || 'Game Total', stat: lbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
+      return {name: leg.game || 'Game Total', stat: totLbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
     }
     if (g.state === 'pre') {
-      return {name: leg.game, stat: lbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1};
-
+      return {name: leg.game, stat: totLbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1};
+    }
     const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0);
     const isUnder = ou === 'Under';
     const diff = Math.round((isUnder ? (line - comb) : (comb - line)) * 10) / 10;
     const hit = isUnder ? (g.state === 'post' && comb < line) : (comb > line);
     const miss = isUnder ? (Number.isInteger(line) ? comb > line : comb >= line) : (g.state === 'post' && comb <= line);
     const pct = (hit || miss) ? 100 : Math.max(0, Math.min(100, (comb / line) * 100));
-    const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(Math.abs(diff)))));
-    return {name: leg.game, stat: lbl, gained: String(comb), needed: needTxt, hit, miss, pct, bg: g.bg1, logo: g.lg1};
+    const totNeed = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(Math.abs(diff)))));
+    return {name: leg.game, stat: totLbl, gained: String(comb), needed: totNeed, hit, miss, pct, bg: g.bg1, logo: g.lg1};
   }
 
   const targetName = String(leg.player || '').trim().toLowerCase();
   const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
   const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
   const isUnder = leg.ou === 'Under';
-  const lbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat || ''}`.trim();
+  const propLbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat || ''}`.trim();
 
   if (isUnder) {
     const cushion = Math.round((tgt - cur) * 10) / 10;
     const miss = tgt > 0 && (Number.isInteger(tgt) ? cur > tgt : cur >= tgt);
     const hit = !miss && tgt > 0 && Boolean(p && p.state === 'post');
     const pct = (hit || miss) ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
-    const needTxt = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
-    return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+    const underNeed = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
+    return {name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: underNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
   }
 
   const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
   const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
-  const needTxt = delta > 0 ? `+${delta}` : (delta === 0 ? '0' : String(Math.abs(delta)));
-  return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+  const overNeed = delta > 0 ? `+${delta}` : (delta === 0 ? '0' : String(Math.abs(delta)));
+  return {name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: overNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
 let customSamples = [];
