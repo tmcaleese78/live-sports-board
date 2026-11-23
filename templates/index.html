@@ -1447,7 +1447,7 @@
         const url = URL.createObjectURL(file);
         img.onload = () => {
           URL.revokeObjectURL(url);
-          const scale = img.width < 1000 ? 1.8 : (img.width > 1600 ? (1600 / img.width) : 1.2);
+          const scale = img.width < 1000 ? 2.0 : (img.width > 1600 ? (1600 / img.width) : 1.4);
           const w = Math.round(img.width * scale);
           const h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
@@ -1464,13 +1464,25 @@
           }
           const isDarkBg = (lumSum / (d.length / 16)) < 128;
 
+          const redBands = [];
+          for (let y = 0; y < h; y += 2) {
+            let redHits = 0;
+            for (let x = Math.floor(w * 0.65); x < w; x += 2) {
+              const idx = (y * w + x) * 4;
+              if (d[idx] > 175 && d[idx + 1] < 95 && d[idx + 2] < 95) redHits++;
+            }
+            if (redHits >= 3) redBands.push(y / h);
+          }
+          window._ocrRedBands = redBands;
+
           for (let i = 0; i < d.length; i += 4) {
-            let gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
             if (isDarkBg) {
-              gray = 255 - gray;
-              gray = gray < 155 ? Math.max(0, gray * 0.65) : Math.min(255, 255 - (255 - gray) * 0.4);
+              // Crisp white text extraction: wipe out dark pill boxes (<115 lum) to pure white
+              gray = gray > 118 ? Math.max(0, 255 - (gray - 118) * 1.9) : 255;
             } else {
-              const lightGray = 0.25 * d[i] + 0.65 * d[i + 1] + 0.10 * d[i + 2];
+              const lightGray = 0.25 * r + 0.65 * g + 0.10 * b;
               gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
             }
             d[i] = d[i + 1] = d[i + 2] = gray;
@@ -1482,6 +1494,7 @@
         img.src = url;
       });
     }
+
     function triggerQuickSlipUpload() {
       setTab('build');
       const fileInput = document.getElementById('slip-file');
@@ -1722,6 +1735,17 @@
         }
 
         const pairCount = Math.min(dfsPlayers.length, dfsProps.length);
+        const redBands = window._ocrRedBands || [];
+        if (redBands.length > 0 && pairCount > 0) {
+          const avgRedY = redBands.reduce((a, b) => a + b, 0) / redBands.length;
+          // PrizePicks rows sit roughly between y=0.18 and y=0.82 of the screenshot
+          const estIdx = Math.round(((avgRedY - 0.18) / 0.64) * (pairCount - 1));
+          if (estIdx >= 0 && estIdx < pairCount && !dfsProps.some(p => p.ou === 'Under')) {
+            dfsProps[estIdx].ou = 'Under';
+          }
+        }
+        for (let k = 0; k < pairCount; k++) {
+
         for (let k = 0; k < pairCount; k++) {
           draftLegs.push({
             type: 'prop',
@@ -2252,6 +2276,7 @@
   </script>
 </body>
 </html>
+
 
 
 
