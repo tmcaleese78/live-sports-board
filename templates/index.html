@@ -1398,7 +1398,7 @@
       if (/receiving\s*yards|rec\s*yds|rec\s*yards/.test(s)) return 'REC YDS';
       if (/receiving\s*td|rec\s*td|receiving\s*touchdowns/.test(s)) return 'REC TD';
       if (/rush\s*\+\s*rec|scrimmage/.test(s)) return 'SCRIM YDS';
-      if (/receptions|catches|\brec\b/.test(s)) return 'REC';
+      if (/receptions|catches|\brecs?\b/.test(s)) return 'REC';
       if (/3-pt|3pm|three\s*pointers|threes/.test(s)) return '3PM';
       if (/rebounds|\breb\b/.test(s)) return 'REB';
       if (/assists|\bast\b/.test(s)) return 'AST';
@@ -1674,6 +1674,68 @@
       const detectedBookName = foundBook ? foundBook.at(1) : '';
       const isDfsPickem = ['PrizePicks', 'Underdog', 'Sleeper'].includes(detectedBookName) || /\b(power\s*play|flex\s*play|pick\s*play|slide\s*for\s*refund)\b/i.test(text);
       const isRosterSubtitle = s => /#\s*\d{1,2}\b/.test(s) || /\b(QB|RB|WR|TE|K|DST|PG|SG|SF|PF|C)\b\s*[•·|-]/.test(s);
+      if (isDfsPickem) {
+        const dfsPlayers = [];
+        const dfsProps = [];
+        const isDfsMeta = s => /\b(power\s*play|flex\s*play|slide\s*for\s*refund|self\s*refund|time\s*remaining|prizepicks|underdog|sleeper|to\s*win)\b/i.test(s);
+
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          if (isDfsMeta(line)) continue;
+
+          // 1. Collect matched players in top-to-bottom order
+          if (!isRosterSubtitle(line)) {
+            const lineNorm = resolveAlias(line);
+            const mp = allPlayers.find(p =>
+              line.toLowerCase().includes(p.lower) ||
+              (p.normLower.length >= 5 && new RegExp(`\\b${escRx(p.normLower)}\\b`).test(lineNorm)) ||
+              (p.short && new RegExp(`\\b${escRx(normName(p.short))}\\b`).test(lineNorm))
+            );
+            if (mp && !dfsPlayers.some(x => x.name === mp.name)) {
+              dfsPlayers.push(mp);
+            }
+          }
+
+          // 2. Collect (target, stat, ou) blocks in top-to-bottom order
+          const st = mapOcrStat(line);
+          if (st) {
+            const windowTxt = `${lines[i - 1] || ''} ${line} ${lines[i + 1] || ''}`;
+            const cleaned = windowTxt
+              .replace(/#\s*\d{1,2}\b/g, ' ')
+              .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
+              .replace(/\$\s*\d+(?:\.\d{1,2})?/g, ' ');
+            const ou = (/\b(under|less|lower)\b/i.test(cleaned) || /[↓▼]/.test(cleaned)) ? 'Under' : 'Over';
+            const nums = (cleaned.match(/\b\d{1,4}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0);
+            let val = nums.find(n => !Number.isInteger(n) && n < 600);
+            if (!val && nums.length) {
+              const cand = nums.find(n => n >= 15 && n % 10 === 5) || nums.find(n => n < 600);
+              if (cand) val = (Number.isInteger(cand) && cand >= 15 && cand % 10 === 5) ? cand / 10 : cand;
+            }
+            if (val && val > 0 && val < 600) {
+              dfsProps.push({ stat: st, ou, target: val });
+            }
+          }
+        }
+
+        const pairCount = Math.min(dfsPlayers.length, dfsProps.length);
+        for (let k = 0; k < pairCount; k++) {
+          draftLegs.push({
+            type: 'prop',
+            sport: dfsPlayers[k].sport,
+            player: dfsPlayers[k].name,
+            stat: dfsProps[k].stat,
+            ou: dfsProps[k].ou,
+            target: dfsProps[k].target
+          });
+          added++;
+        }
+        renderDraft();
+        if (added > 0) {
+          if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${added} leg${added === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
+          showToast(`Imported ${added} leg${added === 1 ? '' : 's'} from screenshot!`);
+        }
+        return;
+      }
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -2186,6 +2248,7 @@
   </script>
 </body>
 </html>
+
 
 
 
