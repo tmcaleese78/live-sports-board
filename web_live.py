@@ -572,3 +572,7 @@ threading.Thread(target=get_live_payload, kwargs={"fast": False}, daemon=True).s
 def index():
     return render_template("index.html")
 
+@app.route("/ping")
+def ping():
+    return "ok", 200
+
