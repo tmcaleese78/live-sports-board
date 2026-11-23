@@ -1159,7 +1159,6 @@
           }).join('');
 
           const bk = c.book || 'Other';
-          const lbl = `${(c.legs || []).length}-Leg Card`;
           let actionBtns = '';
           if (isSampleView) {
             if (isAdminUser() && customSamples.length > 0) {
@@ -1177,14 +1176,14 @@
             ? (allHit ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(34,197,94,0.2);color:#4ade80">WON</span>` : (anyMiss ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(239,68,68,0.2);color:#f87171">LOST</span>` : `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(148,163,184,0.2);color:#cbd5e1">ARCHIVED</span>`))
             : '';
 
-          const topTag = `<div style="padding:6px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between">
-            <div><span class="book-badge ${bookClass(bk)}">${bk}</span><span>${lbl}</span>${statusBadge}${(isSampleView || c.isSample) ? '<span class="sample-tag">Live Sample</span>' : ''}</div>
+          const topTag = `<div style="padding:7px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="book-badge ${bookClass(bk)}">${bk}</span>${statusBadge}${(isSampleView || c.isSample) ? '<span class="sample-tag">Live Sample</span>' : ''}</div>
             <div style="display:flex;align-items:center">${actionBtns}</div>
           </div>`;
           return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
             <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
         };
-        
+       
         if (sharedSweatCard) {
           const sharedHtml = renderSingleCard(sharedSweatCard, 0, true);
           container.innerHTML = `<div class="mission-hero" style="margin-bottom:16px">
