@@ -1479,8 +1479,8 @@
             const r = d[i], g = d[i + 1], b = d[i + 2];
             let gray = 0.299 * r + 0.587 * g + 0.114 * b;
             if (isDarkBg) {
-              // Crisp white text extraction: wipe out dark pill boxes (<115 lum) to pure white
-              gray = gray > 118 ? Math.max(0, 255 - (gray - 118) * 1.9) : 255;
+              // Wipe dark boxes (<95 lum) to white, force muted gray & white text (>95) to solid black
+              gray = gray > 95 ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
             } else {
               const lightGray = 0.25 * r + 0.65 * g + 0.10 * b;
               gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
@@ -2274,6 +2274,7 @@
   </script>
 </body>
 </html>
+
 
 
 
