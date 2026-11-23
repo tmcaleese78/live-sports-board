@@ -861,19 +861,19 @@
     }
 
     function evalLeg(leg) {
-      if (!leg) return { name: 'Unknown Pick', stat: '—', gained: '0', needed: '—', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '' };
+      if (!leg) return { name: 'Unknown Pick', stat: '—', gained: '0', needed: '—', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: 'NFL', clickType: 'player', clickKey: '' };
       const games = (liveData.games && liveData.games[leg.sport]) || [];
 
       if (leg.type === 'ml' || leg.type === 'spread') {
         const g = games.find(x => x.away === leg.team || x.home === leg.team || x.away_full === leg.team || x.home_full === leg.team);
         const sp = Number(leg.spread) || 0, lbl = leg.type === 'spread' ? `${sp > 0 ? '+' + sp : sp} Spread` : 'Win Game';
-        if (!g) return { name: leg.team || 'Team', stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '' };
+        if (!g) return { name: leg.team || 'Team', stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.team || '' };
         const isAway = (g.away === leg.team || g.away_full === leg.team);
         const myS = Number(isAway ? g.ascore : g.hscore) || 0, oppS = Number(isAway ? g.hscore : g.ascore) || 0;
         const margin = Math.round(((myS - oppS) + (leg.type === 'spread' ? sp : 0)) * 10) / 10;
         const hit = g.state === 'post' && margin > 0, miss = g.state === 'post' && margin <= 0;
         const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (margin > 0 ? `+${margin}` : String(margin)));
-        return { name: leg.team, stat: lbl, gained: g.state === 'pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1 };
+        return { name: leg.team, stat: lbl, gained: g.state === 'pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.team };
       }
 
       if (leg.type === 'total' || (leg.game && !leg.player)) {
@@ -882,19 +882,22 @@
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const targetGame = norm(leg.game);
         const g = games.find(x => norm(`${x.away} @ ${x.home}`) === targetGame || norm(`${x.away_full} @ ${x.home_full}`) === targetGame || (targetGame && targetGame.includes(norm(x.away_full || x.away)) && targetGame.includes(norm(x.home_full || x.home))));
-        if (!g || line <= 0) return { name: leg.game || 'Game Total', stat: totLbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '' };
-        if (g.state === 'pre') return { name: leg.game, stat: totLbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1 };
+        if (!g || line <= 0) return { name: leg.game || 'Game Total', stat: totLbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game || '' };
+        if (g.state === 'pre') return { name: leg.game, stat: totLbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game };
         const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0), isUnder = ou === 'Under';
         const diff = Math.round((isUnder ? (line - comb) : (comb - line)) * 10) / 10;
         const hit = isUnder ? (g.state === 'post' && comb < line) : (comb > line);
         const miss = isUnder ? (Number.isInteger(line) ? comb > line : comb >= line) : (g.state === 'post' && comb <= line);
         const pct = (hit || miss) ? 100 : Math.max(0, Math.min(100, (comb / line) * 100));
         const totNeed = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(Math.abs(diff)))));
-        return { name: leg.game, stat: totLbl, gained: String(comb), needed: totNeed, hit, miss, pct, bg: g.bg1, logo: g.lg1 };
+        return { name: leg.game, stat: totLbl, gained: String(comb), needed: totNeed, hit, miss, pct, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.game };
       }
 
       const targetName = String(leg.player || '').trim().toLowerCase();
       const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
+      const pGame = games.find(x => x.away === (p && p.team) || x.home === (p && p.team));
+      const pStatus = (p && p.status) || (pGame && pGame.status) || '';
+      const pIsLive = Boolean((p && p.state === 'in') || (pGame && pGame.state === 'in'));
       const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
       const isUnder = leg.ou === 'Under', propLbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat || ''}`.trim();
 
@@ -904,13 +907,13 @@
         const hit = !miss && tgt > 0 && Boolean(p && p.state === 'post');
         const pct = (hit || miss) ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
         const underNeed = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
-        return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: underNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '' };
+        return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: underNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: leg.sport, clickType: 'player', clickKey: leg.player || '' };
       }
 
       const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
       const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
       const overNeed = delta > 0 ? `+${delta}` : (delta === 0 ? '0' : String(Math.abs(delta)));
-      return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: overNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '' };
+      return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: overNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: leg.sport, clickType: 'player', clickKey: leg.player || '' };
     }
     /* ========================================================================
        4. BET CARD MANAGEMENT, SAMPLE CARDS & RENDERER (renderCards)
@@ -1026,6 +1029,38 @@
       }
       return samples;
     }
+    function openCardLegModal(sport, clickType, clickKey) {
+      if (!clickKey) return;
+      const sp = sport || 'NFL';
+      if (clickType === 'player') {
+        const pList = (liveData.players && liveData.players[sp]) || [];
+        const target = clickKey.trim().toLowerCase();
+        const p = pList.find(x => String(x && x.name || '').trim().toLowerCase() === target);
+        if (p && p.id) {
+          openPlayerCard(sp, p.id, p.name);
+        } else {
+          showToast(`Player box score not active yet for ${clickKey}`);
+        }
+        return;
+      }
+
+      const gList = (liveData.games && liveData.games[sp]) || [];
+      const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const q = norm(clickKey);
+      const g = gList.find(x => {
+        const away = norm(x.away), awayF = norm(x.away_full);
+        const home = norm(x.home), homeF = norm(x.home_full);
+        const fullMatchup = norm(`${x.away_full || x.away}@${x.home_full || x.home}`);
+        return fullMatchup === q || away === q || awayF === q || home === q || homeF === q ||
+          (q.includes(awayF || away) && q.includes(homeF || home));
+      });
+      if (g && g.id) {
+        openBox(sp, g.id, `${g.away_full || g.away} @ ${g.home_full || g.home}`);
+      } else {
+        showToast(`Game summary not active yet for ${clickKey}`);
+      }
+    }
+
     function renderCards() {
       const container = document.getElementById('view-cards');
       if (!container) return;
@@ -1056,13 +1091,21 @@
         const renderSingleCard = (c, idx, isSampleView) => {
           const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
           const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-          const rows = evals.map(e => `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg}">
-            <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}">` : ''}</div>
-            <div>${e.name}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
-            <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`).join('');
+          const rows = evals.map(e => {
+            const stBadge = e.statusTxt
+              ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive ? '● ' : ''}${e.statusTxt}</div>`
+              : '';
+            const safeSport = String(e.sport || '').replace(/'/g, "\\'");
+            const safeType = String(e.clickType || '').replace(/'/g, "\\'");
+            const safeKey = String(e.clickKey || '').replace(/'/g, "\\'");
+            return `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg};cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}')" title="Click for live stats / box score">
+              <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}">` : ''}</div>
+              <div><div>${e.name}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
+              <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
+          }).join('');
+
           const bk = c.book || 'Other';
           const lbl = `${(c.legs || []).length}-Leg Card`;
-
           let actionBtns = '';
           if (isSampleView) {
             if (isAdminUser() && customSamples.length > 0) {
@@ -1087,7 +1130,7 @@
             <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
         };
 
-        let actRisk = 0, actPot = 0;
+                let actRisk = 0, actPot = 0;
         activeAll.forEach(c => { actRisk += parseAmt(c.cost); actPot += parseAmt(c.payout); });
         let wins = 0, losses = 0, histRisk = 0, histPaid = 0;
         historyAll.forEach(c => {
@@ -1103,13 +1146,19 @@
         const heroHtml = isDemo ? `<div class="mission-hero">
           <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
           <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog & more in real time.</div></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="setTab('build')">+ Build Your First Bet Card</button>
-          <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="openAuthModal()">Sign In to Sync</button></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
+            <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="setTab('build')">+ Build Manually</button>
+            <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="openAuthModal()">Sign In to Sync</button>
+          </div>
         </div>` : '';
 
-        const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px">
-          <button class="pill ${curCardView === 'active' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('active')">Active Cards (${activeAll.length})</button>
-          <button class="pill ${curCardView === 'history' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
+        const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px;align-items:center;justify-content:space-between">
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="pill ${curCardView === 'active' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('active')">Active Cards (${activeAll.length})</button>
+            <button class="pill ${curCardView === 'history' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
+          </div>
+          <button class="btn-primary" style="padding:8px 15px;font-size:13px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
         </div>`;
 
         const stripHtml = isDemo ? '' : (curCardView === 'history'
@@ -1132,7 +1181,7 @@
         </div>` : '';
 
         const emptyText = curCardView === 'history' ? 'No settled or archived bet cards yet.' : 'No active bet cards right now. Build a new card or check Settled History!';
-                const secTitle = isDemo
+        const secTitle = isDemo
           ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates live — disappears once you build your first card)</span></h2>`
           : `<h2>${curCardView === 'history' ? 'Settled History' : 'Active Bet Cards'} (${activeList.length})</h2>`;
         const gridWrap = cardsHtml
@@ -1143,7 +1192,6 @@
         container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
       }
     }
-
     /* ========================================================================
        5. MANUAL BET CARD BUILDER & DRAFT LEG LIST
        ======================================================================== */
@@ -1322,7 +1370,11 @@
         img.src = url;
       });
     }
-
+    function triggerQuickSlipUpload() {
+      setTab('build');
+      const fileInput = document.getElementById('slip-file');
+      if (fileInput) fileInput.click();
+    }
     async function handleSlipImage(input) {
       let file = input;
       if (input && input.files) { file = input.files.item(0); input.value = ''; }
