@@ -642,6 +642,10 @@
     let sortCol = 'PASS YDS', sortDir = 1;
     localStorage.removeItem('osp_theme');
     document.body.classList.remove('light');
+    try {
+      const cachedLive = JSON.parse(localStorage.getItem('osp_live_cache') || 'null');
+      if (cachedLive && cachedLive.games) liveData = cachedLive;
+    } catch (_) {}
 
     function showToast(msg) {
       const t = document.getElementById('toast');
@@ -1636,6 +1640,7 @@
           data.players = liveData.players;
         }
         liveData = data;
+        try { localStorage.setItem('osp_live_cache', JSON.stringify(data)); } catch (_) {}
         document.getElementById('card-cnt').textContent = userCards.length;
         if (curTab === 'scoreboard') renderGames();
         if (curTab === 'stats') renderPlayers();
@@ -1649,6 +1654,7 @@
       }
     }
 
+    renderCards();
     refresh();
     setInterval(refresh, 15000);
 
