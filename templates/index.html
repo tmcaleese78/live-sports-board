@@ -689,6 +689,75 @@
     }
 
     const money = v => '$' + ((Number(v) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    let sharedSweatCard = null;
+    try {
+      const sweatParam = new URLSearchParams(window.location.search).get('sweat');
+      if (sweatParam) {
+        const decoded = JSON.parse(decodeURIComponent(escape(atob(sweatParam))));
+        if (decoded && Array.isArray(decoded.legs) && decoded.legs.length) sharedSweatCard = decoded;
+      }
+    } catch (_) {}
+
+    function shareCard(i) {
+      const c = userCards[i];
+      if (!c) return;
+      const payload = { book: c.book || 'Other', cost: c.cost || 0, payout: c.payout || 0, legs: c.legs || [] };
+      const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+      const shareUrl = `${window.location.origin}${window.location.pathname}?sweat=${encodeURIComponent(encoded)}`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(shareUrl).then(() => showToast('Live Sweat Link copied to clipboard!'));
+      } else {
+        prompt('Copy your Live Sweat Link:', shareUrl);
+      }
+    }
+
+    function exitSharedSweat() {
+      sharedSweatCard = null;
+      window.history.replaceState({}, '', window.location.pathname);
+      renderCards();
+    }
+
+    function playHitAlertSound() {
+      try {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        if (!Ctx) return;
+        const ctx = new Ctx();
+        [523.25, 659.25, 783.99].forEach((freq, idx) => {
+          const osc = ctx.createOscillator(), gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.08, ctx.currentTime + idx * 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + idx * 0.09 + 0.25);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + idx * 0.09);
+          osc.stop(ctx.currentTime + idx * 0.09 + 0.26);
+        });
+      } catch (_) {}
+    }
+
+    let knownHitKeys = new Set();
+    let hitTrackerSeeded = false;
+    function checkNewLegHits() {
+      const currentHits = new Set();
+      userCards.forEach((c, ci) => {
+        if (c.archived) return;
+        (c.legs || []).forEach((leg, li) => {
+          const ev = evalLeg(leg);
+          if (ev.hit) {
+            const key = `${ci}-${li}-${ev.name}-${ev.stat}`;
+            currentHits.add(key);
+            if (hitTrackerSeeded && !knownHitKeys.has(key)) {
+              playHitAlertSound();
+              showToast(`CASHED! ${ev.name} (${ev.stat}) hit!`);
+            }
+          }
+        });
+      });
+      knownHitKeys = currentHits;
+      hitTrackerSeeded = true;
+    }
+
     /* ========================================================================
        2. GAME BOX SCORE MODAL & LIVE SCOREBOARD RENDERER
        ======================================================================== */
@@ -1112,10 +1181,11 @@
               actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
             }
           } else {
+            const shareBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="shareCard(${idx})">Share</button>`;
             const archBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(148,163,184,0.4);color:#cbd5e1" onclick="toggleArchiveCard(${idx})">${isSettled ? 'Reopen' : 'Archive'}</button>`;
             const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
-            const promoteBtn = isAdminUser() ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>` : '';
-            actionBtns = `${archBtn}${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
+            const promoteBtn = isAdminUser() ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.45);color:#fde047" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>` : '';
+            actionBtns = `${shareBtn}${archBtn}${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
           }
 
           const statusBadge = !isSampleView && isSettled
@@ -1129,8 +1199,18 @@
           return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
             <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
         };
+        
+        if (sharedSweatCard) {
+          const sharedHtml = renderSingleCard(sharedSweatCard, 0, true);
+          container.innerHTML = `<div class="mission-hero" style="margin-bottom:16px">
+            <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:22px;font-weight:900;color:#4ade80">LIVE SHARED SWEAT LINK</div>
+            <div style="color:#cbd5e1;font-size:13px">Watching a live shared bet card — stats and progress bars update automatically every 15 seconds.</div></div>
+            <button class="btn-primary" style="padding:9px 16px;font-size:13px" onclick="exitSharedSweat()">View My Cards</button>
+          </div><div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${sharedHtml}</div>`;
+          return;
+        }
 
-                let actRisk = 0, actPot = 0;
+        let actRisk = 0, actPot = 0;
         activeAll.forEach(c => { actRisk += parseAmt(c.cost); actPot += parseAmt(c.payout); });
         let wins = 0, losses = 0, histRisk = 0, histPaid = 0;
         historyAll.forEach(c => {
@@ -1693,6 +1773,7 @@
         }
         liveData = data;
         try { localStorage.setItem('osp_live_cache', JSON.stringify(data)); } catch (_) {}
+        checkNewLegHits();
         document.getElementById('card-cnt').textContent = userCards.length;
         if (curTab === 'scoreboard') renderGames();
         if (curTab === 'stats') renderPlayers();
