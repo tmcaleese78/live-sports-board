@@ -1558,6 +1558,7 @@
       if (finalPay && document.getElementById('b-pay')) document.getElementById('b-pay').value = finalPay;
 
       // --- 7C. Build Player & Team Lookup Indexes ---
+      const escRx = s => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const stripSuffix = s => String(s || '').replace(/\b(jr\.?|sr\.?|ii|iii|iv|v)\b/gi, '').replace(/\s+/g, ' ').trim();
       const normName = s => stripSuffix(s).toLowerCase().replace(/['’.-]/g, '').replace(/\s+/g, ' ').trim();
       const playerNameAliases = {
@@ -1585,7 +1586,15 @@
           const first = parts.at(0) || '';
           const last = parts.slice(1).join(' ');
           const shortForm = (first && last) ? `${first.charAt(0)}. ${last}`.toLowerCase() : '';
-          allPlayers.push({ sport: sp, name: p.name, lower: p.name.toLowerCase(), normLower: normName(p.name), baseLower: baseName.toLowerCase(), short: shortForm });
+          allPlayers.push({
+            sport: sp,
+            team: String(p.team || '').toUpperCase(),
+            name: p.name,
+            lower: p.name.toLowerCase(),
+            normLower: normName(p.name),
+            baseLower: baseName.toLowerCase(),
+            short: shortForm
+          });
         });
         ((liveData.games && liveData.games[sp]) || []).forEach(g => {
           const awayFull = g.away_full || g.away || '';
@@ -1593,6 +1602,18 @@
           allGames.push({ sport: sp, away: g.away || '', home: g.home || '', awayFull, homeFull, gameLbl: `${awayFull} @ ${homeFull}` });
         });
       });
+
+      const slipTeams = new Set();
+      allGames.forEach(g => {
+        const gTokens = [g.away, g.home, g.awayFull, g.homeFull].filter(Boolean).map(t => t.toLowerCase());
+        if (gTokens.some(tok => tok.length >= 3 && new RegExp(`\\b${escRx(tok)}\\b`).test(fullLower))) {
+          if (g.away) slipTeams.add(g.away.toUpperCase());
+          if (g.home) slipTeams.add(g.home.toUpperCase());
+        }
+      });
+      if (slipTeams.size > 0) {
+        allPlayers.sort((a, b) => (slipTeams.has(b.team) ? 1 : 0) - (slipTeams.has(a.team) ? 1 : 0));
+      }
 
       const teamAliases = {
         'miami fl': 'miami hurricanes', 'miami (fl)': 'miami hurricanes',
@@ -1631,6 +1652,7 @@
         if (awayHit && !homeHit) return game.awayFull;
         return game.homeFull;
       };
+
       // --- 7D. Extract Summary Picks & Match Legs Across Patterns A–E ---
       const summaryPicks = [];
       const summaryRegex = /\b(Over|Under)\s+(\d{1,3}(?:\.\d)?)\b/gi;
@@ -1672,8 +1694,8 @@
         const lineNorm = resolveAlias(line);
         const matchedPlayer = allPlayers.find(p =>
           lineLow.includes(p.lower) ||
-          (p.normLower.length >= 5 && lineNorm.includes(p.normLower)) ||
-          (p.short && lineNorm.includes(normName(p.short)))
+          (p.normLower.length >= 5 && new RegExp(`\\b${p.normLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lineNorm)) ||
+          (p.short && new RegExp(`\\b${normName(p.short).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lineNorm))
         );
         if (matchedPlayer) {
           const isPropHeader = s => /\b(over|under|more|less|higher|lower)\b|\d+\s*[+t]|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
@@ -2137,6 +2159,7 @@
   </script>
 </body>
 </html>
+
 
 
 
