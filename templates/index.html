@@ -1715,17 +1715,19 @@
             }
           }
 
-          // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs)
+            // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs)
           const stHere = mapOcrStat(line);
           if (stHere) {
-            const prev1 = normDecLine(lines[i - 1] || '');
-            const prev2 = normDecLine(lines[i - 2] || '');
-            const curClean = normDecLine(line);
-            const prev2Safe = (mapOcrStat(prev1) || mapOcrStat(prev2) || /\b0\.5\b/.test(prev2)) ? '' : prev2;
+            const stripClock = s => String(s || '').replace(/\b\d{1,2}:\d{2}\s*(?:am|pm|est|pst|cst|mst)?\b/gi, ' ');
+            const prev1 = normDecLine(stripClock(lines[i - 1] || ''));
+            const prev2 = normDecLine(stripClock(lines[i - 2] || ''));
+            const curClean = normDecLine(stripClock(line));
+
+            // Keep prev2 unless prev1 or prev2 already belongs to a previous stat line
+            const prev2Safe = (mapOcrStat(prev1) || mapOcrStat(prev2)) ? '' : prev2;
             const windowTxt = `${prev2Safe} ${prev1} ${curClean}`;
             const cleaned = windowTxt
               .replace(/#\s*\d{1,2}\b/g, ' ')
-              .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
               .replace(/\$\s*\d+(?:\.\d{1,2})?/g, ' ');
 
             const isUnderArrow = /\b(under|less|lower)\b/i.test(cleaned) || /[↓▼⬇]/.test(windowTxt) || /\bJ\s*\d{2,4}\b/.test(cleaned);
@@ -1740,7 +1742,7 @@
               if (cand) val = (cand >= 15 && cand % 10 === 5) ? cand / 10 : cand;
             }
 
-            // Promo line check: crossed-out original line (e.g. 302.5 / 245) paired with 0.5 / 05 / O.5
+            // Promo line check: crossed-out original line (e.g. 302.5) paired with 0.5 / 05 / O.5
             const hasCrossedOrig = /\b[1-5]\d{2}(?:\.\d)?\b/.test(cleaned);
             if (hasCrossedOrig && /(?:^|\s)(?:0\.5|05|O\.5|0\.S|0\.s)(?:\s|$)/.test(cleaned)) {
               val = 0.5;
@@ -1758,7 +1760,7 @@
               val = val + 0.5;
             }
 
-            dfsProps.push({ stat: stHere, ou, target: val || (/YDS/i.test(stHere) ? 24.5 : 4.5) });
+            dfsProps.push({ stat: stHere, ou, target: val !== null ? val : (/YDS/i.test(stHere) ? 24.5 : 4.5) });
           }
         }
 
@@ -2304,6 +2306,7 @@
   </script>
 </body>
 </html>
+
 
 
 
