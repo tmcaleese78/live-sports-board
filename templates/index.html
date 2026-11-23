@@ -1481,8 +1481,8 @@
             const r = d[i], g = d[i + 1], b = d[i + 2];
             let gray = 0.299 * r + 0.587 * g + 0.114 * b;
             if (isDarkBg) {
-              const isRedArrow = (r > g + 35 && r > 140);
-              gray = (!isRedArrow && gray > 95) ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
+              const isColoredArrowOrIcon = (g > r + 25 && g > 110 && g < 205) || (r > g + 35 && r > 140);
+              gray = (!isColoredArrowOrIcon && gray > 95) ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
             } else {
               const lightGray = 0.25 * r + 0.65 * g + 0.10 * b;
               gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
@@ -1557,7 +1557,7 @@
       }
 
       // --- 7B. Detect Wager Cost & Potential Payout ---
-      const dfsToWinMatch = text.match(/\$?\s*(\d+(?:\.\d{1,2})?)\s+to\s+win\s+\$\s*(\d+(?:\.\d{1,2})?)/i);
+      const dfsToWinMatch = text.match(/(?:[$§S]\s*)?(\d+(?:\.\d{1,2})?)\s+to\s+win\s+\$\s*(\d+(?:\.\d{1,2})?)/i);
       const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
       const costMatch = dfsToWinMatch || dualFooterMatch ||
         text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
@@ -1695,7 +1695,7 @@
         const dfsProps = [];
         const isDfsMeta = s => /\b(power\s*play|flex\s*play|slide\s*for\s*refund|self\s*refund|time\s*remaining|prizepicks|underdog|sleeper|to\s*win|pick\s*combo)\b/i.test(s);
         const normDecLine = s => String(s || '')
-          .replace(/\b(\d{1,3})\.[sS]\b/g, '$1.5')
+          .replace(/(?:^|[^0-9])([0-9oO])\.[sS5]\b/g, (_, d) => ` ${d === 'o' || d === 'O' ? '0' : d}.5`)
           .replace(/\b(\d{1,3})[, ]\s*5\b/g, '$1.5');
 
         for (let i = 0; i < lines.length; i++) {
@@ -2307,6 +2307,7 @@
   </script>
 </body>
 </html>
+
 
 
 
