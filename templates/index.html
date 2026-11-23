@@ -1316,7 +1316,7 @@
       renderDraft();
     }
 
-       function updateDraftLine(i, val) {
+    function updateDraftLine(i, val) {
       const num = parseFloat(val);
       if (isNaN(num) || !draftLegs[i]) return;
       if (draftLegs[i].type === 'prop') draftLegs[i].target = num;
@@ -1421,7 +1421,7 @@
         const tryLoad = () => {
           if (idx >= cdns.length) {
             tesseractPromise = null;
-            return reject(new Error('Failed to load OCR scanner'));
+            return reject(new Error('Scanner script blocked or offline'));
           }
           const s = document.createElement('script');
           s.src = cdns[idx++];
@@ -1434,13 +1434,20 @@
       return tesseractPromise;
     }
 
+    function withTimeout(promise, ms, label) {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out — try again`)), ms))
+      ]);
+    }
+
     function preprocessSlipImage(file) {
       return new Promise(resolve => {
         const img = new Image();
         const url = URL.createObjectURL(file);
         img.onload = () => {
           URL.revokeObjectURL(url);
-          const scale = img.width < 1100 ? 2 : 1.5;
+          const scale = img.width < 1000 ? 1.8 : (img.width > 1600 ? (1600 / img.width) : 1.2);
           const w = Math.round(img.width * scale);
           const h = Math.round(img.height * scale);
           const canvas = document.createElement('canvas');
@@ -1480,20 +1487,35 @@
       const fileInput = document.getElementById('slip-file');
       if (fileInput) fileInput.click();
     }
-    async function handleSlipImage(input) {
+     async function handleSlipImage(input) {
       let file = input;
       if (input && input.files) { file = input.files.item(0); input.value = ''; }
       else if (input && typeof input.item === 'function') { file = input.item(0); }
       if (!file) return;
       const statusEl = document.getElementById('ocr-status');
-      if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Enhancing & scanning "${file.name || 'screenshot'}"... (~2–4 seconds)</span>`;
       try {
-        const [T, cleanBlob] = await Promise.all([ensureTesseract(), preprocessSlipImage(file)]);
-        const res = await T.recognize(cleanBlob, 'eng');
+        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing "${file.name || 'screenshot'}"...</span>`;
+        const [T, cleanBlob] = await withTimeout(
+          Promise.all([ensureTesseract(), preprocessSlipImage(file)]),
+          12000,
+          'Scanner load'
+        );
+        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 2/2: Reading slip text...</span>`;
+        const worker = await withTimeout(
+          T.createWorker('eng', 1, {
+            workerPath: 'https://jsdelivr.net',
+            corePath: 'https://jsdelivr.net'
+          }),
+          15000,
+          'OCR engine'
+        );
+        const res = await withTimeout(worker.recognize(cleanBlob), 15000, 'Text scan');
+        await worker.terminate();
         const text = (res && res.data && res.data.text) || '';
         parseSlipText(text);
       } catch (err) {
-        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Could not read image: ${err.message}</span>`;
+        tesseractPromise = null;
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Scan error: ${err.message}</span>`;
       }
     }
     /* ========================================================================
