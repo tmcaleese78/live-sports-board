@@ -1477,12 +1477,12 @@
           }
           window._ocrRedBands = redYList;
 
-          for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i + 1], b = d[i + 2];
+                    for (let i = 0; i < d.length; i += 4) {
+          const r = d[i], g = d[i + 1], b = d[i + 2];
             let gray = 0.299 * r + 0.587 * g + 0.114 * b;
             if (isDarkBg) {
-              // Wipe dark boxes (<95 lum) to white, force muted gray & white text (>95) to solid black
-              gray = gray > 95 ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
+              const isColoredArrowOrIcon = (g > r + 25 && g > 110) || (r > g + 35 && r > 140);
+              gray = (!isColoredArrowOrIcon && gray > 95) ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
             } else {
               const lightGray = 0.25 * r + 0.65 * g + 0.10 * b;
               gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
@@ -1752,7 +1752,12 @@
               val = val + 0.5;
             }
 
-            const resolvedSt = stHere || mapOcrStat(nextL) || (val && val < 15 ? 'REC' : 'REC YDS');
+          const resolvedSt = stHere || mapOcrStat(nextL) || (val && val < 15 ? 'REC' : 'REC YDS');
+            if (/YDS/i.test(resolvedSt) && val && val > 0.5 && val < 12) {
+              const altNums = (cleaned.match(/\d{2,4}(?:\.\d)?/g) || []).map(Number).filter(n => n >= 12);
+              const altCand = altNums.find(n => n < 600) || (altNums.find(n => n >= 120 && n % 10 === 5) ? altNums.find(n => n >= 120 && n % 10 === 5) / 10 : null);
+              if (altCand) val = altCand;
+            }
             if (val && Number.isInteger(val) && val >= 1 && val <= 12 && !/\.\d/.test(cleaned) && !/YDS/i.test(resolvedSt)) {
               val = val + 0.5;
             }
@@ -2304,6 +2309,7 @@
   </script>
 </body>
 </html>
+
 
 
 
