@@ -1413,8 +1413,8 @@
       if (window.Tesseract) return Promise.resolve(window.Tesseract);
       if (tesseractPromise) return tesseractPromise;
       const cdns = [
-        'https://jsdelivr.net',
-        'https://unpkg.com'
+        'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js',
+        'https://unpkg.com/tesseract.js@5/dist/tesseract.min.js'
       ];
       tesseractPromise = new Promise((resolve, reject) => {
         let idx = 0;
@@ -1501,16 +1501,11 @@
           'Scanner load'
         );
         if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 2/2: Reading slip text...</span>`;
-        const worker = await withTimeout(
-          T.createWorker('eng', 1, {
-            workerPath: 'https://jsdelivr.net',
-            corePath: 'https://jsdelivr.net'
-          }),
-          15000,
-          'OCR engine'
+          const res = await withTimeout(
+          T.recognize(cleanBlob, 'eng'),
+          18000,
+          'Text scan'
         );
-        const res = await withTimeout(worker.recognize(cleanBlob), 15000, 'Text scan');
-        await worker.terminate();
         const text = (res && res.data && res.data.text) || '';
         parseSlipText(text);
       } catch (err) {
@@ -2103,4 +2098,5 @@
   </script>
 </body>
 </html>
+
 
