@@ -1673,7 +1673,7 @@
             .replace(/\b\d+(?:\.\d+)?%/g, ' ')
             .replace(/\b(\d{1,3})\s+5\b/g, '$1.5');
           const explicitDirNum = cleanedNumsTxt.match(/\b(?:over|under|more|less|higher|lower)\s+(\d{1,3}(?:\.\d)?)\b/i);
-          const milestoneNum = cleanedNumsTxt.match(/\b(\d{2,3})\+/);
+          const milestoneNum = cleanedNumsTxt.match(/\b(\d{1,3})\+/);
           const fallbackNums = (cleanedNumsTxt.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
           const decimalFirst = fallbackNums.find(n => !Number.isInteger(n)) || fallbackNums.find(n => n >= 10) || fallbackNums.at(0);
           const target = explicitDirNum ? parseFloat(explicitDirNum.at(1)) : (milestoneNum ? parseFloat(milestoneNum.at(1)) : decimalFirst);
@@ -1690,7 +1690,7 @@
           }
         }
 
-        // Pattern C: Direct Player Prop Line (Unmatched Roster)
+        // Pattern C: Direct Player Prop Line or 2-Line Milestone Block (Unmatched Roster)
         const directProp = line.match(/^([A-Z][a-zA-Z'.-]+(?:\s+[A-Z][a-zA-Z'.-]+){1,2})\s+(?:(Over|Under|More|Less|Higher|Lower)\s+)?(\d{1,3}(?:\.\d)?)\+?\s+(.+)$/i);
         if (directProp) {
           const [, pNameRaw = '', rawOuStr = 'Over', targetRaw = '0', statRaw = ''] = directProp;
@@ -1698,6 +1698,21 @@
           const target = parseFloat(targetRaw), detectedStat = mapOcrStat(statRaw);
           if (detectedStat && target > 0 && target < 600) {
             draftLegs.push({ type: 'prop', sport: nbaStats.has(detectedStat) ? 'NBA' : 'NFL', player: pNameRaw.trim(), stat: detectedStat, ou, target });
+            added++;
+            continue;
+          }
+        }
+
+        const twoLineStat = mapOcrStat(line);
+        const prevMilestone = prevLine.match(/\b(\d{1,3}(?:\.\d)?)\s*\+?\s*$/);
+        if (twoLineStat && prevMilestone) {
+          const nameOnly = line
+            .replace(/\b(pts\s*\+\s*rebs\s*\+\s*asts|pra|passing\s*yards|pass\s*yds|passing\s*td|pass\s*td|rushing\s*yards|rush\s*yds|rushing\s*td|rush\s*td|receiving\s*yards|rec\s*yds|receiving\s*td|rec\s*td|rush\s*\+\s*rec|scrimmage|receptions|catches|3-pt|3pm|three\s*pointers|threes|rebounds|assists|steals|blocks|points)\b.*$/i, '')
+            .replace(/^[^a-zA-Z]+/, '')
+            .trim();
+          const target = parseFloat(prevMilestone.at(1));
+          if (nameOnly.split(/\s+/).length >= 2 && target > 0 && target < 600) {
+            draftLegs.push({ type: 'prop', sport: nbaStats.has(twoLineStat) ? 'NBA' : 'NFL', player: nameOnly, stat: twoLineStat, ou: 'Over', target });
             added++;
             continue;
           }
@@ -2098,5 +2113,6 @@
   </script>
 </body>
 </html>
+
 
 
