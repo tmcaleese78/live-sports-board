@@ -1333,16 +1333,58 @@
       renderDraft();
     }
 
+       function updateDraftLine(i, val) {
+      const num = parseFloat(val);
+      if (isNaN(num) || !draftLegs[i]) return;
+      if (draftLegs[i].type === 'prop') draftLegs[i].target = num;
+      else if (draftLegs[i].type === 'total') draftLegs[i].total = num;
+      else if (draftLegs[i].type === 'spread') draftLegs[i].spread = num;
+    }
+
+    function toggleDraftOu(i) {
+      const l = draftLegs[i];
+      if (!l) return;
+      if (l.type === 'prop' || l.type === 'total') {
+        l.ou = l.ou === 'Under' ? 'Over' : 'Under';
+        renderDraft();
+      }
+    }
+
+    function moveDraftLeg(i, dir) {
+      const targetIdx = i + dir;
+      if (targetIdx < 0 || targetIdx >= draftLegs.length) return;
+      const [moved] = draftLegs.splice(i, 1);
+      draftLegs.splice(targetIdx, 0, moved);
+      renderDraft();
+    }
+
     function renderDraft() {
       const dl = document.getElementById('draft-legs');
       if (!dl) return;
       dl.innerHTML = draftLegs.map((l, i) => {
-        const txt = l.type === 'ml'
-          ? `${l.team} (Win)`
-          : (l.type === 'spread'
-              ? `${l.team} (${l.spread > 0 ? '+' + l.spread : l.spread})`
-              : (l.type === 'total' ? `${l.game} (${l.ou} ${l.total})` : `${l.player} — ${l.ou || 'Over'} ${l.target} ${l.stat}`));
-        return `<div class="leg-chip"><span>${l.sport}: ${txt}</span><button class="pill" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button></div>`;
+        const upBtn = i > 0 ? `<button class="pill" style="padding:3px 7px;font-size:11px" onclick="moveDraftLeg(${i},-1)" title="Move up">↑</button>` : '';
+        const dnBtn = i < draftLegs.length - 1 ? `<button class="pill" style="padding:3px 7px;font-size:11px" onclick="moveDraftLeg(${i},1)" title="Move down">↓</button>` : '';
+
+        let labelHtml = '';
+        if (l.type === 'ml') {
+          labelHtml = `<span><strong>${l.sport}:</strong> ${l.team} (Win)</span>`;
+        } else if (l.type === 'spread') {
+          labelHtml = `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong>${l.sport}:</strong> ${l.team}
+            <input type="number" step="0.5" value="${l.spread}" onchange="updateDraftLine(${i},this.value)" style="width:74px;padding:4px 7px;font-size:12.5px;font-weight:800"> Spread</span>`;
+        } else if (l.type === 'total') {
+          labelHtml = `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong>${l.sport}:</strong> ${l.game}
+            <button class="pill" style="padding:3px 8px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="toggleDraftOu(${i})">${l.ou || 'Over'}</button>
+            <input type="number" step="0.5" value="${l.total}" onchange="updateDraftLine(${i},this.value)" style="width:74px;padding:4px 7px;font-size:12.5px;font-weight:800"></span>`;
+        } else {
+          labelHtml = `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong>${l.sport}:</strong> ${l.player} —
+            <button class="pill" style="padding:3px 8px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="toggleDraftOu(${i})">${l.ou || 'Over'}</button>
+            <input type="number" step="0.5" value="${l.target}" onchange="updateDraftLine(${i},this.value)" style="width:74px;padding:4px 7px;font-size:12.5px;font-weight:800"> ${l.stat}</span>`;
+        }
+
+        return `<div class="leg-chip" style="gap:8px;flex-wrap:wrap">${labelHtml}
+          <div style="display:flex;gap:5px;align-items:center;margin-left:auto">${upBtn}${dnBtn}
+            <button class="pill" style="padding:4px 10px;font-size:12px;border-color:rgba(248,113,113,0.45);color:#f87171" onclick="draftLegs.splice(${i},1);renderDraft()">Remove</button>
+          </div></div>`;
       }).join('');
     }
     /* ========================================================================
