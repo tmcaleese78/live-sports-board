@@ -1735,8 +1735,8 @@
             let val = decs.length ? decs.at(-1) : null;
 
             if (val === null) {
-              const nums = (cleaned.match(/\b\d{1,4}\b/g) || []).map(Number).filter(n => n > 0);
-              const cand = nums.find(n => n >= 15 && n % 10 === 5) || nums.find(n => n > 1 && n < 600);
+              const nums = (cleaned.match(/(?:^|[^0-9.])(\d{2,4})(?![0-9.])/g) || []).map(s => Number(s.replace(/[^0-9]/g, ''))).filter(n => n > 0);
+              const cand = nums.find(n => n >= 15 && n % 10 === 5) || nums.find(n => n >= 12 && n < 600);
               if (cand) val = (cand >= 15 && cand % 10 === 5) ? cand / 10 : cand;
             }
 
@@ -1758,7 +1758,7 @@
               val = val + 0.5;
             }
 
-            dfsProps.push({ stat: stHere, ou, target: val || 0.5 });
+            dfsProps.push({ stat: stHere, ou, target: val || (/YDS/i.test(stHere) ? 24.5 : 4.5) });
           }
         }
 
@@ -2304,6 +2304,7 @@
   </script>
 </body>
 </html>
+
 
 
 
