@@ -395,7 +395,7 @@
     .pc-stat-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
     .pc-stat-val { font-size: 16px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
   </style>
-  <script src="https://jsdelivr.net"></script>
+  <script src="https://jsdelivr.net" defer></script>
 </head>
 <body>
   <!-- ========================================================================
@@ -1658,13 +1658,24 @@
     refresh();
     setInterval(refresh, 15000);
 
-    /* ========================================================================
+      /* ========================================================================
        9. SUPABASE AUTH, CLOUD SYNC & ADMIN DAILY SAMPLES
        ======================================================================== */
-    const sbClient = window.supabase
-      ? window.supabase.createClient('https://supabase.co', 'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh')
-      : null;
+    let sbClient = null;
     let currentUser = null;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window.supabase) {
+        sbClient = window.supabase.createClient(
+          'https://supabase.co',
+          'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh'
+        );
+        loadDailySamples();
+        sbClient.auth.getSession().then(({ data }) => {
+          if (data && data.session && data.session.user) syncCloudCards(data.session.user);
+        });
+      }
+    });
 
     function openAuthModal() { document.getElementById('auth-modal').classList.add('open'); }
     function closeAuthModal() { document.getElementById('auth-modal').classList.remove('open'); }
@@ -1735,9 +1746,6 @@
       renderDraft();
       showToast('Editing Daily Sample card — click Update to publish');
     }
-
-    loadDailySamples();
-
     async function syncCloudCards(user) {
       currentUser = user;
       const btn = document.getElementById('auth-btn');
@@ -1806,16 +1814,10 @@
     }
 
     async function handleLogout() {
-      await sbClient.auth.signOut();
+      if (sbClient) await sbClient.auth.signOut();
       await syncCloudCards(null);
       closeAuthModal();
       showToast('Signed out');
-    }
-
-    if (sbClient) {
-      sbClient.auth.getSession().then(({ data }) => {
-        if (data && data.session && data.session.user) syncCloudCards(data.session.user);
-      });
     }
 
        /* ========================================================================
