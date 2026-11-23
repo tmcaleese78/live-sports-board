@@ -1487,7 +1487,7 @@
       const fileInput = document.getElementById('slip-file');
       if (fileInput) fileInput.click();
     }
-     async function handleSlipImage(input) {
+      async function handleSlipImage(input) {
       let file = input;
       if (input && input.files) { file = input.files.item(0); input.value = ''; }
       else if (input && typeof input.item === 'function') { file = input.item(0); }
@@ -2103,3 +2103,4 @@
   </script>
 </body>
 </html>
+
