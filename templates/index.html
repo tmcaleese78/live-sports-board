@@ -395,7 +395,7 @@
     .pc-stat-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
     .pc-stat-val { font-size: 16px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
   </style>
-  <script src="https://jsdelivr.net" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 </head>
 <body>
   <!-- ========================================================================
@@ -1667,7 +1667,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       if (window.supabase) {
         sbClient = window.supabase.createClient(
-          'https://supabase.co',
+          'https://decjgnolcxnndpicztun.supabase.co',
           'sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh'
         );
         loadDailySamples();
