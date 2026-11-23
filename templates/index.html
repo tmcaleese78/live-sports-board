@@ -1721,8 +1721,8 @@
             const prev1 = normDecLine(lines[i - 1] || '');
             const prev2 = normDecLine(lines[i - 2] || '');
             const curClean = normDecLine(line);
-            // Only look at prev2 if prev1 did NOT already have a stat word (prevents bleeding into previous leg)
-            const windowTxt = mapOcrStat(prev1) ? `${prev1} ${curClean}` : `${prev2} ${prev1} ${curClean}`;
+            const prev2Safe = (mapOcrStat(prev1) || mapOcrStat(prev2) || /\b0\.5\b/.test(prev2)) ? '' : prev2;
+            const windowTxt = `${prev2Safe} ${prev1} ${curClean}`;
             const cleaned = windowTxt
               .replace(/#\s*\d{1,2}\b/g, ' ')
               .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
@@ -1740,8 +1740,9 @@
               if (cand) val = (cand >= 15 && cand % 10 === 5) ? cand / 10 : cand;
             }
 
-            // Promo line check (e.g., 302.5 crossed out next to 0.5 / 05 / O.5)
-            if (/(?:^|\s)(?:0\.5|05|O\.5|0\.S|0\.s)(?:\s|$)/.test(cleaned)) {
+            // Promo line check: crossed-out original line (e.g. 302.5 / 245) paired with 0.5 / 05 / O.5
+            const hasCrossedOrig = /\b[1-5]\d{2}(?:\.\d)?\b/.test(cleaned);
+            if (hasCrossedOrig && /(?:^|\s)(?:0\.5|05|O\.5|0\.S|0\.s)(?:\s|$)/.test(cleaned)) {
               val = 0.5;
             }
 
@@ -2303,6 +2304,7 @@
   </script>
 </body>
 </html>
+
 
 
 
