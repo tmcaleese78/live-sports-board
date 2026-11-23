@@ -945,15 +945,15 @@ function evalLeg(leg) {
       return {name: leg.game || 'Game Total', stat: lbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: ''};
     }
     if (g.state === 'pre') {
-      return {name: leg.game, stat: lbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : `-${line}`, hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1};
-    }
+      return {name: leg.game, stat: lbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1};
+
     const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0);
     const isUnder = ou === 'Under';
     const diff = Math.round((isUnder ? (line - comb) : (comb - line)) * 10) / 10;
     const hit = isUnder ? (g.state === 'post' && comb < line) : (comb > line);
     const miss = isUnder ? (Number.isInteger(line) ? comb > line : comb >= line) : (g.state === 'post' && comb <= line);
     const pct = (hit || miss) ? 100 : Math.max(0, Math.min(100, (comb / line) * 100));
-    const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(diff))));
+    const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(Math.abs(diff)))));
     return {name: leg.game, stat: lbl, gained: String(comb), needed: needTxt, hit, miss, pct, bg: g.bg1, logo: g.lg1};
   }
 
@@ -974,7 +974,8 @@ function evalLeg(leg) {
 
   const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
   const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
-  return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: delta > 0 ? `+${delta}` : String(delta), hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
+  const needTxt = delta > 0 ? `+${delta}` : (delta === 0 ? '0' : String(Math.abs(delta)));
+  return {name: leg.player || 'Unknown Pick', stat: lbl, gained: String(cur), needed: needTxt, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : ''};
 }
 
 let customSamples = [];
