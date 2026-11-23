@@ -491,9 +491,7 @@
         <div class="row-flex" style="margin-bottom:10px">
           <select id="b-book" style="padding:9px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px">
             <option value="FanDuel">FanDuel</option>
-            <option value="FanDuel Predicts">FanDuel Predicts</option>
             <option value="DraftKings">DraftKings</option>
-            <option value="DraftKings Predictions">DraftKings Predictions</option>
             <option value="PrizePicks">PrizePicks</option>
             <option value="Underdog">Underdog</option>
             <option value="BetMGM">BetMGM</option>
@@ -1136,17 +1134,18 @@
         const historyAll = isDemo ? [] : rawList.filter(c => getCardOutcome(c).isSettled);
         const viewPool = isDemo ? rawList : (curCardView === 'history' ? historyAll : activeAll);
 
-        const booksPresent = [...new Set(viewPool.map(c => c.book || 'Other'))];
+        const normBook = b => String(b || 'Other').replace(/\s+(?:Predictions?|Predicts)$/i, '').trim() || 'Other';
+        const booksPresent = [...new Set(viewPool.map(c => normBook(c.book)))];
         if (curBookFilter !== 'ALL' && !booksPresent.includes(curBookFilter)) curBookFilter = 'ALL';
         const activeList = (!isDemo && curBookFilter !== 'ALL')
-          ? viewPool.filter(c => (c.book || 'Other') === curBookFilter)
+          ? viewPool.filter(c => normBook(c.book) === curBookFilter)
           : viewPool;
 
         const renderSingleCard = (c, idx, isSampleView) => {
           const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
           const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
           const rows = evals.map(e => {
-            const stBadge = e.statusTxt
+          const stBadge = e.statusTxt
               ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive ? '● ' : ''}${e.statusTxt}</div>`
               : '';
             const safeSport = String(e.sport || '').replace(/'/g, "\\'");
@@ -1158,7 +1157,7 @@
               <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
           }).join('');
 
-          const bk = c.book || 'Other';
+          const bk = normBook(c.book);
           let actionBtns = '';
           if (isSampleView) {
             if (isAdminUser() && customSamples.length > 0) {
@@ -1235,9 +1234,9 @@
               <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(actPot)}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Settled Net P&L</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div></div>`);
 
-        const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
+          const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
           <button class="pill ${curBookFilter === 'ALL' ? 'active' : ''}" onclick="setBookFilter('ALL')">All Platforms (${viewPool.length})</button>` +
-          booksPresent.map(b => `<button class="pill ${curBookFilter === b ? 'active' : ''}" onclick="setBookFilter('${b}')">${b} (${viewPool.filter(c => (c.book || 'Other') === b).length})</button>`).join('') + `</div>` : '';
+          booksPresent.map(b => `<button class="pill ${curBookFilter === b ? 'active' : ''}" onclick="setBookFilter('${b}')">${b} (${viewPool.filter(c => normBook(c.book) === b).length})</button>`).join('') + `</div>` : '';
 
         const adminSampleSection = isAdminUser() ? `<div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
           <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
@@ -1510,8 +1509,8 @@
       const bookMap = [
         ['prizepicks', 'PrizePicks'],
         ['underdog', 'Underdog'],
-        ['fanduel', isPredictFormat ? 'FanDuel Predicts' : 'FanDuel'],
-        ['draftkings', isPredictFormat ? 'DraftKings Predictions' : 'DraftKings'],
+        ['fanduel', 'FanDuel'],
+        ['draftkings', 'DraftKings'],
         ['betmgm', 'BetMGM'],
         ['caesars', 'Caesars'],
         ['espn bet', 'ESPN BET'],
@@ -1521,7 +1520,7 @@
       const bookEl = document.getElementById('b-book');
       if (bookEl) {
         if (foundBook) bookEl.value = foundBook.at(1);
-        else if (isPredictFormat && /\b(sell|trade|combo)\b/i.test(text)) bookEl.value = 'DraftKings Predictions';
+        else if (isPredictFormat && /\b(sell|trade|combo)\b/i.test(text)) bookEl.value = 'DraftKings';
       }
 
       // --- 7B. Detect Wager Cost & Potential Payout ---
