@@ -1541,16 +1541,17 @@
       }
 
       // --- 7B. Detect Wager Cost & Potential Payout ---
+      const dfsToWinMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+to\s+win\s+\$\s*(\d+(?:\.\d{1,2})?)/i);
       const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
-      const costMatch =
+      const costMatch = dfsToWinMatch || dualFooterMatch ||
         text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
         text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
       const payMatch =
         text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
         text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
 
-      const finalCost = dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '');
-      let finalPay = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
+      const finalCost = dfsToWinMatch ? dfsToWinMatch.at(1) : (dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : ''));
+      let finalPay = dfsToWinMatch ? dfsToWinMatch.at(2) : (dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : ''));
       if (finalCost && finalPay && /^\d{3,4}$/.test(finalPay) && parseFloat(finalPay) > parseFloat(finalCost) * 25) {
         finalPay = (parseInt(finalPay, 10) / 100).toFixed(2);
       }
@@ -1670,13 +1671,18 @@
       const nbaStats = new Set(['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']);
       let added = 0;
 
+      const detectedBookName = foundBook ? foundBook.at(1) : '';
+      const isDfsPickem = ['PrizePicks', 'Underdog', 'Sleeper'].includes(detectedBookName) || /\b(power\s*play|flex\s*play|pick\s*play|slide\s*for\s*refund)\b/i.test(text);
+      const isRosterSubtitle = s => /#\s*\d{1,2}\b/.test(s) || /\b(QB|RB|WR|TE|K|DST|PG|SG|SF|PF|C)\b\s*[•·|-]/.test(s);
+
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const lineLow = line.toLowerCase();
+        if (isRosterSubtitle(line)) continue;
 
-        // Pattern A: Game Total
+        // Pattern A: Game Total (Sportsbooks Only)
         const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage)\b/i.test(line);
-        const totalLine = !hasPlayerStatWord && line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
+        const totalLine = !isDfsPickem && !hasPlayerStatWord && line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
         if (totalLine) {
           const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
           const ou = ouRaw.charAt(0).toUpperCase() + ouRaw.slice(1).toLowerCase();
@@ -1690,40 +1696,59 @@
         }
 
         // Pattern B: Matched Player Prop from Live Feed
-        const prevLine = lines[i - 1] || '', prevLine2 = lines[i - 2] || '', nextLine = lines[i + 1] || '';
+        const prevLine = lines[i - 1] || '', prevLine2 = lines[i - 2] || '', nextLine = lines[i + 1] || '', nextLine2 = lines[i + 2] || '';
         const lineNorm = resolveAlias(line);
         const matchedPlayer = allPlayers.find(p =>
           lineLow.includes(p.lower) ||
-          (p.normLower.length >= 5 && new RegExp(`\\b${p.normLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lineNorm)) ||
-          (p.short && new RegExp(`\\b${normName(p.short).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lineNorm))
+          (p.normLower.length >= 5 && new RegExp(`\\b${escRx(p.normLower)}\\b`).test(lineNorm)) ||
+          (p.short && new RegExp(`\\b${escRx(normName(p.short))}\\b`).test(lineNorm))
         );
         if (matchedPlayer) {
-          const isPropHeader = s => /\b(over|under|more|less|higher|lower)\b|\d+\s*[+t]|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
-          const dirLine = (!isPredictFormat && isPropHeader(nextLine))
-            ? nextLine
-            : (isPropHeader(prevLine) ? prevLine : (isPropHeader(prevLine2) ? prevLine2 : (isPropHeader(line) ? line : (isPredictFormat ? prevLine : nextLine))));
-          const stat = mapOcrStat(line) || mapOcrStat(dirLine) || mapOcrStat(nextLine) || mapOcrStat(prevLine);
-          const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
+          const cleanNext = isRosterSubtitle(nextLine) ? nextLine2 : nextLine;
+          const isPropHeader = s => /\b(over|under|more|less|higher|lower)\b|\d+\s*[+t]|\b\d{1,4}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s) && !isRosterSubtitle(s);
+          const dirLine = isDfsPickem
+            ? `${line} ${cleanNext}`
+            : ((!isPredictFormat && isPropHeader(cleanNext))
+                ? cleanNext
+                : (isPropHeader(prevLine) ? prevLine : (isPropHeader(prevLine2) ? prevLine2 : (isPropHeader(line) ? line : (isPredictFormat ? prevLine : cleanNext)))));
+
+          const stat = mapOcrStat(line) || mapOcrStat(cleanNext) || mapOcrStat(dirLine) || mapOcrStat(prevLine);
+          const ou = (/\b(under|less|lower)\b/i.test(dirLine) || /[↓▼]/.test(dirLine)) ? 'Under' : 'Over';
           const resolvedStat = stat || (matchedPlayer.sport === 'NBA' ? 'PTS' : 'PASS YDS');
 
           const cleanedNumsTxt = dirLine
+            .replace(/#\s*\d{1,2}\b/g, ' ')
             .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
             .replace(/\b\d+(?:\.\d+)?%/g, ' ')
             .replace(/\b(\d{1,3})\s+5\b/g, '$1.5')
             .replace(/\b(\d{1,3})[tT]\b/g, '$1+');
+
           const explicitDirNum = cleanedNumsTxt.match(/\b(?:over|under|more|less|higher|lower)\s+(\d{1,3}(?:\.\d)?)\b/i);
           const milestoneNum = cleanedNumsTxt.match(/\b(\d{1,3})\+/);
-          const fallbackNums = (cleanedNumsTxt.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
-          const decimalFirst = fallbackNums.find(n => !Number.isInteger(n)) || fallbackNums.find(n => n >= 10) || fallbackNums.at(0);
-          let target = explicitDirNum ? parseFloat(explicitDirNum.at(1)) : (milestoneNum ? parseFloat(milestoneNum.at(1)) : decimalFirst);
+          const rawNums = (cleanedNumsTxt.match(/\b\d{1,4}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0);
 
+          let decimalFirst = rawNums.find(n => !Number.isInteger(n) && n < 600);
+          if (!decimalFirst && isDfsPickem && rawNums.length) {
+            const candidate = rawNums.at(0);
+            if (Number.isInteger(candidate) && candidate >= 15 && candidate % 10 === 5) {
+              decimalFirst = candidate / 10;
+            } else if (candidate < 600) {
+              decimalFirst = candidate;
+            }
+          }
+          if (!decimalFirst) {
+            const validNums = rawNums.filter(n => n < 600);
+            decimalFirst = validNums.find(n => n >= 10) || validNums.at(0);
+          }
+
+          let target = explicitDirNum ? parseFloat(explicitDirNum.at(1)) : (milestoneNum ? parseFloat(milestoneNum.at(1)) : decimalFirst);
           if ((!target || (isPredictFormat && !milestoneNum && headerMilestones[added])) && headerMilestones[added]) {
             target = headerMilestones[added];
           }
 
           const isYardStat = /YDS/i.test(resolvedStat);
           const summaryFallback = summaryPicks.at(added);
-          const useSummary = Boolean(summaryFallback) && (!target || (isYardStat && target < 15));
+          const useSummary = !isDfsPickem && Boolean(summaryFallback) && (!target || (isYardStat && target < 15));
           const finalOu = useSummary ? summaryFallback.ou : ou;
           const finalTarget = useSummary ? summaryFallback.val : target;
           if (finalTarget) {
@@ -1748,13 +1773,13 @@
 
         const twoLineStat = mapOcrStat(line);
         const prevClean = prevLine.replace(/\b(\d{1,3})[tT]\b/g, '$1+');
-        const prevMilestone = prevClean.match(/\b(\d{1,3}(?:\.\d)?)\s*\+?\s*$/);
-        if (twoLineStat) {
+        const prevMilestone = !isDfsPickem && !isRosterSubtitle(prevLine) && prevClean.match(/\b(\d{1,3}(?:\.\d)?)\s*\+?\s*$/);
+        if (twoLineStat && prevMilestone) {
           const nameOnly = line
             .replace(/\b(pts\s*\+\s*rebs\s*\+\s*asts|pra|passing\s*yards|pass\s*yds|passing\s*td|pass\s*td|rushing\s*yards|rush\s*yds|rushing\s*td|rush\s*td|receiving\s*yards|rec\s*yds|receiving\s*td|rec\s*td|rush\s*\+\s*rec|scrimmage|receptions|catches|3-pt|3pm|three\s*pointers|threes|rebounds|assists|steals|blocks|points)\b.*$/i, '')
             .replace(/^[^a-zA-Z]+/, '')
             .trim();
-          const target = prevMilestone ? parseFloat(prevMilestone.at(1)) : headerMilestones[added];
+          const target = parseFloat(prevMilestone.at(1));
           if (nameOnly.split(/\s+/).length >= 2 && target > 0 && target < 600) {
             const aliasedMatch = allPlayers.find(p => p.normLower === resolveAlias(nameOnly));
             const finalPlayerName = aliasedMatch ? aliasedMatch.name : nameOnly;
@@ -1764,7 +1789,9 @@
           }
         }
 
-        // Pattern D: Team Spread or Moneyline (Supports YES/NO · SPREAD Flip)
+        if (isDfsPickem) continue;
+
+        // Pattern D: Team Spread or Moneyline (Sportsbooks Only)
         const nextRow = lines[i + 1] || '', hasSpreadTag = /\bspread\b/i.test(nextRow);
         const teamPick = line.match(/^([A-Za-z0-9 .&'()-]{3,30})\s+([+-–—−]?\s*\d{1,2}(?:\.\d)?|ML|Moneyline|to\s+Win)\b/i);
         if (teamPick) {
@@ -1793,7 +1820,7 @@
           }
         }
 
-        // Pattern E: Standalone Team Winner Line
+        // Pattern E: Standalone Team Winner Line (Sportsbooks Only)
         const isScheduleBanner = /\b(\d{1,2}:\d{2}|am|pm|sun|mon|tue|wed|thu|fri|sat|today|tomorrow|final|live|q[1-4]|half|ot)\b/i.test(line);
         const isPredictControl = /\b(yes|no|n0)\s*[·•|-]?\s*(spread|total|over|under|moneyline|ml)\b/i.test(line);
         if (!hasSpreadTag && !isScheduleBanner && !isPredictControl && !/\b(over|under|spread|bought|to pay|to win|wager|combo|pick|open|sell|share|hide|trade|placed|total|amount|payout|@|vs)\b/i.test(line)) {
@@ -2159,6 +2186,7 @@
   </script>
 </body>
 </html>
+
 
 
 
