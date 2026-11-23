@@ -1477,18 +1477,19 @@
           }
           window._ocrRedBands = redYList;
 
-                    for (let i = 0; i < d.length; i += 4) {
-          const r = d[i], g = d[i + 1], b = d[i + 2];
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2];
             let gray = 0.299 * r + 0.587 * g + 0.114 * b;
             if (isDarkBg) {
-              const isColoredArrowOrIcon = (g > r + 25 && g > 110) || (r > g + 35 && r > 140);
-              gray = (!isColoredArrowOrIcon && gray > 95) ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
+              const isRedArrow = (r > g + 35 && r > 140);
+              gray = (!isRedArrow && gray > 95) ? Math.max(0, 255 - (gray - 95) * 2.8) : 255;
             } else {
               const lightGray = 0.25 * r + 0.65 * g + 0.10 * b;
               gray = lightGray < 238 ? Math.max(0, lightGray * 0.68) : 255;
             }
             d[i] = d[i + 1] = d[i + 2] = gray;
           }
+
           ctx.putImageData(imgData, 0, 0);
           canvas.toBlob(blob => resolve(blob || file), 'image/png');
         };
@@ -1556,7 +1557,7 @@
       }
 
       // --- 7B. Detect Wager Cost & Potential Payout ---
-      const dfsToWinMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+to\s+win\s+\$\s*(\d+(?:\.\d{1,2})?)/i);
+      const dfsToWinMatch = text.match(/\$?\s*(\d+(?:\.\d{1,2})?)\s+to\s+win\s+\$\s*(\d+(?:\.\d{1,2})?)/i);
       const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
       const costMatch = dfsToWinMatch || dualFooterMatch ||
         text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
@@ -1717,17 +1718,18 @@
           // 2. Collect prop rows (each prop has a target number + stat line right below/beside it)
           const stHere = mapOcrStat(line);
           const lineCleanDec = normDecLine(line);
-          const decHere = lineCleanDec.match(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/);
+          const allDecsHere = [...lineCleanDec.matchAll(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/g)].map(m => parseFloat(m.at(1)));
+          const decHereVal = allDecsHere.length ? allDecsHere.at(-1) : null;
           const prevLineTxt = normDecLine(lines[i - 1] || '');
-          const prevHadDec = /(?:^|[^0-9.])\d{1,3}\.\d(?![0-9])/.test(prevLineTxt);
+          const prevDecs = [...prevLineTxt.matchAll(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/g)].map(m => parseFloat(m.at(1)));
+          const prevHadDec = prevDecs.length > 0;
 
           // Skip stat-only line if its .5 target line was already captured on the line above
-          if (stHere && !decHere && prevHadDec) continue;
+          if (stHere && decHereVal === null && prevHadDec) continue;
 
-          if (decHere || stHere) {
+          if (decHereVal !== null || stHere) {
             const nextL = normDecLine(lines[i + 1] || '');
-            // If stat is already on this line, never bleed forward into nextL (belongs to next player)
-            const windowTxt = decHere ? `${lineCleanDec} ${nextL}` : `${prevLineTxt} ${lineCleanDec}`;
+            const windowTxt = decHereVal !== null ? `${lineCleanDec} ${nextL}` : `${prevLineTxt} ${lineCleanDec}`;
             const cleaned = windowTxt
               .replace(/#\s*\d{1,2}\b/g, ' ')
               .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
@@ -1736,20 +1738,16 @@
             const isUnderArrow = /\b(under|less|lower)\b/i.test(cleaned) || /[↓▼⬇]/.test(windowTxt) || /\bJ\s*\d{2,4}\b/.test(cleaned);
             const ou = isUnderArrow ? 'Under' : 'Over';
 
-            let val = decHere ? parseFloat(decHere.at(1)) : null;
-            if (!val) {
-             const decPrev = prevLineTxt.match(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/);
-             const decWin = cleaned.match(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/);
-             if (decPrev) val = parseFloat(decPrev.at(1));
-             else if (decWin) val = parseFloat(decWin.at(1));
+            let val = decHereVal;
+            if (val === null) {
+              const winDecs = [...cleaned.matchAll(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/g)].map(m => parseFloat(m.at(1)));
+              if (prevDecs.length) val = prevDecs.at(-1);
+              else if (winDecs.length) val = winDecs.at(-1);
             }
-            if (!val) {
+            if (val === null) {
               const nums = (cleaned.match(/\b\d{1,4}\b/g) || []).map(Number).filter(n => n > 0);
               const cand = nums.find(n => n >= 15 && n % 10 === 5) || nums.find(n => n > 1 && n < 600);
               if (cand) val = (cand >= 15 && cand % 10 === 5) ? cand / 10 : cand;
-            }
-            if (val && Number.isInteger(val) && val >= 1 && val <= 12 && !/\.\d/.test(cleaned)) {
-              val = val + 0.5;
             }
 
           const resolvedSt = stHere || mapOcrStat(nextL) || (val && val < 15 ? 'REC' : 'REC YDS');
@@ -2309,6 +2307,7 @@
   </script>
 </body>
 </html>
+
 
 
 
