@@ -1788,8 +1788,9 @@
           added++;
         }
         renderDraft();
-        if (added > 0) {
-          if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${added} leg${added === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
+          if (added > 0) {
+          const rawDiag = lines.filter(l => /\d|rec|pass|rush|chase|burrow|diggs/i.test(l)).slice(0, 14).join(' | ');
+          if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${added} legs.</span><br><span style="font-size:11px;color:#94a3b8">${rawDiag}</span>`;
           showToast(`Imported ${added} leg${added === 1 ? '' : 's'} from screenshot!`);
         }
         return;
@@ -2306,6 +2307,7 @@
   </script>
 </body>
 </html>
+
 
 
 
