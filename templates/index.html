@@ -1705,6 +1705,8 @@
 
           // 1. Collect matched players in top-to-bottom order
           if (!isRosterSubtitle(line)) {
+          // Skip standalone Over/Under prop header lines (e.g. "Over 4.5", "○ Under 41.5")
+          if (/^(?:[oO0○•]\s*)?(?:over|under|more|less)\s+\d{1,3}(?:\.\d)?\s*$/i.test(line)) continue;  
             const lineNorm = resolveAlias(line);
             const mp = allPlayers.find(p =>
               line.toLowerCase().includes(p.lower) ||
@@ -1869,9 +1871,8 @@
             target = headerMilestones[added];
           }
 
-          const isYardStat = /YDS/i.test(resolvedStat);
           const summaryFallback = summaryPicks.at(added);
-          const useSummary = !isDfsPickem && Boolean(summaryFallback) && (!target || (isYardStat && target < 15));
+          const useSummary = !isDfsPickem && Boolean(summaryFallback) && (isPredictFormat || !target);
           const finalOu = useSummary ? summaryFallback.ou : ou;
           const finalTarget = useSummary ? summaryFallback.val : target;
           if (finalTarget) {
@@ -2309,6 +2310,7 @@
   </script>
 </body>
 </html>
+
 
 
 
