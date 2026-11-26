@@ -1561,17 +1561,18 @@
     // =========================================================================
     // --- 6C. VISION AI SLIP IMPORTER (With Automatic Local OCR Fallback) ---
     // =========================================================================
-     function fileToBase64(file) {
+    function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = reject;
+        reader.onerror = () => reject(new Error('Could not read selected image'));
         reader.readAsDataURL(file);
       });
     }
+
     async function handleSlipImage(input) {
       let file = input;
-      if (input && input.files) { file = input.files.item(0); input.value = ''; }
+      if (input && input.files) { file = input.files.item(0); }
       else if (input && typeof input.item === 'function') { file = input.item(0); }
       if (!file) return;
 
@@ -1607,6 +1608,7 @@
           renderDraft();
           if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
           showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
+          if (input && 'value' in input) input.value = '';
           return;
         }
       } catch (e) {
@@ -1632,6 +1634,8 @@
       } catch (err) {
         tesseractPromise = null;
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Scan error: ${err.message}</span>`;
+      } finally {
+        if (input && 'value' in input) input.value = '';
       }
     }
     // =========================================================================
