@@ -593,7 +593,7 @@ def api_parse_slip():
         return jsonify({"ok": False, "error": "Missing image data"}), 400
 
     if "," in img_b64:
-        img_b64 = img_b64.split(",", 1)
+        img_b64 = img_b64.split(",", 1)[1]
 
     prompt = f"""You are a sports betting slip OCR parser for {book}.
 Extract the wager cost, payout, and every bet leg from this screenshot into strict JSON.
@@ -627,7 +627,9 @@ Rules:
         url = f"https://googleapis.com{api_key}"
         resp = requests.post(url, json=payload, timeout=18)
         raw_res = resp.json()
-        txt = raw_res["candidates"]["content"]["parts"]["text"]
+        if "error" in raw_res:
+            return jsonify({"ok": False, "fallback": True, "error": raw_res["error"].get("message", "Gemini API error")}), 200
+        txt = raw_res["candidates"][0]["content"]["parts"][0]["text"]
         parsed = json.loads(txt)
         return jsonify({
             "ok": True,
@@ -637,3 +639,4 @@ Rules:
         })
     except Exception as e:
         return jsonify({"ok": False, "fallback": True, "error": str(e)}), 200
+
