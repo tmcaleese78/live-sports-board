@@ -1521,7 +1521,7 @@
             }
             if (darkGap < 2) continue;
 
-            let topW = 0, botW = 0;
+            let topW = 0, botLeft = 0, botRight = 0;
             for (let dx = -2; dx <= 10; dx++) {
               const px = arrowX + dx;
               if (px < xArrowMin || px >= xArrowMax) continue;
@@ -1531,11 +1531,15 @@
               }
               for (let dy = 1; dy <= 6; dy++) {
                 const idx = ((y + dy) * w + px) * 4;
-                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 185) botW++;
+                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 185) {
+                  if (dx <= 3) botLeft++;
+                  else botRight++;
+                }
               }
             }
-            // Down-arrow (↓) has a thin top stem (topW <= 18) and wide bottom arrowhead (botW >= topW + 10)
-            if (topW >= 4 && topW <= 18 && botW >= topW + 10) {
+            const botW = botLeft + botRight;
+            // Down-arrow (↓) has a thin top stem and symmetrical bottom wings (both botLeft & botRight >= 4)
+            if (topW >= 4 && topW <= 18 && botLeft >= 4 && botRight >= 4 && botW >= topW + 10) {
               downBands.push((y - yStart) / (yEnd - yStart));
             }
           }
@@ -2110,7 +2114,7 @@
           downHits[bIdx]++;
         });
         downHits.forEach((cnt, idx) => {
-          if (cnt >= 2) dfsProps[idx].ou = 'Under';
+          if (cnt >= 3) dfsProps[idx].ou = 'Under';
         });
       }
 
