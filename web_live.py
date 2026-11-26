@@ -603,9 +603,11 @@ Rules:
    - Player prop: {{"type":"prop","sport":"NFL"|"NBA"|"CFB","player":"Full Name","stat":"STAT_CODE","ou":"Over"|"Under","target":number}}
    - Team spread or ML: {{"type":"spread"|"ml","sport":"NFL"|"NBA"|"CFB","team":"Full Team Name","spread":number}}
    - Game total: {{"type":"total","sport":"NFL"|"NBA"|"CFB","game":"Away Team @ Home Team","ou":"Over"|"Under","total":number}}
-3. For PrizePicks / DFS slips:
-   - An upward arrow (↑) or green goblin icon means "Over".
-   - A downward arrow (↓) — whether white or red — means "Under".
+3. CRITICAL FOR PRIZEPICKS / DFS ARROWS:
+   - Directly to the left of each prop number (such as "↓ 6" or "↑ 9.5") is a vertical arrow icon.
+   - Look at which end of the vertical line has the triangular arrowhead:
+     * If the arrowhead is at the BOTTOM pointing DOWN (↓), "ou" MUST be "Under" (do NOT assume Over).
+     * If the arrowhead is at the TOP pointing UP (↑), "ou" MUST be "Over".
    - If a number is crossed out next to a discounted promo number (e.g. 302.5 crossed out next to 0.5), use the active promo number (0.5).
 4. Map "stat" strictly to one of: PASS YDS, PASS TD, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD, PTS, REB, AST, 3PM, STL, BLK, PRA.
 5. Ignore any embedded live mini-scoreboard widgets at the bottom of the screen."""
