@@ -1557,7 +1557,10 @@
       setTab('build');
       openSlipBookPicker();
     }
-
+    
+    // =========================================================================
+    // --- 6C. VISION AI SLIP IMPORTER (With Automatic Local OCR Fallback) ---
+    // =========================================================================
      function fileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1566,9 +1569,6 @@
         reader.readAsDataURL(file);
       });
     }
-    // =========================================================================
-    // --- 6C. VISION AI SLIP IMPORTER (With Automatic Local OCR Fallback) ---
-    // =========================================================================
     async function handleSlipImage(input) {
       let file = input;
       if (input && input.files) { file = input.files.item(0); input.value = ''; }
