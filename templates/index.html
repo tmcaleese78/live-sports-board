@@ -1725,14 +1725,21 @@
 
         if (/^(?:[oO0○•]\s*)?(?:over|under|more|less)\s+\d{1,3}(?:\.\d)?\s*$/i.test(line)) continue;
 
-        // 1. Game Total
-        const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage)\b/i.test(line);
+        // 1. Game Total (supports both "Over 56.5" and "56.5 Total Points" + "UNDER · TOTAL")
+        const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage)\b/i.test(line) && !/\btotal\s*points\b/i.test(line);
         const totalLine = !hasPlayerStatWord && line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
-        if (totalLine) {
-          const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
+        const fdRevTotal = !totalLine && line.match(/^(\d{2,3}(?:\.\d)?)\s+Total\s+Points\b/i);
+
+        if (totalLine || fdRevTotal) {
+          const ouRaw = totalLine ? totalLine.at(1) : ((nextLine.match(/\b(Over|Under)\b/i) || [])[1] || 'Over');
+          const totalRaw = totalLine ? totalLine.at(2) : fdRevTotal.at(1);
+          const hintRaw = totalLine ? (totalLine.at(3) || '') : '';
           const ou = ouRaw.charAt(0).toUpperCase() + ouRaw.slice(1).toLowerCase();
           const total = parseFloat(totalRaw);
-          const matchedGame = findGameByTeamHint(`${hintRaw} ${nextLine}`);
+          const matchupHdr = lines.slice(0, i).find(l => /@|\bvs\.?\b/i.test(l)) || '';
+          const prevTeamLeg = legs.find(l => l.team);
+          const legGame = prevTeamLeg ? ctx.allGames.find(g => g.awayFull === prevTeamLeg.team || g.homeFull === prevTeamLeg.team) : null;
+          const matchedGame = findGameByTeamHint(`${hintRaw} ${nextLine}`) || findGameByTeamHint(matchupHdr) || legGame;
           if (matchedGame && total > 20) {
             legs.push({ type: 'total', sport: matchedGame.sport, game: matchedGame.gameLbl, ou, total });
             continue;
