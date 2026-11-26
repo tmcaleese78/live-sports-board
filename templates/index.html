@@ -1558,12 +1558,62 @@
       openSlipBookPicker();
     }
 
-      async function handleSlipImage(input) {
+     function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+    // =========================================================================
+    // --- 6C. VISION AI SLIP IMPORTER (With Automatic Local OCR Fallback) ---
+    // =========================================================================
+    async function handleSlipImage(input) {
       let file = input;
       if (input && input.files) { file = input.files.item(0); input.value = ''; }
       else if (input && typeof input.item === 'function') { file = input.item(0); }
       if (!file) return;
+
       const statusEl = document.getElementById('ocr-status');
+      const selectedBook = pendingOcrBook || (document.getElementById('b-book') && document.getElementById('b-book').value) || 'DraftKings';
+      if (statusEl) statusEl.innerHTML = `<span style="color:#38bdf8;font-weight:700">Scanning ${selectedBook} slip with Vision AI...</span>`;
+
+      try {
+        const b64 = await fileToBase64(file);
+        const res = await fetch('/api/parse-slip', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image_b64: b64, mime_type: file.type || 'image/png', book: selectedBook })
+        });
+        const data = await res.json();
+
+        if (data && data.ok && Array.isArray(data.legs) && data.legs.length > 0) {
+          if (data.cost && document.getElementById('b-cost')) document.getElementById('b-cost').value = data.cost;
+          if (data.payout && document.getElementById('b-pay')) document.getElementById('b-pay').value = data.payout;
+
+          const cleanLegs = data.legs.map(leg => {
+            if (leg.type === 'prop' && leg.player) {
+              const spList = (liveData.players && liveData.players[leg.sport]) || [];
+              const low = leg.player.toLowerCase();
+              const hit = spList.find(p => p.name && p.name.toLowerCase() === low) ||
+                          spList.find(p => p.name && (p.name.toLowerCase().includes(low) || low.includes(p.name.toLowerCase())));
+              if (hit) leg.player = hit.name;
+            }
+            return leg;
+          });
+
+          draftLegs.push(...cleanLegs);
+          renderDraft();
+          if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
+          showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
+          return;
+        }
+      } catch (e) {
+        console.warn('Vision AI fallback to local OCR:', e);
+      }
+
+      // Automatic fallback to local Tesseract + modular 7B/7C/7D parsers
       try {
         if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing "${file.name || 'screenshot'}"...</span>`;
         const [T, cleanBlob] = await withTimeout(
@@ -1572,7 +1622,7 @@
           'Scanner load'
         );
         if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 2/2: Reading slip text...</span>`;
-          const res = await withTimeout(
+        const res = await withTimeout(
           T.recognize(cleanBlob, 'eng'),
           18000,
           'Text scan'
