@@ -1997,7 +1997,7 @@
           }
         }
 
-        // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs)
+        // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs, Rec Targets)
         const stHere = mapOcrStat(line);
         if (stHere) {
           const prev1 = normDecLine(lines[i - 1] || '');
@@ -2045,6 +2045,8 @@
       }
 
       const pairCount = Math.min(dfsPlayers.length, dfsProps.length);
+
+      // 3. Apply pixel-scanned red demon arrow bands (Under)
       const redBands = window._ocrRedBands || [];
       if (redBands.length > 0 && pairCount > 0) {
         const bucketHits = new Array(pairCount).fill(0);
@@ -2053,6 +2055,19 @@
           bucketHits[bIdx]++;
         });
         bucketHits.forEach((cnt, idx) => {
+          if (cnt >= 2) dfsProps[idx].ou = 'Under';
+        });
+      }
+
+      // 4. Apply pixel-scanned white down-arrow (↓) geometry bands (Under)
+      const downBands = window._ocrDownArrowBands || [];
+      if (downBands.length > 0 && pairCount > 0) {
+        const downHits = new Array(pairCount).fill(0);
+        downBands.forEach(normY => {
+          const bIdx = Math.min(pairCount - 1, Math.max(0, Math.floor(normY * pairCount)));
+          downHits[bIdx]++;
+        });
+        downHits.forEach((cnt, idx) => {
           if (cnt >= 2) dfsProps[idx].ou = 'Under';
         });
       }
