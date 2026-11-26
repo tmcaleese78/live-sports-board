@@ -1502,8 +1502,8 @@
 
           // Detect white down-arrow (↓) vs up-arrow (↑) by checking narrow top stem (topW <= 12) vs wide bottom wings
           const downBands = [];
-          const dyStart = Math.floor(h * 0.20), dyEnd = Math.floor(h * 0.86);
-          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.94);
+          const dyStart = Math.floor(h * 0.15), dyEnd = Math.floor(h * 0.88);
+          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.97);
           for (let y = dyStart + 6; y < dyEnd - 6; y += 2) {
             let arrowX = -1;
             for (let x = xArrowMin; x < xArrowMax; x++) {
@@ -1514,13 +1514,6 @@
               }
             }
             if (arrowX < 0) continue;
-
-            let darkGap = 0;
-            for (let gx = arrowX + 11; gx <= arrowX + 15 && gx < xArrowMax; gx++) {
-              const idx = (y * w + gx) * 4;
-              if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] < 90) darkGap++;
-            }
-            if (darkGap < 2) continue;
 
             let topW = 0, botLeft = 0, botRight = 0;
             for (let dx = -2; dx <= 10; dx++) {
