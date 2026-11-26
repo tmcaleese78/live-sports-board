@@ -1809,7 +1809,8 @@
         const prevLine = lines[i - 1] || '', prevLine2 = lines[i - 2] || '', nextLine = lines[i + 1] || '';
 
         // Stop when reaching DraftKings' embedded live mini-scoreboard widget at the bottom
-        if (/\b(Q1\s+Q2|1st\s*&|2nd\s*&|3rd\s*&|4th\s*&|Goal\s+to\s+Go)\b/i.test(line)) break;
+        if (/\b(Q1|Q2|Q3|Q4|1st\s*[&8]|2nd\s*[&8]|3rd\s*[&8]|4th\s*[&8]|Goal\s+to\s+Go)\b/i.test(line)) break;
+        if (isPredictFormat && /\b\d+\s+\d+\s+[-–—]\s+[-–—]\s+\d+\b/.test(line)) break;
 
         // Skip header summary lines (e.g. "3 Pick Combo", "30+, 7+, Kyren Williams", "Over 4.5, Under 41.5")
         if (line === summaryHeaderLine || line === milestoneHeaderLine) continue;
