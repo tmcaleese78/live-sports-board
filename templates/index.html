@@ -2333,7 +2333,7 @@
       pendingQuickProp = { sport, player, team };
       const stats = sport === 'NBA'
         ? ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']
-        : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'];
+        : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS', 'TD'];
       document.getElementById('qp-player').textContent = `${player} (${sport}${team ? ' • ' + team : ''})`;
       document.getElementById('qp-stat').innerHTML = stats.map(s => `<option value="${s}" ${s === defaultStat ? 'selected' : ''}>${s}</option>`).join('');
       document.getElementById('qp-ou').value = 'Over';
