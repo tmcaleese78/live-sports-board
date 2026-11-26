@@ -1399,6 +1399,10 @@
 
     function mapOcrStat(raw) {
       const s = raw.toLowerCase();
+      if (/pts\s*\+\s*rebs\s*\+\s*asts|\bpra\b/.test(s)) return 'PRA';
+      if (/rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage/.test(s)) return 'SCRIM YDS';
+      if (/rush(?:ing)?\s*att(?:empts)?|carries/.test(s)) return 'RUSH ATT';
+      if (/anytime\s*td|touchdown|\btd\b/.test(s)) return 'TD';   
       if (/pts\s*\+\s*rebs\s*\+\s*asts|pra|points\s*\+\s*rebounds\s*\+\s*assists/.test(s)) return 'PRA';
       if (/passing\s*yards|pass\s*yds|pass\s*yards/.test(s)) return 'PASS YDS';
       if (/passing\s*td|pass\s*td|passing\s*touchdowns/.test(s)) return 'PASS TD';
@@ -1791,7 +1795,6 @@
         payout = (parseInt(payout, 10) / 100).toFixed(2);
       }
 
-      // Extract DraftKings Predictions header summary lines (e.g. "Over 4.5, Under 41.5..." or "250+, 50+, 5+...")
       const isPredictFormat = /\b(pick\s*combo|bought|to\s*pay|yes\s*[·•|-]|no\s*[·•|-])\b/i.test(text);
       const summaryHeaderLine = lines.slice(0, 8).find(l => (l.match(/\b(?:over|under)\s+\d+/gi) || []).length >= 2) || '';
       const summaryPicks = [...summaryHeaderLine.matchAll(/\b(over|under)\s+(\d{1,3}(?:\.\d)?)\b/gi)].map(m => ({
@@ -1805,12 +1808,17 @@
         const line = lines[i];
         const prevLine = lines[i - 1] || '', prevLine2 = lines[i - 2] || '', nextLine = lines[i + 1] || '';
 
-        // Never treat standalone prop header lines ("Over 4.5", "○ Under 41.5", "250+") as team spreads/totals
+        // Stop when reaching DraftKings' embedded live mini-scoreboard widget at the bottom
+        if (/\b(Q1\s+Q2|1st\s*&|2nd\s*&|3rd\s*&|4th\s*&|Goal\s+to\s+Go)\b/i.test(line)) break;
+
+        // Skip header summary lines (e.g. "3 Pick Combo", "30+, 7+, Kyren Williams", "Over 4.5, Under 41.5")
+        if (line === summaryHeaderLine || line === milestoneHeaderLine) continue;
+        if (/\bpick\s*combo\b/i.test(line)) continue;
         if (/^(?:[oO0○•]\s*)?(?:over|under|more|less)\s+\d{1,3}(?:\.\d)?\s*$/i.test(line)) continue;
         if (/^(?:[oO0○•]\s*)?\d{1,3}\s*\+?\s*$/.test(line)) continue;
 
         // 1. Game Total
-        const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage)\b/i.test(line);
+        const hasPlayerStatWord = /\b(yards|yds|points|pts|rebounds|reb|assists|ast|receptions|rec|touchdowns|td|threes|3pm|steals|blocks|pra|scrimmage|attempts|scorer)\b/i.test(line);
         const totalLine = !hasPlayerStatWord && line.match(/\b(Over|Under)\s+(\d{2,3}(?:\.\d)?)\s*[,|-]?\s*(.+)?$/i);
         if (totalLine) {
           const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
@@ -1827,11 +1835,19 @@
         const mp = matchPlayerInLine(line);
         if (mp) {
           const idx = legs.length;
-          const stat = mapOcrStat(line) || mapOcrStat(nextLine) || mapOcrStat(prevLine) || (mp.sport === 'NBA' ? 'PTS' : 'PASS YDS');
+          const combinedPropTxt = `${line} ${nextLine}`;
+          const isAnytimeTd = /\b(anytime\s*td|td\s*scorer|first\s*td|last\s*td|2\+\s*td)\b/i.test(combinedPropTxt);
+          const stat = isAnytimeTd ? 'TD' : (mapOcrStat(line) || mapOcrStat(nextLine) || mapOcrStat(prevLine) || (mp.sport === 'NBA' ? 'PTS' : 'PASS YDS'));
+
+          if (isAnytimeTd) {
+            legs.push({ type: 'prop', sport: mp.sport, player: mp.name, stat: 'TD', ou: 'Over', target: 0.5 });
+            continue;
+          }
           if (summaryPicks[idx]) {
             legs.push({ type: 'prop', sport: mp.sport, player: mp.name, stat, ou: summaryPicks[idx].ou, target: summaryPicks[idx].val });
             continue;
           }
+
           const isPropHeader = s => /\b(over|under|more|less)\b|\d+\s*[+t]|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
           const dirLine = isPropHeader(prevLine) ? prevLine : (isPropHeader(nextLine) ? nextLine : (isPropHeader(prevLine2) ? prevLine2 : line));
           const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
@@ -1854,12 +1870,16 @@
         if (twoLineStat && !/^(?:over|under|bought|to pay|pick combo)/i.test(line)) {
           const idx = legs.length;
           const nameOnly = line
-            .replace(/\b(pts\s*\+\s*rebs\s*\+\s*asts|pra|passing\s*yards|pass\s*yds|passing\s*td|pass\s*td|rushing\s*yards|rush\s*yds|rushing\s*td|rush\s*td|receiving\s*yards|rec\s*yds|receiving\s*td|rec\s*td|rush\s*\+\s*rec|scrimmage|receptions|catches|3-pt|3pm|three\s*pointers|threes|rebounds|assists|steals|blocks|points)\b.*$/i, '')
+            .replace(/\b(pts\s*\+\s*rebs\s*\+\s*asts|pra|rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage|rush(?:ing)?\s*att(?:empts)?|anytime\s*td|touchdown|passing\s*yards|pass\s*yds|passing\s*td|pass\s*td|rushing\s*yards|rush\s*yds|rushing\s*td|rush\s*td|receiving\s*yards|rec\s*yds|receiving\s*td|rec\s*td|receptions|catches|3-pt|3pm|three\s*pointers|threes|rebounds|assists|steals|blocks|points)\b.*$/i, '')
             .replace(/^[^a-zA-Z]+/, '').trim();
           if (nameOnly.split(/\s+/).length >= 2) {
             const aliased = allPlayers.find(p => p.normLower === resolveAlias(nameOnly));
             const playerName = aliased ? aliased.name : nameOnly;
             const sport = nbaStats.has(twoLineStat) ? 'NBA' : 'NFL';
+            if (twoLineStat === 'TD') {
+              legs.push({ type: 'prop', sport, player: playerName, stat: 'TD', ou: 'Over', target: 0.5 });
+              continue;
+            }
             if (summaryPicks[idx]) {
               legs.push({ type: 'prop', sport, player: playerName, stat: twoLineStat, ou: summaryPicks[idx].ou, target: summaryPicks[idx].val });
               continue;
