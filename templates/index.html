@@ -1500,10 +1500,11 @@
           window._ocrRedBands = redYList;
           window._ocrRedBands = redYList;
 
-          // Detect white down-arrow (↓) vs up-arrow (↑) by checking narrow top stem vs wide bottom arrowhead
+          // Detect white down-arrow (↓) vs up-arrow (↑) by checking narrow top stem (topW <= 12) vs wide bottom wings
           const downBands = [];
-          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.92);
-          for (let y = yStart + 8; y < yEnd - 8; y += 2) {
+          const dyStart = Math.floor(h * 0.20), dyEnd = Math.floor(h * 0.86);
+          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.94);
+          for (let y = dyStart + 6; y < dyEnd - 6; y += 2) {
             let arrowX = -1;
             for (let x = xArrowMin; x < xArrowMax; x++) {
               const idx = (y * w + x) * 4;
@@ -1513,7 +1514,7 @@
               }
             }
             if (arrowX < 0) continue;
-            // Verify there is dark space right after the arrow (separating arrow from the digit)
+
             let darkGap = 0;
             for (let gx = arrowX + 11; gx <= arrowX + 15 && gx < xArrowMax; gx++) {
               const idx = (y * w + gx) * 4;
@@ -1538,9 +1539,8 @@
               }
             }
             const botW = botLeft + botRight;
-            // Down-arrow (↓) has a thin top stem and symmetrical bottom wings (both botLeft & botRight >= 4)
-            if (topW >= 4 && topW <= 18 && botLeft >= 4 && botRight >= 4 && botW >= topW + 10) {
-              downBands.push((y - yStart) / (yEnd - yStart));
+            if (topW >= 4 && topW <= 12 && botLeft >= 4 && botRight >= 4 && botW >= topW + 8) {
+              downBands.push((y - dyStart) / (dyEnd - dyStart));
             }
           }
           window._ocrDownArrowBands = downBands;
