@@ -403,6 +403,10 @@ def parse_scoreboard(sport_path, lg_code, fast=False):
             seen_p.add((ab, nm))
             if lg_code == "nfl":
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
+            if lg_code == "nfl":
+                d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
+                d["stats"]["RUSH ATT"] = d["stats"].get("CAR", 0.0)
+                d["stats"]["TD"] = d["stats"].get("RUSH TD", 0.0) + d["stats"].get("REC TD", 0.0)
             m = team_meta.get(ab, {"bg": "#1e293b", "logo": ""})
             players.append({"id": d.get("id", ""), "name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": d["stats"]})
     for r in rosters:
