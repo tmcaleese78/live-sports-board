@@ -1556,36 +1556,48 @@
     function triggerQuickSlipUpload() {
       setTab('build');
       openSlipBookPicker();
-    }
-    
+    }    
     // =========================================================================
     // --- 6C. VISION AI SLIP IMPORTER (With Automatic Local OCR Fallback) ---
     // =========================================================================
-    function fileToBase64(file) {
+    function blobToBase64(blob) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(String(reader.result || ''));
-        reader.onerror = () => reject(new Error('Could not read selected image'));
-        reader.readAsDataURL(file);
+        reader.onerror = () => reject(new Error('Could not read image buffer'));
+        reader.readAsDataURL(blob);
       });
     }
 
     async function handleSlipImage(input) {
-      let file = input;
-      if (input && input.files) { file = input.files.item(0); }
-      else if (input && typeof input.item === 'function') { file = input.item(0); }
-      if (!file) return;
+      let rawFile = input;
+      if (input && input.files) { rawFile = input.files.item(0); }
+      else if (input && typeof input.item === 'function') { rawFile = input.item(0); }
+      if (!rawFile) return;
 
       const statusEl = document.getElementById('ocr-status');
       const selectedBook = pendingOcrBook || (document.getElementById('b-book') && document.getElementById('b-book').value) || 'DraftKings';
       if (statusEl) statusEl.innerHTML = `<span style="color:#38bdf8;font-weight:700">Scanning ${selectedBook} slip with Vision AI...</span>`;
 
+      // Copy file bytes into memory immediately so mobile browsers never revoke the handle
+      let memBlob;
       try {
-        const b64 = await fileToBase64(file);
+        const buf = await rawFile.arrayBuffer();
+        memBlob = new Blob([buf], { type: rawFile.type || 'image/png' });
+      } catch (readErr) {
+        if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Could not open image file (${readErr.message}). Try selecting from Photos/Gallery.</span>`;
+        if (input && 'value' in input) input.value = '';
+        return;
+      }
+      if (input && 'value' in input) input.value = '';
+
+      let visionErr = '';
+      try {
+        const b64 = await blobToBase64(memBlob);
         const res = await fetch('/api/parse-slip', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_b64: b64, mime_type: file.type || 'image/png', book: selectedBook })
+          body: JSON.stringify({ image_b64: b64, mime_type: memBlob.type || 'image/png', book: selectedBook })
         });
         const data = await res.json();
 
@@ -1608,18 +1620,19 @@
           renderDraft();
           if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
           showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
-          if (input && 'value' in input) input.value = '';
           return;
         }
+        if (data && data.error) visionErr = data.error;
       } catch (e) {
-        console.warn('Vision AI fallback to local OCR:', e);
+        visionErr = e.message || String(e);
       }
 
       // Automatic fallback to local Tesseract + modular 7B/7C/7D parsers
       try {
-        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing "${file.name || 'screenshot'}"...</span>`;
+        const warnTag = visionErr ? ` <span style="color:#94a3b8;font-size:11px">(Vision AI: ${visionErr})</span>` : '';
+        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing screenshot...</span>${warnTag}`;
         const [T, cleanBlob] = await withTimeout(
-          Promise.all([ensureTesseract(), preprocessSlipImage(file)]),
+          Promise.all([ensureTesseract(), preprocessSlipImage(memBlob)]),
           12000,
           'Scanner load'
         );
@@ -1634,8 +1647,6 @@
       } catch (err) {
         tesseractPromise = null;
         if (statusEl) statusEl.innerHTML = `<span style="color:#f87171">Scan error: ${err.message}</span>`;
-      } finally {
-        if (input && 'value' in input) input.value = '';
       }
     }
     // =========================================================================
