@@ -1462,7 +1462,9 @@
         new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out — try again`)), ms))
       ]);
     }
-
+    // =========================================================================
+    // --- 6B. IMAGE PREPROCESSING (Dark/Light Contrast & Red Demon Scan) ---
+    // =========================================================================
     function preprocessSlipImage(file) {
       return new Promise(resolve => {
         const img = new Image();
@@ -1480,12 +1482,15 @@
 
           const imgData = ctx.getImageData(0, 0, w, h);
           const d = imgData.data;
+
+          // 1. Detect dark-mode vs light-mode screenshot background
           let lumSum = 0;
           for (let i = 0; i < d.length; i += 16) {
             lumSum += 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
           }
           const isDarkBg = (lumSum / (d.length / 16)) < 128;
 
+          // 2. Scan right-hand prop boxes for red/coral Under arrows (PrizePicks demons)
           const redYList = [];
           const yStart = Math.floor(h * 0.12), yEnd = Math.floor(h * 0.92);
           for (let y = yStart; y < yEnd; y += 2) {
@@ -1498,54 +1503,8 @@
             if (redHits >= 2) redYList.push((y - yStart) / (yEnd - yStart));
           }
           window._ocrRedBands = redYList;
-          window._ocrRedBands = redYList;
 
-          // Detect white down-arrow (↓) vs up-arrow (↑) by checking narrow top stem (topW <= 12) vs wide bottom wings
-          const downBands = [];
-          const dyStart = Math.floor(h * 0.15), dyEnd = Math.floor(h * 0.88);
-          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.97);
-          for (let y = dyStart + 6; y < dyEnd - 6; y += 2) {
-            let arrowX = -1;
-            for (let x = xArrowMin; x < xArrowMax; x++) {
-              const idx = (y * w + x) * 4;
-              if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 185) {
-                arrowX = x;
-                break;
-              }
-            }
-            if (arrowX < 0) continue;
-
-            // Require at least 1 dark column between the arrow and the digits so "5.5" cannot trigger
-            let hasSep = false;
-            for (let gx = arrowX + 8; gx <= arrowX + 14 && gx < xArrowMax; gx++) {
-              const idx = (y * w + gx) * 4;
-              if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] < 95) { hasSep = true; break; }
-            }
-            if (!hasSep) continue;
-
-            let topW = 0, botLeft = 0, botRight = 0;
-            for (let dx = -2; dx <= 10; dx++) {
-              const px = arrowX + dx;
-              if (px < xArrowMin || px >= xArrowMax) continue;
-              for (let dy = -6; dy <= -1; dy++) {
-                const idx = ((y + dy) * w + px) * 4;
-                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 185) topW++;
-              }
-              for (let dy = 1; dy <= 6; dy++) {
-                const idx = ((y + dy) * w + px) * 4;
-                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 185) {
-                  if (dx <= 3) botLeft++;
-                  else botRight++;
-                }
-              }
-            }
-            const botW = botLeft + botRight;
-            if (topW >= 4 && topW <= 12 && botLeft >= 4 && botRight >= 4 && botW >= topW + 8) {
-              downBands.push((y - dyStart) / (dyEnd - dyStart));
-            }
-          }
-          window._ocrDownArrowBands = downBands;
-
+          // 3. Convert screenshot pixels into high-contrast black-on-white text for Tesseract
           for (let i = 0; i < d.length; i += 4) {
             const r = d[i], g = d[i + 1], b = d[i + 2];
             let gray = 0.299 * r + 0.587 * g + 0.114 * b;
@@ -2106,19 +2065,6 @@
         });
       }
 
-      // 4. Apply pixel-scanned white down-arrow (↓) geometry bands (Under)
-      const downBands = window._ocrDownArrowBands || [];
-      if (downBands.length > 0 && pairCount > 0) {
-        const downHits = new Array(pairCount).fill(0);
-        downBands.forEach(normY => {
-          const bIdx = Math.min(pairCount - 1, Math.max(0, Math.floor(normY * pairCount)));
-          downHits[bIdx]++;
-        });
-        downHits.forEach((cnt, idx) => {
-          if (cnt >= 2) dfsProps[idx].ou = 'Under';
-        });
-      }
-
       for (let k = 0; k < pairCount; k++) {
         legs.push({
           type: 'prop',
@@ -2131,7 +2077,6 @@
       }
       return { cost, payout, legs };
     }
-
     /* ========================================================================
        8. SAVE / UPDATE BET CARDS & LIVE API POLLING
        ======================================================================== */
