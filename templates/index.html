@@ -1515,6 +1515,14 @@
             }
             if (arrowX < 0) continue;
 
+            // Require at least 1 dark column between the arrow and the digits so "5.5" cannot trigger
+            let hasSep = false;
+            for (let gx = arrowX + 8; gx <= arrowX + 14 && gx < xArrowMax; gx++) {
+              const idx = (y * w + gx) * 4;
+              if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] < 95) { hasSep = true; break; }
+            }
+            if (!hasSep) continue;
+
             let topW = 0, botLeft = 0, botRight = 0;
             for (let dx = -2; dx <= 10; dx++) {
               const px = arrowX + dx;
