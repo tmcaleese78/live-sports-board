@@ -1778,7 +1778,7 @@
     // --- 7C. DRAFTKINGS PARSER (DraftKings Sportsbook & DraftKings Predictions)
     // =========================================================================
     function parseDraftKingsSlip(ctx) {
-      const { text, lines, resolveAlias, allPlayers, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
+      const { text, lines, resolveAlias, allPlayers, allGames, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
       const legs = [];
 
       const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
@@ -1825,13 +1825,19 @@
           const [, ouRaw = 'Over', totalRaw = '0', hintRaw = ''] = totalLine;
           const ou = ouRaw.charAt(0).toUpperCase() + ouRaw.slice(1).toLowerCase();
           const total = parseFloat(totalRaw);
-          const matchedGame = findGameByTeamHint(`${hintRaw} ${nextLine}`) || (/\btotal\s*points\b/i.test(nextLine) ? findGameByTeamHint(lines.slice(-4).join(' ')) : null);
+          const bottomBanner = lines.slice(-4).join(' ');
+          const abbrGame = allGames.find(g =>
+            (g.away && new RegExp(`\\b${g.away}\\b`, 'i').test(bottomBanner)) ||
+            (g.home && new RegExp(`\\b${g.home}\\b`, 'i').test(bottomBanner))
+          );
+          const prevTeamLeg = legs.find(l => l.team);
+          const legGame = prevTeamLeg ? allGames.find(g => g.awayFull === prevTeamLeg.team || g.homeFull === prevTeamLeg.team) : null;
+          const matchedGame = findGameByTeamHint(`${hintRaw} ${nextLine}`) || (/\btotal\s*points\b/i.test(nextLine) ? (abbrGame || legGame) : null);
           if (matchedGame && total > 20) {
             legs.push({ type: 'total', sport: matchedGame.sport, game: matchedGame.gameLbl, ou, total });
             continue;
           }
         }
-
         // 2. Matched Player Prop
         const mp = matchPlayerInLine(line);
         if (mp) {
