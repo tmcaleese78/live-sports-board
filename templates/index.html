@@ -1857,7 +1857,7 @@
           const mileNum = cleaned.match(/\b(\d{1,3})\+/);
           const nums = (cleaned.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
           let target = explicitDir ? parseFloat(explicitDir.at(1)) : (mileNum ? parseFloat(mileNum.at(1)) : (nums.find(n => !Number.isInteger(n)) || nums.find(n => n >= 10) || nums.at(0)));
-          if ((!target || (isPredictFormat && !mileNum && headerMilestones[idx])) && headerMilestones[idx]) {
+          if (isPredictFormat && headerMilestones[idx]) {
             target = headerMilestones[idx];
           }
           if (target) {
