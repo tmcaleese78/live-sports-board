@@ -1498,6 +1498,39 @@
             if (redHits >= 2) redYList.push((y - yStart) / (yEnd - yStart));
           }
           window._ocrRedBands = redYList;
+          window._ocrRedBands = redYList;
+
+          // Detect white down-arrow (↓) vs up-arrow (↑) by finding the arrow icon left of the digits (x: 76%-94%)
+          const downBands = [];
+          const xArrowMin = Math.floor(w * 0.76), xArrowMax = Math.floor(w * 0.94);
+          for (let y = yStart + 6; y < yEnd - 6; y += 2) {
+            let arrowX = -1;
+            for (let x = xArrowMin; x < xArrowMax; x++) {
+              const idx = (y * w + x) * 4;
+              if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 175) {
+                arrowX = x;
+                break;
+              }
+            }
+            if (arrowX < 0) continue;
+            let topW = 0, botW = 0;
+            for (let dx = -3; dx <= 10; dx++) {
+              const px = arrowX + dx;
+              if (px < xArrowMin || px >= xArrowMax) continue;
+              for (let dy = -5; dy <= -1; dy++) {
+                const idx = ((y + dy) * w + px) * 4;
+                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 175) topW++;
+              }
+              for (let dy = 1; dy <= 5; dy++) {
+                const idx = ((y + dy) * w + px) * 4;
+                if (0.299 * d[idx] + 0.587 * d[idx + 1] + 0.114 * d[idx + 2] > 175) botW++;
+              }
+            }
+            if (botW >= 8 && botW > topW + 5 && topW >= 2) {
+              downBands.push((y - yStart) / (yEnd - yStart));
+            }
+          }
+          window._ocrDownArrowBands = downBands;
 
           for (let i = 0; i < d.length; i += 4) {
             const r = d[i], g = d[i + 1], b = d[i + 2];
