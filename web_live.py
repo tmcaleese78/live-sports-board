@@ -403,10 +403,9 @@ def parse_scoreboard(sport_path, lg_code, fast=False):
             seen_p.add((ab, nm))
             if lg_code == "nfl":
                 d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
-            if lg_code == "nfl":
-                d["stats"]["SCRIM YDS"] = d["stats"].get("RUSH YDS", 0.0) + d["stats"].get("REC YDS", 0.0)
                 d["stats"]["RUSH ATT"] = d["stats"].get("CAR", 0.0)
                 d["stats"]["TD"] = d["stats"].get("RUSH TD", 0.0) + d["stats"].get("REC TD", 0.0)
+                d["stats"]["REC TGTS"] = d["stats"].get("TGTS", 0.0)
             m = team_meta.get(ab, {"bg": "#1e293b", "logo": ""})
             players.append({"id": d.get("id", ""), "name": nm, "team": ab, "pos": d["pos"], "league": lg_code.upper(), "status": status, "state": state, "bg": m["bg"], "logo": m["logo"], "stats": d["stats"]})
     for r in rosters:
@@ -580,3 +579,61 @@ def index():
 def ping():
     return "ok", 200
 
+@app.route("/api/parse-slip", methods=["POST"])
+def api_parse_slip():
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return jsonify({"ok": False, "fallback": True, "error": "No GEMINI_API_KEY configured"}), 200
+
+    body = request.get_json(silent=True) or {}
+    img_b64 = str(body.get("image_b64") or "").strip()
+    mime_type = str(body.get("mime_type") or "image/png").strip()
+    book = str(body.get("book") or "PrizePicks").strip()
+    if not img_b64:
+        return jsonify({"ok": False, "error": "Missing image data"}), 400
+
+    if "," in img_b64:
+        img_b64 = img_b64.split(",", 1)
+
+    prompt = f"""You are a sports betting slip OCR parser for {book}.
+Extract the wager cost, payout, and every bet leg from this screenshot into strict JSON.
+Rules:
+1. Return ONLY valid JSON with keys: "cost" (string, e.g. "2.00" or ""), "payout" (string, e.g. "9.00" or ""), and "legs" (array).
+2. Each item in "legs" must be one of three types:
+   - Player prop: {{"type":"prop","sport":"NFL"|"NBA"|"CFB","player":"Full Name","stat":"STAT_CODE","ou":"Over"|"Under","target":number}}
+   - Team spread or ML: {{"type":"spread"|"ml","sport":"NFL"|"NBA"|"CFB","team":"Full Team Name","spread":number}}
+   - Game total: {{"type":"total","sport":"NFL"|"NBA"|"CFB","game":"Away Team @ Home Team","ou":"Over"|"Under","total":number}}
+3. For PrizePicks / DFS slips:
+   - An upward arrow (↑) or green goblin icon means "Over".
+   - A downward arrow (↓) — whether white or red — means "Under".
+   - If a number is crossed out next to a discounted promo number (e.g. 302.5 crossed out next to 0.5), use the active promo number (0.5).
+4. Map "stat" strictly to one of: PASS YDS, PASS TD, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD, PTS, REB, AST, 3PM, STL, BLK, PRA.
+5. Ignore any embedded live mini-scoreboard widgets at the bottom of the screen."""
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"text": prompt},
+                {"inline_data": {"mime_type": mime_type, "data": img_b64}}
+            ]
+        }],
+        "generationConfig": {
+            "temperature": 0.0,
+            "response_mime_type": "application/json"
+        }
+    }
+
+    try:
+        url = f"https://googleapis.com{api_key}"
+        resp = requests.post(url, json=payload, timeout=18)
+        raw_res = resp.json()
+        txt = raw_res["candidates"]["content"]["parts"]["text"]
+        parsed = json.loads(txt)
+        return jsonify({
+            "ok": True,
+            "cost": str(parsed.get("cost") or ""),
+            "payout": str(parsed.get("payout") or ""),
+            "legs": parsed.get("legs") or []
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "fallback": True, "error": str(e)}), 200
