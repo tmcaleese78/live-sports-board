@@ -1406,24 +1406,26 @@
     });
 
     function mapOcrStat(raw) {
-      const s = raw.toLowerCase();
-      if (/pts\s*\+\s*rebs\s*\+\s*asts|\bpra\b/.test(s)) return 'PRA';
+      const s = String(raw || '').toLowerCase();
+      if (/pts\s*\+\s*rebs?\s*\+\s*asts?|points\s*\+\s*rebounds\s*\+\s*assists|\bpra\b/.test(s)) return 'PRA';
+      if (/(?:pts|points)\s*\+\s*(?:rebs?|rebounds)|\bpr\b/.test(s)) return 'PR';
+      if (/(?:pts|points)\s*\+\s*(?:asts?|assists)|\bpa\b/.test(s)) return 'PA';
+      if (/(?:rebs?|rebounds)\s*\+\s*(?:asts?|assists)|\bra\b/.test(s)) return 'RA';
       if (/rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage/.test(s)) return 'SCRIM YDS';
-      if (/rush(?:ing)?\s*att(?:empts)?|carries/.test(s)) return 'RUSH ATT';
-      if (/anytime\s*td|touchdown|\btd\b/.test(s)) return 'TD';   
-      if (/pts\s*\+\s*rebs\s*\+\s*asts|pra|points\s*\+\s*rebounds\s*\+\s*assists/.test(s)) return 'PRA';
-      if (/passing\s*yards|pass\s*yds|pass\s*yards/.test(s)) return 'PASS YDS';
-      if (/passing\s*td|pass\s*td|passing\s*touchdowns/.test(s)) return 'PASS TD';
-      if (/rushing\s*yards|rush\s*yds|rush\s*yards/.test(s)) return 'RUSH YDS';
-      if (/rushing\s*td|rush\s*td|rushing\s*touchdowns/.test(s)) return 'RUSH TD';
-      if (/receiving\s*yards|rec\s*yds|rec\s*yards/.test(s)) return 'REC YDS';
-      if (/receiving\s*td|rec\s*td|receiving\s*touchdowns/.test(s)) return 'REC TD';
-      if (/rush\s*\+\s*rec|scrimmage/.test(s)) return 'SCRIM YDS';
-      if (/rec(?:eiving)?\s*targets|\btargets\b/.test(s)) return 'REC TGTS';
+      if (/pass(?:ing)?\s*comp(?:letions)?|\bcomp\b/.test(s)) return 'COMP';
+      if (/pass(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'PASS TD';
+      if (/rush(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'RUSH TD';
+      if (/rec(?:eiving)?\s*(?:td|touchdown)/.test(s)) return 'REC TD';
+      if (/rush(?:ing)?\s*att(?:empts)?|carries|\bcar\b/.test(s)) return 'RUSH ATT';
+      if (/pass(?:ing)?\s*(?:yards|yds)/.test(s)) return 'PASS YDS';
+      if (/rush(?:ing)?\s*(?:yards|yds)/.test(s)) return 'RUSH YDS';
+      if (/rec(?:eiving)?\s*(?:yards|yds)/.test(s)) return 'REC YDS';
+      if (/rec(?:eiving)?\s*targets|\btgts?\b|\btargets\b/.test(s)) return 'REC TGTS';
       if (/receptions|catches|\brecs?\b/.test(s)) return 'REC';
-      if (/3-pt|3pm|three\s*pointers|threes/.test(s)) return '3PM';
-      if (/rebounds|\breb\b/.test(s)) return 'REB';
-      if (/assists|\bast\b/.test(s)) return 'AST';
+      if (/anytime\s*td|touchdown|\btd\b/.test(s)) return 'TD';
+      if (/3-?pt|3pm|3-?pointer|three\s*pointer|threes/.test(s)) return '3PM';
+      if (/rebounds|\brebs?\b/.test(s)) return 'REB';
+      if (/assists|\basts?\b/.test(s)) return 'AST';
       if (/steals|\bstl\b/.test(s)) return 'STL';
       if (/blocks|\bblk\b/.test(s)) return 'BLK';
       if (/points|\bpts\b/.test(s)) return 'PTS';
@@ -1569,6 +1571,129 @@
       });
     }
 
+    function prepareVisionPayload(blob, selectedBook) {
+      return new Promise(resolve => {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          try {
+            const maxW = 1600, maxH = 2600;
+            const ratio = Math.min(1, maxW / (img.width || 1), maxH / (img.height || 1));
+            const w = Math.max(1, Math.round(img.width * ratio));
+            const h = Math.max(1, Math.round(img.height * ratio));
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, w, h);
+            const usePng = (w * h) <= 1600000;
+            const mime_type = usePng ? 'image/png' : 'image/jpeg';
+            const image_b64 = usePng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.94);
+
+            let crop_b64 = '', crop_mime_type = 'image/png';
+            if (selectedBook === 'PrizePicks' && img.width >= 200 && img.height >= 200) {
+              const sx = Math.floor(img.width * 0.54);
+              const sy = Math.floor(img.height * 0.08);
+              const sw = Math.max(1, img.width - sx);
+              const sh = Math.max(1, Math.floor(img.height * 0.86));
+              const zoom = sw < 500 ? 2.2 : (sw < 800 ? 1.6 : 1.2);
+              const cw = Math.min(1400, Math.round(sw * zoom));
+              const ch = Math.min(2600, Math.round(sh * zoom));
+              const cCanvas = document.createElement('canvas');
+              cCanvas.width = cw;
+              cCanvas.height = ch;
+              const cCtx = cCanvas.getContext('2d');
+              cCtx.imageSmoothingEnabled = true;
+              cCtx.imageSmoothingQuality = 'high';
+              cCtx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
+              crop_b64 = cCanvas.toDataURL('image/png');
+            }
+            resolve({ image_b64, mime_type, crop_b64, crop_mime_type });
+          } catch (_) {
+            blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png' }));
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png' }));
+        };
+        img.src = url;
+      });
+    }
+
+    function normalizeVisionLeg(leg) {
+      if (!leg || typeof leg !== 'object') return null;
+      const stripSuf = s => String(s || '').replace(/\b(jr\.?|sr\.?|ii|iii|iv|v)\b/gi, '').replace(/\s+/g, ' ').trim();
+      const normP = s => stripSuf(s).toLowerCase().replace(/['’.-]/g, '').replace(/\s+/g, ' ').trim();
+      const aliasMap = {
+        'james cook': 'james cook iii',
+        'chigoziem okonkwo': 'chig okonkwo',
+        'kenneth walker': 'kenneth walker iii',
+        'brian robinson': 'brian robinson jr',
+        'marvin harrison': 'marvin harrison jr',
+        'michael pittman': 'michael pittman jr',
+        'patrick mahomes': 'patrick mahomes ii',
+        'travis etienne': 'travis etienne jr',
+        'deebo samuel': 'deebo samuel sr'
+      };
+      const sport = ['NFL', 'NBA', 'CFB'].includes(String(leg.sport || '').toUpperCase())
+        ? String(leg.sport).toUpperCase()
+        : 'NFL';
+
+      if (leg.type === 'prop' || (!leg.type && leg.player)) {
+        const rawPlayer = String(leg.player || '').trim();
+        const stat = mapOcrStat(leg.stat) || String(leg.stat || '').toUpperCase().trim();
+        const target = parseFloat(leg.target);
+        if (!rawPlayer || !stat || !Number.isFinite(target) || target <= 0) return null;
+        const ou = /under|less|lower|down|^u$/i.test(String(leg.ou || '')) ? 'Under' : 'Over';
+        const spList = (liveData.players && liveData.players[sport]) || [];
+        const low = rawPlayer.toLowerCase();
+        const aliased = aliasMap[normP(rawPlayer)] || normP(rawPlayer);
+        const hit = spList.find(p => p.name && p.name.toLowerCase() === low) ||
+                    spList.find(p => p.name && (normP(p.name) === aliased || normP(p.name) === normP(rawPlayer))) ||
+                    (low.length >= 5 && spList.find(p => p.name && (p.name.toLowerCase().includes(low) || low.includes(p.name.toLowerCase()))));
+        let player = hit ? hit.name : rawPlayer;
+        if (player.toLowerCase() === 'james cook') player = 'James Cook III';
+        return { type: 'prop', sport, player, stat, ou, target };
+      }
+
+      if (leg.type === 'ml' || leg.type === 'spread') {
+        const rawTeam = String(leg.team || '').trim();
+        if (!rawTeam) return null;
+        const spread = leg.type === 'ml' ? 0 : parseFloat(leg.spread);
+        if (leg.type === 'spread' && !Number.isFinite(spread)) return null;
+        const games = (liveData.games && liveData.games[sport]) || [];
+        const tLow = rawTeam.toLowerCase();
+        const excludeSouthAla = /\balabama\b/.test(tLow) && !/\bsouth\s+alabama\b/.test(tLow);
+        let team = rawTeam;
+        outerTeamLoop: for (const g of games) {
+          for (const cand of [g.away_full, g.home_full, g.away, g.home]) {
+            if (!cand) continue;
+            const cLow = cand.toLowerCase();
+            if (excludeSouthAla && cLow.includes('south alabama')) continue;
+            const isMatch = cLow === tLow || (cLow.length >= 4 && tLow.length >= 4 && (cLow.includes(tLow) || tLow.includes(cLow)));
+            if (isMatch) {
+              team = (cand === g.away || cand === g.away_full) ? (g.away_full || g.away) : (g.home_full || g.home);
+              break outerTeamLoop;
+            }
+          }
+        }
+        return { type: leg.type, sport, team, spread };
+      }
+
+      if (leg.type === 'total') {
+        const game = String(leg.game || '').trim();
+        const total = parseFloat(leg.total != null ? leg.total : leg.target);
+        if (!game || !Number.isFinite(total) || total <= 10) return null;
+        const ou = /under|less|lower|^u$/i.test(String(leg.ou || '')) ? 'Under' : 'Over';
+        return { type: 'total', sport, game, ou, total };
+      }
+      return null;
+    }
+
     async function handleSlipImage(input) {
       let rawFile = input;
       if (input && input.files) { rawFile = input.files.item(0); }
@@ -1593,43 +1718,49 @@
 
       let visionErr = '';
       try {
-        const b64 = await blobToBase64(memBlob);
-        const res = await fetch('/api/parse-slip', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ image_b64: b64, mime_type: memBlob.type || 'image/png', book: selectedBook })
-        });
+        const prepared = await prepareVisionPayload(memBlob, selectedBook);
+        const res = await withTimeout(
+          fetch('/api/parse-slip', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              image_b64: prepared.image_b64,
+              mime_type: prepared.mime_type,
+              crop_b64: prepared.crop_b64,
+              crop_mime_type: prepared.crop_mime_type,
+              book: selectedBook
+            })
+          }),
+          40000,
+          'Vision AI scan'
+        );
         const data = await res.json();
 
         if (data && data.ok && Array.isArray(data.legs) && data.legs.length > 0) {
-          if (data.cost && document.getElementById('b-cost')) document.getElementById('b-cost').value = data.cost;
-          if (data.payout && document.getElementById('b-pay')) document.getElementById('b-pay').value = data.payout;
+          const cleanCost = String(data.cost || '').replace(/[^0-9.]/g, '');
+          const cleanPay = String(data.payout || '').replace(/[^0-9.]/g, '');
+          if (cleanCost && document.getElementById('b-cost')) document.getElementById('b-cost').value = cleanCost;
+          if (cleanPay && document.getElementById('b-pay')) document.getElementById('b-pay').value = cleanPay;
 
-          const cleanLegs = data.legs.map(leg => {
-            if (leg.type === 'prop' && leg.player) {
-              const spList = (liveData.players && liveData.players[leg.sport]) || [];
-              const low = leg.player.toLowerCase();
-              const hit = spList.find(p => p.name && p.name.toLowerCase() === low) ||
-                          spList.find(p => p.name && (p.name.toLowerCase().includes(low) || low.includes(p.name.toLowerCase())));
-              if (hit) leg.player = hit.name;
-            }
-            return leg;
-          });
-
-          draftLegs.push(...cleanLegs);
-          renderDraft();
-          if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
-          showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
-          return;
+          const cleanLegs = data.legs.map(normalizeVisionLeg).filter(Boolean);
+          if (cleanLegs.length > 0) {
+            draftLegs.push(...cleanLegs);
+            renderDraft();
+            if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'} via Vision AI! Review lines/payout below and click Save.</span>`;
+            showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
+            return;
+          }
+          visionErr = 'No valid legs returned by Vision AI';
+        } else if (data && data.error) {
+          visionErr = data.error;
         }
-        if (data && data.error) visionErr = data.error;
       } catch (e) {
         visionErr = e.message || String(e);
       }
 
       // Automatic fallback to local Tesseract + modular 7B/7C/7D parsers
       try {
-        const warnTag = visionErr ? ` <span style="color:#94a3b8;font-size:11px">(Vision AI: ${visionErr})</span>` : '';
+        const warnTag = visionErr ? ` <span style="color:#94a3b8;font-size:11px">(Vision AI fallback: ${visionErr})</span>` : '';
         if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing screenshot...</span>${warnTag}`;
         const [T, cleanBlob] = await withTimeout(
           Promise.all([ensureTesseract(), preprocessSlipImage(memBlob)]),
@@ -1672,6 +1803,7 @@
       const normName = s => stripSuffix(s).toLowerCase().replace(/['’.-]/g, '').replace(/\s+/g, ' ').trim();
 
       const playerNameAliases = {
+        'james cook': 'james cook iii',
         'chigoziem okonkwo': 'chig okonkwo',
         'kenneth walker': 'kenneth walker iii',
         'brian robinson': 'brian robinson jr',
@@ -1732,12 +1864,23 @@
       const findGameByTeamHint = hint => {
         const raw = String(hint || '').toLowerCase().replace(/[^a-z0-9()\s]/g, ' ').replace(/\s+/g, ' ').trim();
         if (!raw || raw.length < 4) return null;
+        const excludeSouthAla = /\balabama\b/.test(raw) && !/\bsouth\s+alabama\b/.test(raw);
         const clean = raw.replace(/\b(over|under|spread|total|moneyline|ml|yes|no|fl|oh|tx|ca|nc|sc|va|ga|al|la|mi|pa|ny|nj|il|in|wi|mn|ia|mo|ks|ok|ar|ms|tn|ky|wv|md|ma|ct|co|az|ut|or|wa|nv)\b/g, '').trim();
         const words = clean.split(/\s+/).filter(w => w.length >= 4);
         if (!words.length) return null;
-        return allGames.find(g => `${g.away} ${g.awayFull} ${g.home} ${g.homeFull}`.toLowerCase().includes(clean))
-          || allGames.find(g => words.some(w => new RegExp(`\\b${escRx(w)}\\b`).test(`${g.away} ${g.awayFull} ${g.home} ${g.homeFull}`.toLowerCase())));
+        const pool = excludeSouthAla
+          ? allGames.filter(g => !`${g.away} ${g.awayFull} ${g.home} ${g.homeFull}`.toLowerCase().includes('south alabama'))
+          : allGames;
+        return pool.find(g => `${g.away} ${g.awayFull} ${g.home} ${g.homeFull}`.toLowerCase().includes(clean))
+          || pool.find(g => words.some(w => new RegExp(`\\b${escRx(w)}\\b`).test(`${g.away} ${g.awayFull} ${g.home} ${g.homeFull}`.toLowerCase())));
       };
+
+      const stripOdds = s => String(s || '')
+        .replace(/(?:^|\s)[+-–—−]\s*[1-9]\d{2,3}(?![\d.])/g, ' ')
+        .replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
+        .replace(/\b\d+(?:\.\d+)?%/g, ' ')
+        .replace(/\b(\d{1,3})[, ]\s*5\b/g, '$1.5')
+        .replace(/\b(\d{1,3})[tT]\b/g, '$1+');
 
       const resolveTeamSide = (game, hint) => {
         const raw = String(hint || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
@@ -1750,8 +1893,8 @@
         return game.homeFull;
       };
 
-      const nbaStats = new Set(['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']);
-      const ctx = { text, lines, fullLower, escRx, normName, resolveAlias, allPlayers, allGames, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats };
+      const nbaStats = new Set(['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA']);
+      const ctx = { text, lines, fullLower, escRx, normName, resolveAlias, allPlayers, allGames, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, stripOdds, nbaStats };
 
       let parsed = { cost: '', payout: '', legs: [] };
       if (selectedBook === 'PrizePicks') parsed = parsePrizePicksSlip(ctx);
@@ -1774,20 +1917,20 @@
     // --- 7B. FANDUEL PARSER (FanDuel Sportsbook & FanDuel Predicts) ---
     // =========================================================================
     function parseFanDuelSlip(ctx) {
-      const { text, lines, resolveAlias, allPlayers, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
+      const { text, lines, resolveAlias, allPlayers, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, stripOdds, nbaStats } = ctx;
       const legs = [];
 
-      const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
+      const dualFooterMatch = text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s+\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
       const costMatch = dualFooterMatch ||
-        text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
+        text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
       const payMatch =
-        text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
+        text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
 
-      const cost = dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '');
-      let payout = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
-      if (cost && payout && /^\d{3,4}$/.test(payout) && parseFloat(payout) > parseFloat(cost) * 25) {
+      const cost = (dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '')).replace(/,/g, '');
+      let payout = (dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '')).replace(/,/g, '');
+      if (cost && payout && /^\d{4,5}$/.test(payout) && parseFloat(payout) > parseFloat(cost) * 80) {
         payout = (parseInt(payout, 10) / 100).toFixed(2);
       }
 
@@ -1825,7 +1968,7 @@
           const dirLine = isPropHeader(nextLine) ? nextLine : (isPropHeader(prevLine) ? prevLine : (isPropHeader(prevLine2) ? prevLine2 : line));
           const stat = mapOcrStat(line) || mapOcrStat(dirLine) || mapOcrStat(nextLine) || mapOcrStat(prevLine) || (mp.sport === 'NBA' ? 'PTS' : 'PASS YDS');
           const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
-          const cleaned = dirLine.replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ').replace(/\b\d+(?:\.\d+)?%/g, ' ').replace(/\b(\d{1,3})\s+5\b/g, '$1.5').replace(/\b(\d{1,3})[tT]\b/g, '$1+');
+          const cleaned = stripOdds(dirLine);
           const explicitDir = cleaned.match(/\b(?:over|under|more|less)\s+(\d{1,3}(?:\.\d)?)\b/i);
           const mileNum = cleaned.match(/\b(\d{1,3})\+/);
           const nums = (cleaned.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
@@ -1882,20 +2025,20 @@
     // --- 7C. DRAFTKINGS PARSER (DraftKings Sportsbook & DraftKings Predictions)
     // =========================================================================
     function parseDraftKingsSlip(ctx) {
-      const { text, lines, resolveAlias, allPlayers, allGames, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
+      const { text, lines, resolveAlias, allPlayers, allGames, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, stripOdds, nbaStats } = ctx;
       const legs = [];
 
-      const dualFooterMatch = text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s+\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
+      const dualFooterMatch = text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s+\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)[^\r\n]*(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
       const costMatch = dualFooterMatch ||
-        text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
+        text.match(/(?:wager|entry|risk|bet|stake|bought|paid|total\s*wager|total\s*amount)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*amount|total\s*wager|wager|risk|entry)/i);
       const payMatch =
-        text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d+(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
+        text.match(/(?:to\s*win|to\s*pay|payout|potential\s*win|returns?|est\.?\s*payout|total\s*payout)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*payout|to\s*win|payout|potential\s*win)/i);
 
-      const cost = dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '');
-      let payout = dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '');
-      if (cost && payout && /^\d{3,4}$/.test(payout) && parseFloat(payout) > parseFloat(cost) * 25) {
+      const cost = (dualFooterMatch ? dualFooterMatch.at(1) : (costMatch ? costMatch.at(1) : '')).replace(/,/g, '');
+      let payout = (dualFooterMatch ? dualFooterMatch.at(2) : (payMatch ? payMatch.at(1) : '')).replace(/,/g, '');
+      if (cost && payout && /^\d{4,5}$/.test(payout) && parseFloat(payout) > parseFloat(cost) * 80) {
         payout = (parseInt(payout, 10) / 100).toFixed(2);
       }
 
@@ -1962,7 +2105,7 @@
           const isPropHeader = s => /\b(over|under|more|less)\b|\d+\s*[+t]|\b\d{1,3}(?:\.\d|\s+5)\b/i.test(s) && !/\d{1,2}:\d{2}/.test(s);
           const dirLine = isPropHeader(prevLine) ? prevLine : (isPropHeader(nextLine) ? nextLine : (isPropHeader(prevLine2) ? prevLine2 : line));
           const ou = /\b(under|less|lower)\b/i.test(dirLine) ? 'Under' : 'Over';
-          const cleaned = dirLine.replace(/\b\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ').replace(/\b\d+(?:\.\d+)?%/g, ' ').replace(/\b(\d{1,3})\s+5\b/g, '$1.5').replace(/\b(\d{1,3})[tT]\b/g, '$1+');
+          const cleaned = stripOdds(dirLine);
           const explicitDir = cleaned.match(/\b(?:over|under|more|less)\s+(\d{1,3}(?:\.\d)?)\b/i);
           const mileNum = cleaned.match(/\b(\d{1,3})\+/);
           const nums = (cleaned.match(/\b\d{1,3}(?:\.\d)?\b/g) || []).map(Number).filter(n => n > 0 && n < 600);
@@ -2038,23 +2181,39 @@
     // --- 7D. PRIZEPICKS PARSER (PrizePicks Power / Flex / Promo Slips) ---
     // =========================================================================
     function parsePrizePicksSlip(ctx) {
-      const { text, lines, matchPlayerInLine } = ctx;
+      const { text, lines, matchPlayerInLine, nbaStats } = ctx;
       const legs = [];
 
-      const dfsToWinMatch = text.match(/(?:^|[^0-9.])(\d{1,3}(?:\.\d{1,2})?)\s*to\s*win\s*\$\s*(\d+(?:\.\d{1,2})?)/i);
-      const costMatch = dfsToWinMatch || text.match(/(?:entry|wager|risk|bet|stake|paid)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
-      const payMatch = text.match(/(?:to\s*win|payout|potential\s*win)\s*[:$]?\s*\$?\s*(\d+(?:\.\d{1,2})?)/i);
-      const cost = dfsToWinMatch ? dfsToWinMatch.at(1) : (costMatch ? costMatch.at(1) : '');
-      const payout = dfsToWinMatch ? dfsToWinMatch.at(2) : (payMatch ? payMatch.at(1) : '');
+      const dfsToWinMatch = text.match(/(?:^|[^0-9.])\$?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*to\s*win\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const costMatch = dfsToWinMatch || text.match(/(?:entry|wager|risk|bet|stake|paid)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const payMatch = text.match(/(?:to\s*win|payout|potential\s*win)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const cost = (dfsToWinMatch ? dfsToWinMatch.at(1) : (costMatch ? costMatch.at(1) : '')).replace(/,/g, '');
+      const payout = (dfsToWinMatch ? dfsToWinMatch.at(2) : (payMatch ? payMatch.at(1) : '')).replace(/,/g, '');
 
       const dfsPlayers = [];
       const dfsProps = [];
       const isRosterSubtitle = s => /#\s*\d{1,2}\b/.test(s) || /\b(QB|RB|WR|TE|K|DST|PG|SG|SF|PF|C)\b\s*[•·|-]/.test(s);
-      const isDfsMeta = s => /\b(power\s*play|flex\s*play|slide\s*for\s*refund|self\s*refund|time\s*remaining|prizepicks|underdog|sleeper|to\s*win|towin|pick\s*combo)\b/i.test(s);
+      const isDfsMeta = s => /\b(power\s*play|flex\s*play|slide\s*for\s*refund|self\s*refund|time\s*remaining|prizepicks|underdog|sleeper|to\s*win|towin|pick\s*combo|demon|goblin|free\s*square|discount)\b/i.test(s);
       const normDecLine = s => String(s || '')
         .replace(/\b\d{1,2}:?\d{2}\s*(?:am|pm|est|pst|cst|mst)\b/gi, ' ')
         .replace(/(?:^|[^0-9])([0-9oO])\.[sS5]\b/g, (_, d) => ` ${d === 'o' || d === 'O' ? '0' : d}.5`)
         .replace(/\b(\d{1,3})[, ]\s*5\b/g, '$1.5');
+      const guessRawPlayerAbove = idx => {
+        for (let j = idx - 1; j >= Math.max(0, idx - 3); j--) {
+          const cand = String(lines[j] || '').trim();
+          if (!cand || isDfsMeta(cand) || isRosterSubtitle(cand) || mapOcrStat(cand)) continue;
+          const cleanedName = cand
+            .replace(/[↓↑▼▲⬇⬆]/g, ' ')
+            .replace(/\b\d+(?:\.\d+)?\b/g, ' ')
+            .replace(/[^A-Za-z'.\-\s]/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          if (/^[A-Z][a-zA-Z'.-]+\s+[A-Z][a-zA-Z'.-]+(?:\s+(?:Jr\.?|Sr\.?|II|III|IV|V|[A-Z][a-zA-Z'.-]+))?$/.test(cleanedName)) {
+            return cleanedName.toLowerCase() === 'james cook' ? 'James Cook III' : cleanedName;
+          }
+        }
+        return '';
+      };
 
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -2068,7 +2227,7 @@
           }
         }
 
-        // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs, Rec Targets)
+        // 2. Anchor strictly on each stat line (Rec Yards, Rush Yards, Pass Yards, Recs, Rec Targets, etc.)
         const stHere = mapOcrStat(line);
         if (stHere) {
           const prev1 = normDecLine(lines[i - 1] || '');
@@ -2111,18 +2270,19 @@
             if (altCand) val = altCand;
           }
 
-          dfsProps.push({ stat: stHere, ou, target: val !== null ? val : (/YDS/i.test(stHere) ? 24.5 : 4.5) });
+          const fallbackName = guessRawPlayerAbove(i);
+          dfsProps.push({ stat: stHere, ou, target: val !== null ? val : (/YDS/i.test(stHere) ? 24.5 : 4.5), fallbackName });
         }
       }
 
-      const pairCount = Math.min(dfsPlayers.length, dfsProps.length);
+      const legCount = dfsProps.length;
 
       // 3. Apply pixel-scanned red demon arrow bands (Under)
       const redBands = window._ocrRedBands || [];
-      if (redBands.length > 0 && pairCount > 0) {
-        const bucketHits = new Array(pairCount).fill(0);
+      if (redBands.length > 0 && legCount > 0) {
+        const bucketHits = new Array(legCount).fill(0);
         redBands.forEach(normY => {
-          const bIdx = Math.min(pairCount - 1, Math.max(0, Math.floor(normY * pairCount)));
+          const bIdx = Math.min(legCount - 1, Math.max(0, Math.floor(normY * legCount)));
           bucketHits[bIdx]++;
         });
         bucketHits.forEach((cnt, idx) => {
@@ -2130,14 +2290,19 @@
         });
       }
 
-      for (let k = 0; k < pairCount; k++) {
+      for (let k = 0; k < legCount; k++) {
+        const prop = dfsProps[k];
+        const rosterMatch = dfsPlayers[k] || null;
+        const playerName = rosterMatch ? rosterMatch.name : prop.fallbackName;
+        if (!playerName) continue;
+        const sport = rosterMatch ? rosterMatch.sport : (nbaStats.has(prop.stat) ? 'NBA' : 'NFL');
         legs.push({
           type: 'prop',
-          sport: dfsPlayers[k].sport,
-          player: dfsPlayers[k].name,
-          stat: dfsProps[k].stat,
-          ou: dfsProps[k].ou,
-          target: dfsProps[k].target
+          sport,
+          player: playerName,
+          stat: prop.stat,
+          ou: prop.ou,
+          target: prop.target
         });
       }
       return { cost, payout, legs };

@@ -502,8 +502,8 @@ def api_player(lg, pid):
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         f_bio = pool.submit(fetch_json, f"https://{HOST}/apis/common/v3/sports/{sp}/athletes/{pid}", 6)
-        f_ov = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/overview", 6)
-        f_gl = pool.submit(fetch_json, f"https://espn.com{sp}/athletes/{pid}/gamelog", 6)
+        f_ov = pool.submit(fetch_json, f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/overview", 6)
+        f_gl = pool.submit(fetch_json, f"https://{WEB_HOST}/apis/common/v3/sports/{sp}/athletes/{pid}/gamelog", 6)
         bio = f_bio.result()
         ov = f_ov.result()
         gl = f_gl.result()
@@ -579,6 +579,217 @@ def index():
 def ping():
     return "ok", 200
 
+_VALID_STATS = {
+    "PASS YDS", "PASS TD", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",
+    "REC YDS", "REC", "REC TGTS", "REC TD", "SCRIM YDS", "TD",
+    "PTS", "REB", "AST", "3PM", "STL", "BLK", "PRA", "PR", "PA", "RA"
+}
+_NBA_STATS = {"PTS", "REB", "AST", "3PM", "STL", "BLK", "PRA", "PR", "PA", "RA"}
+
+
+def _clean_money_str(val):
+    s = re.sub(r"[^0-9.]", "", str(val or "").strip())
+    if not s or s.count(".") > 1:
+        return ""
+    try:
+        num = float(s)
+        return f"{num:.2f}" if num > 0 else ""
+    except ValueError:
+        return ""
+
+
+def _parse_float_opt(val):
+    if val is None or isinstance(val, bool):
+        return None
+    s = str(val).strip().replace(",", "").replace("–", "-").replace("—", "-").replace("−", "-")
+    s = re.sub(r"\+$", "", s)
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
+def _normalize_stat(raw):
+    up = re.sub(r"\s+", " ", str(raw or "").strip().upper())
+    if up in _VALID_STATS:
+        return up
+    s = up.lower()
+    if re.search(r"pts\s*\+\s*rebs?\s*\+\s*asts?|points\s*\+\s*rebounds\s*\+\s*assists|\bpra\b", s):
+        return "PRA"
+    if re.search(r"(?:pts|points)\s*\+\s*(?:rebs?|rebounds)|\bpr\b", s):
+        return "PR"
+    if re.search(r"(?:pts|points)\s*\+\s*(?:asts?|assists)|\bpa\b", s):
+        return "PA"
+    if re.search(r"(?:rebs?|rebounds)\s*\+\s*(?:asts?|assists)|\bra\b", s):
+        return "RA"
+    if re.search(r"rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage", s):
+        return "SCRIM YDS"
+    if re.search(r"pass(?:ing)?\s*comp(?:letions)?|\bcomp\b", s):
+        return "COMP"
+    if re.search(r"pass(?:ing)?\s*(?:td|touchdown)", s):
+        return "PASS TD"
+    if re.search(r"rush(?:ing)?\s*(?:td|touchdown)", s):
+        return "RUSH TD"
+    if re.search(r"rec(?:eiving)?\s*(?:td|touchdown)", s):
+        return "REC TD"
+    if re.search(r"rush(?:ing)?\s*att(?:empts)?|carries|\bcar\b", s):
+        return "RUSH ATT"
+    if re.search(r"pass(?:ing)?\s*(?:yards|yds)", s):
+        return "PASS YDS"
+    if re.search(r"rush(?:ing)?\s*(?:yards|yds)", s):
+        return "RUSH YDS"
+    if re.search(r"rec(?:eiving)?\s*(?:yards|yds)", s):
+        return "REC YDS"
+    if re.search(r"rec(?:eiving)?\s*targets|\btgts?\b|\btargets\b", s):
+        return "REC TGTS"
+    if re.search(r"receptions|catches|\brecs?\b", s):
+        return "REC"
+    if re.search(r"anytime\s*td|touchdown|\btd\b", s):
+        return "TD"
+    if re.search(r"3-?pt|3pm|3-?point|three\s*pointer|threes", s):
+        return "3PM"
+    if re.search(r"rebounds|\brebs?\b", s):
+        return "REB"
+    if re.search(r"assists|\basts?\b", s):
+        return "AST"
+    if re.search(r"steals|\bstl\b", s):
+        return "STL"
+    if re.search(r"blocks|\bblk\b", s):
+        return "BLK"
+    if re.search(r"points|\bpts\b", s):
+        return "PTS"
+    return up if up in _VALID_STATS else ""
+
+
+def _normalize_player_name(name):
+    clean = re.sub(r"\s+", " ", str(name or "").strip())
+    if clean.lower() == "james cook":
+        return "James Cook III"
+    return clean
+
+
+def _normalize_parsed_slip(parsed):
+    if not isinstance(parsed, dict):
+        return {"cost": "", "payout": "", "legs": []}
+    cost = _clean_money_str(parsed.get("cost"))
+    payout = _clean_money_str(parsed.get("payout"))
+    raw_legs = parsed.get("legs")
+    if not isinstance(raw_legs, list):
+        raw_legs = []
+
+    legs = []
+    seen = set()
+    for item in raw_legs:
+        if not isinstance(item, dict):
+            continue
+        ltype = str(item.get("type") or "").strip().lower()
+        sport = str(item.get("sport") or "").strip().upper()
+        if sport not in ("NFL", "NBA", "CFB"):
+            sport = ""
+
+        if ltype == "prop" or (not ltype and item.get("player")):
+            player = _normalize_player_name(item.get("player"))
+            stat = _normalize_stat(item.get("stat"))
+            if not player or not stat:
+                continue
+            if not sport:
+                sport = "NBA" if stat in _NBA_STATS else "NFL"
+            ou_raw = str(item.get("ou") or "Over").strip().lower()
+            ou = "Under" if re.search(r"under|less|lower|down|^u$", ou_raw) else "Over"
+            target = _parse_float_opt(item.get("target"))
+            if stat == "TD" and (target is None or target <= 0):
+                target = 0.5
+            if target is None or target <= 0 or target >= 700:
+                continue
+            key = ("prop", sport, player.lower(), stat, ou, target)
+            if key in seen:
+                continue
+            seen.add(key)
+            legs.append({"type": "prop", "sport": sport, "player": player, "stat": stat, "ou": ou, "target": target})
+        elif ltype in ("spread", "ml"):
+            team = re.sub(r"\s+", " ", str(item.get("team") or "").strip())
+            if not team:
+                continue
+            if not sport:
+                sport = "NFL"
+            if ltype == "ml":
+                sp_val = 0.0
+            else:
+                sp_val = _parse_float_opt(item.get("spread"))
+                if sp_val is None or abs(sp_val) > 65:
+                    continue
+            key = (ltype, sport, team.lower(), sp_val)
+            if key in seen:
+                continue
+            seen.add(key)
+            legs.append({"type": ltype, "sport": sport, "team": team, "spread": sp_val})
+        elif ltype == "total":
+            game = re.sub(r"\s+", " ", str(item.get("game") or "").strip())
+            total = _parse_float_opt(item.get("total") if item.get("total") is not None else item.get("target"))
+            if not game or total is None or total <= 10 or total > 350:
+                continue
+            if not sport:
+                sport = "NBA" if total >= 150 else "NFL"
+            ou_raw = str(item.get("ou") or "Over").strip().lower()
+            ou = "Under" if re.search(r"under|less|lower|^u$", ou_raw) else "Over"
+            key = ("total", sport, game.lower(), ou, total)
+            if key in seen:
+                continue
+            seen.add(key)
+            legs.append({"type": "total", "sport": sport, "game": game, "ou": ou, "total": total})
+
+    return {"cost": cost, "payout": payout, "legs": legs}
+
+
+def _build_slip_prompt(book, has_crop):
+    crop_note = (
+        "\nIMAGE 2 is a zoomed-in high-resolution crop of the right-hand prop numbers and arrow icons "
+        "from IMAGE 1. Use IMAGE 2 to verify every arrow direction (↑ vs ↓), decimal point, and crossed-out promo number."
+        if has_crop else ""
+    )
+    return f"""You are a precision sports betting slip OCR parser for {book}.{crop_note}
+Extract the wager cost, payout, and every bet leg from this screenshot into strict JSON.
+
+Output schema (return ONLY valid JSON, no markdown):
+{{
+  "cost": "20.00",
+  "payout": "60.00",
+  "legs": [
+    {{"type":"prop","sport":"NFL"|"NBA"|"CFB","player":"Full Name","stat":"STAT_CODE","ou":"Over"|"Under","target":24.5}},
+    {{"type":"spread"|"ml","sport":"NFL"|"NBA"|"CFB","team":"Full Team Name","spread":-3.5}},
+    {{"type":"total","sport":"NFL"|"NBA"|"CFB","game":"Away Team @ Home Team","ou":"Over"|"Under","total":48.5}}
+  ]
+}}
+
+CRITICAL ACCURACY RULES:
+1. COST & PAYOUT:
+   - Use plain decimal numbers without "$" or commas (e.g. "20.00", "145.50", or "" if not shown).
+   - PrizePicks: "$10 to win $50" -> cost "10.00", payout "50.00".
+   - DraftKings / FanDuel: use Total Wager / Wager / Bought for "cost", and Total Payout / Est. Payout / To Pay / Potential Payout for "payout".
+2. NEVER CONFUSE AMERICAN ODDS WITH TARGETS OR SPREADS:
+   - On DraftKings and FanDuel, odds like -110, -115, -120, +105, +140, +250, -300 appear next to legs or on the right side. NEVER output odds as "target", "spread", or "total".
+   - Read exact decimal values carefully (e.g. 24.5, 6.5, 0.5, -3.5, +7.5, 228.5). Never drop ".5" and never turn 24.5 into 245.
+   - Milestone / alt props written as "25+", "60+", "2+", "100+" -> set "ou": "Over" and "target" to that exact number (25, 60, 2, 100).
+   - "Anytime TD Scorer" / "To Score a Touchdown" -> "stat": "TD", "ou": "Over", "target": 0.5. ("2+ TDs" -> "target": 2).
+   - Preserve exact "+" or "-" sign on spreads (favorite is negative like -3.5, underdog is positive like +3.5).
+3. CRITICAL FOR PRIZEPICKS / DFS ARROWS & PROMOS:
+   - Directly to the left of each prop number (such as "↓ 6" or "↑ 9.5") is a vertical arrow icon (may be white, green goblin, or red/orange demon).
+   - Inspect the triangular arrowhead carefully:
+     * Arrowhead at the BOTTOM pointing DOWN (↓) or text "Less" -> "ou" MUST be "Under".
+     * Arrowhead at the TOP pointing UP (↑) or text "More" -> "ou" MUST be "Over".
+     * Do NOT default white arrows to "Over" — white arrows can point DOWN (↓) for Under!
+   - If an original number is crossed out next to a discounted promo / free square number (e.g. crossed-out 302.5 next to 0.5), ALWAYS use the active discounted number (0.5).
+   - Ignore jersey numbers (#8), game kickoff times, and payout multipliers (3x, 5x, 10x).
+4. STAT CODES (map "stat" strictly to one of these exact codes):
+   - NFL: PASS YDS, PASS TD, COMP, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD
+   - NBA: PTS, REB, AST, 3PM, STL, BLK, PRA, PR, PA, RA
+   - Note: "Rush + Rec Yds" = SCRIM YDS; "Rec Targets" = REC TGTS; "Pts + Rebs + Asts" = PRA; "Pts + Rebs" = PR; "Pts + Asts" = PA; "Rebs + Asts" = RA; "Pass Completions" = COMP.
+5. DEDUPLICATION & NOISE:
+   - If a slip has a compact summary header at the top AND detailed leg rows below, extract each leg ONCE (do not duplicate).
+   - Ignore embedded live mini-scoreboards, cashout buttons, and navigation bars.
+   - Use full athlete names (list James Cook as "James Cook III")."""
+
+
 @app.route("/api/parse-slip", methods=["POST"])
 def api_parse_slip():
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -588,56 +799,63 @@ def api_parse_slip():
     body = request.get_json(silent=True) or {}
     img_b64 = str(body.get("image_b64") or "").strip()
     mime_type = str(body.get("mime_type") or "image/png").strip()
+    crop_b64 = str(body.get("crop_b64") or "").strip()
+    crop_mime = str(body.get("crop_mime_type") or "image/png").strip()
     book = str(body.get("book") or "PrizePicks").strip()
     if not img_b64:
         return jsonify({"ok": False, "error": "Missing image data"}), 400
 
     if "," in img_b64:
         img_b64 = img_b64.split(",", 1)[1]
+    if "," in crop_b64:
+        crop_b64 = crop_b64.split(",", 1)[1]
 
-    prompt = f"""You are a sports betting slip OCR parser for {book}.
-Extract the wager cost, payout, and every bet leg from this screenshot into strict JSON.
-Rules:
-1. Return ONLY valid JSON with keys: "cost" (string, e.g. "2.00" or ""), "payout" (string, e.g. "9.00" or ""), and "legs" (array).
-2. Each item in "legs" must be one of three types:
-   - Player prop: {{"type":"prop","sport":"NFL"|"NBA"|"CFB","player":"Full Name","stat":"STAT_CODE","ou":"Over"|"Under","target":number}}
-   - Team spread or ML: {{"type":"spread"|"ml","sport":"NFL"|"NBA"|"CFB","team":"Full Team Name","spread":number}}
-   - Game total: {{"type":"total","sport":"NFL"|"NBA"|"CFB","game":"Away Team @ Home Team","ou":"Over"|"Under","total":number}}
-3. CRITICAL FOR PRIZEPICKS / DFS ARROWS:
-   - Directly to the left of each prop number (such as "↓ 6" or "↑ 9.5") is a vertical arrow icon.
-   - Look at which end of the vertical line has the triangular arrowhead:
-     * If the arrowhead is at the BOTTOM pointing DOWN (↓), "ou" MUST be "Under" (do NOT assume Over).
-     * If the arrowhead is at the TOP pointing UP (↑), "ou" MUST be "Over".
-   - If a number is crossed out next to a discounted promo number (e.g. 302.5 crossed out next to 0.5), use the active promo number (0.5).
-4. Map "stat" strictly to one of: PASS YDS, PASS TD, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD, PTS, REB, AST, 3PM, STL, BLK, PRA.
-5. Ignore any embedded live mini-scoreboard widgets at the bottom of the screen."""
+    has_crop = bool(crop_b64)
+    parts = [
+        {"text": _build_slip_prompt(book, has_crop)},
+        {"inline_data": {"mime_type": mime_type, "data": img_b64}}
+    ]
+    if has_crop:
+        parts.append({"text": "IMAGE 2 (zoomed right-hand column showing exact arrows and prop numbers):"})
+        parts.append({"inline_data": {"mime_type": crop_mime, "data": crop_b64}})
 
     payload = {
-        "contents": [{
-            "parts": [
-                {"text": prompt},
-                {"inline_data": {"mime_type": mime_type, "data": img_b64}}
-            ]
-        }],
+        "contents": [{"role": "user", "parts": parts}],
         "generationConfig": {
             "temperature": 0.0,
-            "response_mime_type": "application/json"
+            "responseMimeType": "application/json",
+            "mediaResolution": "MEDIA_RESOLUTION_HIGH",
+            "thinkingConfig": {"thinkingBudget": 1024}
         }
     }
 
     try:
-        url = f"https://googleapis.com{api_key}"
-        resp = requests.post(url, json=payload, timeout=18)
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        resp = requests.post(url, json=payload, timeout=35)
         raw_res = resp.json()
+        if "error" in raw_res and resp.status_code == 400:
+            err_msg = str(raw_res["error"].get("message", ""))
+            if any(k in err_msg for k in ("mediaResolution", "thinkingConfig", "Unknown name")):
+                payload["generationConfig"] = {
+                    "temperature": 0.0,
+                    "responseMimeType": "application/json"
+                }
+                resp = requests.post(url, json=payload, timeout=35)
+                raw_res = resp.json()
         if "error" in raw_res:
             return jsonify({"ok": False, "fallback": True, "error": raw_res["error"].get("message", "Gemini API error")}), 200
-        txt = raw_res["candidates"][0]["content"]["parts"][0]["text"]
+        cands = raw_res.get("candidates") or []
+        res_parts = (cands[0].get("content") or {}).get("parts") or [] if cands else []
+        txt = next((p.get("text", "") for p in reversed(res_parts) if p.get("text") and not p.get("thought")), "")
+        txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt.strip(), flags=re.I)
         parsed = json.loads(txt)
+        cleaned = _normalize_parsed_slip(parsed)
         return jsonify({
             "ok": True,
-            "cost": str(parsed.get("cost") or ""),
-            "payout": str(parsed.get("payout") or ""),
-            "legs": parsed.get("legs") or []
+            "source": "vision",
+            "cost": cleaned["cost"],
+            "payout": cleaned["payout"],
+            "legs": cleaned["legs"]
         })
     except Exception as e:
         return jsonify({"ok": False, "fallback": True, "error": str(e)}), 200
