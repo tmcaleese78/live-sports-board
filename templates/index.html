@@ -1571,6 +1571,161 @@
       });
     }
 
+    function detectPrizePicksArrows(img) {
+      try {
+        if (!img || !img.width || !img.height) return [];
+        const W = 1100;
+        const H = Math.max(1, Math.round(img.height * (W / img.width)));
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, W, H);
+        const data = ctx.getImageData(0, 0, W, H).data;
+
+        const x0 = Math.floor(W * 0.50), x1 = Math.floor(W * 0.98);
+        const y0 = Math.floor(H * 0.02), y1 = Math.floor(H * 0.96);
+        const lums = [];
+        for (let y = y0; y < y1; y += 6) {
+          for (let x = x0; x < x1; x += 6) {
+            const o = (y * W + x) * 4;
+            lums.push(0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2]);
+          }
+        }
+        lums.sort((a, b) => a - b);
+        const bgLum = lums[Math.floor(lums.length * 0.5)] || 20;
+        const isDark = bgLum < 128;
+        const isFgAt = (x, y) => {
+          const o = (y * W + x) * 4;
+          const r = data[o], g = data[o + 1], b = data[o + 2];
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          return isDark ? (lum > bgLum + 100 || r > 160 || g > 160) : (lum < bgLum - 100);
+        };
+
+        const roiW = x1 - x0, roiH = y1 - y0;
+        const visited = new Uint8Array(roiW * roiH);
+        const qx = new Int32Array(3000), qy = new Int32Array(3000);
+        const allComps = [];
+
+        for (let y = y0; y < y1; y++) {
+          for (let x = x0; x < x1; x++) {
+            const vi = (y - y0) * roiW + (x - x0);
+            if (visited[vi] || !isFgAt(x, y)) continue;
+            visited[vi] = 1;
+            let head = 0, tail = 0;
+            qx[tail] = x; qy[tail] = y; tail++;
+            let minX = x, maxX = x, minY = y, maxY = y;
+            const px = [], py = [];
+            while (head < tail) {
+              const cx = qx[head], cy = qy[head]; head++;
+              px.push(cx); py.push(cy);
+              if (cx < minX) minX = cx;
+              if (cx > maxX) maxX = cx;
+              if (cy < minY) minY = cy;
+              if (cy > maxY) maxY = cy;
+              if (px.length >= 2500) break;
+              for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                  if (!dx && !dy) continue;
+                  const nx = cx + dx, ny = cy + dy;
+                  if (nx < x0 || nx >= x1 || ny < y0 || ny >= y1) continue;
+                  const nvi = (ny - y0) * roiW + (nx - x0);
+                  if (!visited[nvi] && isFgAt(nx, ny)) {
+                    visited[nvi] = 1;
+                    if (tail < 3000) { qx[tail] = nx; qy[tail] = ny; tail++; }
+                  }
+                }
+              }
+            }
+            allComps.push({ minX, maxX, minY, maxY, w: maxX - minX + 1, h: maxY - minY + 1, px, py });
+          }
+        }
+
+        const minH = Math.max(14, Math.floor(W * 0.015)), maxH = Math.floor(W * 0.065);
+        const arrows = [];
+        for (let i = 0; i < allComps.length; i++) {
+          const comp = allComps[i];
+          if (comp.h < minH || comp.h > maxH) continue;
+          const aspect = comp.w / comp.h;
+          if (aspect < 0.80 || aspect > 1.35) continue;
+          const midY = (comp.minY + comp.maxY) / 2;
+          const midX = (comp.minX + comp.maxX) / 2;
+          let top = 0, bot = 0, left = 0, right = 0;
+          const rMin = new Int32Array(comp.h).fill(1e9);
+          const rMax = new Int32Array(comp.h).fill(-1);
+          for (let k = 0; k < comp.px.length; k++) {
+            const x = comp.px[k], y = comp.py[k];
+            if (y < midY) top++; else if (y > midY) bot++;
+            if (x < midX) left++; else if (x > midX) right++;
+            const ry = y - comp.minY;
+            if (x < rMin[ry]) rMin[ry] = x;
+            if (x > rMax[ry]) rMax[ry] = x;
+          }
+          const lrRatio = (left + 1) / (right + 1);
+          if (lrRatio < 0.65 || lrRatio > 1.55) continue;
+          const tbRatio = (top + 0.5) / (bot + 0.5);
+          const stemRows = Math.max(2, Math.floor(comp.h * 0.22));
+          let topTipMaxW = 0, botTipMaxW = 0, topHalfMaxW = 0, botHalfMaxW = 0;
+          for (let ry = 0; ry < comp.h; ry++) {
+            const rw = rMax[ry] >= rMin[ry] ? (rMax[ry] - rMin[ry] + 1) : 0;
+            if (ry < stemRows && rw > topTipMaxW) topTipMaxW = rw;
+            if (ry >= comp.h - stemRows && rw > botTipMaxW) botTipMaxW = rw;
+            if (ry < comp.h / 2 && rw > topHalfMaxW) topHalfMaxW = rw;
+            if (ry >= comp.h / 2 && rw > botHalfMaxW) botHalfMaxW = rw;
+          }
+          let hasRight = false, hasLeft = false;
+          for (let j = 0; j < allComps.length; j++) {
+            if (j === i) continue;
+            const sib = allComps[j];
+            const ov = Math.min(comp.maxY, sib.maxY) - Math.max(comp.minY, sib.minY);
+            if (ov < comp.h * 0.45 || sib.h < comp.h * 0.50 || sib.h > comp.h * 1.45) continue;
+            const dxR = sib.minX - comp.maxX;
+            if (dxR >= 1 && dxR <= comp.h * 2.8) hasRight = true;
+            const dxL = comp.minX - sib.maxX;
+            if (dxL >= 1 && dxL <= comp.h * 2.2) hasLeft = true;
+          }
+          if (!hasRight || hasLeft) continue;
+          let ou = null;
+          if (tbRatio >= 1.45 && topHalfMaxW >= comp.w * 0.78 && botTipMaxW <= comp.w * 0.48) ou = 'Over';
+          else if (tbRatio <= 0.69 && botHalfMaxW >= comp.w * 0.78 && topTipMaxW <= comp.w * 0.48) ou = 'Under';
+          if (ou) arrows.push({ y: comp.minY, yNorm: (comp.minY + comp.h / 2) / H, ou });
+        }
+        arrows.sort((a, b) => a.y - b.y);
+        // Deduplicate any accidental same-row detections
+        const deduped = [];
+        for (const a of arrows) {
+          if (!deduped.length || (a.y - deduped[deduped.length - 1].y) > 40) deduped.push(a);
+        }
+        return deduped;
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function applyPrizePicksArrowDirs(legs, ppArrows) {
+      if (!Array.isArray(legs) || !legs.length || !Array.isArray(ppArrows) || !ppArrows.length) return;
+      if (ppArrows.length === legs.length) {
+        for (let i = 0; i < legs.length; i++) {
+          if (legs[i].type === 'prop') legs[i].ou = ppArrows[i].ou;
+        }
+        return;
+      }
+      if (ppArrows.length >= 2 && legs.length >= 2) {
+        const minY = ppArrows[0].yNorm, maxY = ppArrows[ppArrows.length - 1].yNorm;
+        const span = maxY - minY;
+        if (span > 0.1) {
+          ppArrows.forEach(a => {
+            if (a.ou === 'Under') {
+              const idx = Math.min(legs.length - 1, Math.max(0, Math.round(((a.yNorm - minY) / span) * (legs.length - 1))));
+              if (legs[idx] && legs[idx].type === 'prop') legs[idx].ou = 'Under';
+            }
+          });
+        }
+      }
+    }
+
     function prepareVisionPayload(blob, selectedBook) {
       return new Promise(resolve => {
         const img = new Image();
@@ -1593,8 +1748,10 @@
             const mime_type = usePng ? 'image/png' : 'image/jpeg';
             const image_b64 = usePng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.94);
 
-            let crop_b64 = '', crop_mime_type = 'image/png';
+            let crop_b64 = '', crop_mime_type = 'image/png', ppArrows = [];
             if (selectedBook === 'PrizePicks' && img.width >= 200 && img.height >= 200) {
+              ppArrows = detectPrizePicksArrows(img);
+              window._ppArrowDirs = ppArrows;
               const sx = Math.floor(img.width * 0.54);
               const sy = Math.floor(img.height * 0.08);
               const sw = Math.max(1, img.width - sx);
@@ -1610,15 +1767,19 @@
               cCtx.imageSmoothingQuality = 'high';
               cCtx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
               crop_b64 = cCanvas.toDataURL('image/png');
+            } else {
+              window._ppArrowDirs = [];
             }
-            resolve({ image_b64, mime_type, crop_b64, crop_mime_type });
+            resolve({ image_b64, mime_type, crop_b64, crop_mime_type, ppArrows });
           } catch (_) {
-            blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png' }));
+            window._ppArrowDirs = [];
+            blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png', ppArrows: [] }));
           }
         };
         img.onerror = () => {
           URL.revokeObjectURL(url);
-          blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png' }));
+          window._ppArrowDirs = [];
+          blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png', ppArrows: [] }));
         };
         img.src = url;
       });
@@ -1743,6 +1904,9 @@
           if (cleanPay && document.getElementById('b-pay')) document.getElementById('b-pay').value = cleanPay;
 
           const cleanLegs = data.legs.map(normalizeVisionLeg).filter(Boolean);
+          if (selectedBook === 'PrizePicks' && prepared.ppArrows && prepared.ppArrows.length > 0) {
+            applyPrizePicksArrowDirs(cleanLegs, prepared.ppArrows);
+          }
           if (cleanLegs.length > 0) {
             draftLegs.push(...cleanLegs);
             renderDraft();
@@ -2304,6 +2468,9 @@
           ou: prop.ou,
           target: prop.target
         });
+      }
+      if (window._ppArrowDirs && window._ppArrowDirs.length > 0) {
+        applyPrizePicksArrowDirs(legs, window._ppArrowDirs);
       }
       return { cost, payout, legs };
     }
