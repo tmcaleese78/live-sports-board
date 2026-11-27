@@ -1432,18 +1432,18 @@
       if (/rush(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'RUSH TD';
       if (/rec(?:eiving)?\s*(?:td|touchdown)/.test(s)) return 'REC TD';
       if (/rush(?:ing)?\s*att(?:empts)?|carries|\bcar\b/.test(s)) return 'RUSH ATT';
-      if (/pass(?:ing)?\s*(?:yards|yds)/.test(s)) return 'PASS YDS';
-      if (/rush(?:ing)?\s*(?:yards|yds)/.test(s)) return 'RUSH YDS';
-      if (/rec(?:eiving)?\s*(?:yards|yds)/.test(s)) return 'REC YDS';
-      if (/rec(?:eiving)?\s*targets|\btgts?\b|\btargets\b/.test(s)) return 'REC TGTS';
-      if (/receptions|catches|\brecs?\b/.test(s)) return 'REC';
-      if (/anytime\s*td|touchdown|\btd\b/.test(s)) return 'TD';
-      if (/3-?pt|3pm|3-?pointer|three\s*pointer|threes/.test(s)) return '3PM';
-      if (/rebounds|\brebs?\b/.test(s)) return 'REB';
-      if (/assists|\basts?\b/.test(s)) return 'AST';
-      if (/steals|\bstl\b/.test(s)) return 'STL';
-      if (/blocks|\bblk\b/.test(s)) return 'BLK';
-      if (/points|\bpts\b/.test(s)) return 'PTS';
+      if (/pass(?:ing)?\s*(?:yards?|yds?)/.test(s)) return 'PASS YDS';
+      if (/rush(?:ing)?\s*(?:yards?|yds?)/.test(s)) return 'RUSH YDS';
+      if (/rec(?:eiving)?\s*(?:yards?|yds?)/.test(s)) return 'REC YDS';
+      if (/rec(?:eiving)?\s*targets?|\btgts?\b|\btargets?\b/.test(s)) return 'REC TGTS';
+      if (/receptions?|catches|\brecs?\b/.test(s)) return 'REC';
+      if (/anytime\s*td|touchdowns?|\btd\b/.test(s)) return 'TD';
+      if (/3-?pt|3pm|3-?point|three\s*pointer|threes/.test(s)) return '3PM';
+      if (/rebounds?|\brebs?\b/.test(s)) return 'REB';
+      if (/assists?|\basts?\b/.test(s)) return 'AST';
+      if (/steals?|\bstl\b/.test(s)) return 'STL';
+      if (/blocks?|\bblk\b/.test(s)) return 'BLK';
+      if (/points?|\bpts\b/.test(s)) return 'PTS';
       return null;
     }
 
@@ -1937,7 +1937,8 @@
         visionErr = e.message || String(e);
       }
 
-      // Automatic fallback to local Tesseract + modular 7B/7C/7D parsers
+      // Automatic fallback to local Tesseract + modular 7B/7C/7D/7E/7F parsers
+      window._lastVisionErr = visionErr || '';
       try {
         const warnTag = visionErr ? ` <span style="color:#94a3b8;font-size:11px">(Vision AI fallback: ${visionErr})</span>` : '';
         if (statusEl) statusEl.innerHTML = `<span style="color:#facc15;font-weight:700">Step 1/2: Enhancing screenshot...</span>${warnTag}`;
@@ -1979,7 +1980,7 @@
       const fullLower = lines.join(' ').toLowerCase();
       const escRx = s => String(s || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const stripSuffix = s => String(s || '').replace(/\b(jr\.?|sr\.?|ii|iii|iv|v)\b/gi, '').replace(/\s+/g, ' ').trim();
-      const normName = s => stripSuffix(s).toLowerCase().replace(/['’.-]/g, '').replace(/\s+/g, ' ').trim();
+      const normName = s => stripSuffix(s).toLowerCase().replace(/['’.]/g, '').replace(/-/g, ' ').replace(/\s+/g, ' ').trim();
 
       const playerNameAliases = {
         'james cook': 'james cook iii',
@@ -2088,10 +2089,12 @@
       if (parsed.legs.length > 0) {
         draftLegs.push(...parsed.legs);
         renderDraft();
-        if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${parsed.legs.length} ${selectedBook} leg${parsed.legs.length === 1 ? '' : 's'}! Review lines/payout below and click Save.</span>`;
+        const vNote = window._lastVisionErr ? ` <span style="color:#94a3b8;font-size:11px">(Offline OCR — Vision AI: ${window._lastVisionErr})</span>` : ' <span style="color:#94a3b8;font-size:11px">(Offline OCR)</span>';
+        if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${parsed.legs.length} ${selectedBook} leg${parsed.legs.length === 1 ? '' : 's'}!</span>${vNote} <span style="color:#cbd5e1;font-size:12px">Review lines/payout below and click Save.</span>`;
         showToast(`Imported ${parsed.legs.length} ${selectedBook} leg${parsed.legs.length === 1 ? '' : 's'}!`);
       } else {
-        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">No ${selectedBook} picks matched automatically — try cropping closer to the legs or add manually below.</span>`;
+        const vNote = window._lastVisionErr ? ` (Vision AI: ${window._lastVisionErr})` : '';
+        if (statusEl) statusEl.innerHTML = `<span style="color:#facc15">No ${selectedBook} picks matched automatically${vNote} — try cropping closer to the legs or add manually below.</span>`;
       }
     }
     // =========================================================================
@@ -2563,14 +2566,18 @@
       const { text, lines, allPlayers, resolveAlias, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
       const legs = [];
 
-      const costMatch =
-        text.match(/(?:total\s*cost|you\s*pay|cost|spent|wager|paid)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*cost|cost|you\s*pay)/i);
-      const payMatch =
-        text.match(/(?:max\s*payout|payout\s*if\s*(?:yes|no)|potential\s*payout|est\.?\s*payout|payout|to\s*win)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
-        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:max\s*payout|payout)/i);
-      const cost = (costMatch ? costMatch.at(1) : '').replace(/,/g, '');
-      const payout = (payMatch ? payMatch.at(1) : '').replace(/,/g, '');
+      // Normalize slashed zeros inside dollar amounts (e.g. "$1.OO" / "$1.ØØ" -> "$1.00")
+      const moneyText = String(text || '').replace(/\$\s*([0-9oOØøQ,]+(?:\.[0-9oOØøQ]{1,2})?)/g, (_, num) => '$' + num.replace(/[oOØøQ]/g, '0'));
+      const dualHeaderMatch = moneyText.match(/(?:total\s*cost|you\s*pay|cost|spent|wager)[^\r\n]*(?:max\s*payout|payout|to\s*win)[\r\n\s]+\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s+\$\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const costMatch = dualHeaderMatch ||
+        moneyText.match(/(?:total\s*cost|you\s*pay|cost|spent|wager|paid)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        moneyText.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*cost|cost|you\s*pay)/i);
+      const payMatch = dualHeaderMatch ||
+        moneyText.match(/(?:max\s*payout|payout\s*if\s*(?:yes|no)|potential\s*payout|est\.?\s*payout|payout|to\s*win)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        moneyText.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:max\s*payout|payout)/i);
+      const allDollars = [...moneyText.matchAll(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)/g)].map(m => m.at(1).replace(/,/g, ''));
+      const cost = (dualHeaderMatch ? dualHeaderMatch.at(1) : (costMatch ? costMatch.at(1) : (allDollars.length >= 2 ? allDollars[0] : ''))).replace(/,/g, '');
+      const payout = (dualHeaderMatch ? dualHeaderMatch.at(2) : (payMatch ? payMatch.at(1) : (allDollars.length >= 2 ? allDollars[1] : ''))).replace(/,/g, '');
 
       const stripKalshiNoise = s => String(s || '')
         .replace(/\b\d{1,2}\s*[¢c]\b/gi, ' ')
@@ -2616,21 +2623,30 @@
           }
         }
 
-        // 3. Kalshi Player Prop ("Player: 70+ receiving yards" / "Anytime Touchdown")
+        // 3. Kalshi Player Prop ("Player: 70+ receiving yards" / "Anytime Touchdown", including roster-unmatched names)
         const mp = matchPlayerInLine(line);
+        const colonProp = cleaned.replace(/^(?:[oO0Q○•●()\[\]\-]+\s+)+/, '').match(/^([A-Z][a-zA-Z'.-]+(?:\s+[A-Za-z'.-]+){1,3})\s*[:;]\s*(.+)$/);
         const stHere = mapOcrStat(line) || mapOcrStat(next1);
-        if (mp && stHere) {
+        if ((mp || colonProp) && stHere) {
+          const rawName = mp ? mp.name : colonProp.at(1).trim();
+          const aliased = !mp && allPlayers.find(p => p.normLower === resolveAlias(rawName));
+          let playerName = mp ? mp.name : (aliased ? aliased.name : rawName);
+          if (playerName.toLowerCase() === 'james cook') playerName = 'James Cook III';
+          const sport = mp ? mp.sport : (aliased ? aliased.sport : (nbaStats.has(stHere) ? 'NBA' : 'NFL'));
           const isTd = stHere === 'TD' && /anytime|score\s+a\s+touchdown/i.test(sideCtx);
           const mile = cleaned.match(/\b(\d{1,3}(?:\.\d)?)\s*\+/);
           const ouNum = cleaned.match(/\b(?:over|under)\s+(\d{1,3}(?:\.\d)?)\b/i);
-          let target = isTd ? 0.5 : (mile ? parseFloat(mile.at(1)) : (ouNum ? parseFloat(ouNum.at(1)) : null));
+          const anyNum = colonProp && cleaned.match(/[:;]\s*(?:over|under)?\s*(\d{1,3}(?:\.\d)?)/i);
+          let target = isTd ? 0.5 : (mile ? parseFloat(mile.at(1)) : (ouNum ? parseFloat(ouNum.at(1)) : (anyNum ? parseFloat(anyNum.at(1)) : null)));
           if (target && target > 0 && target < 600) {
             let ou = (ouNum && /under/i.test(ouNum.at(0))) ? 'Under' : 'Over';
             if (isNo) {
               ou = (ou === 'Over') ? 'Under' : 'Over';
               if (mile && Number.isInteger(target)) target = target - 0.5;
             }
-            legs.push({ type: 'prop', sport: mp.sport, player: mp.name, stat: stHere, ou, target });
+            if (!legs.some(l => l.type === 'prop' && l.player === playerName && l.stat === stHere && l.target === target)) {
+              legs.push({ type: 'prop', sport, player: playerName, stat: stHere, ou, target });
+            }
             continue;
           }
         }

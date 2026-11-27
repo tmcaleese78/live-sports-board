@@ -640,29 +640,29 @@ def _normalize_stat(raw):
         return "REC TD"
     if re.search(r"rush(?:ing)?\s*att(?:empts)?|carries|\bcar\b", s):
         return "RUSH ATT"
-    if re.search(r"pass(?:ing)?\s*(?:yards|yds)", s):
+    if re.search(r"pass(?:ing)?\s*(?:yards?|yds?)", s):
         return "PASS YDS"
-    if re.search(r"rush(?:ing)?\s*(?:yards|yds)", s):
+    if re.search(r"rush(?:ing)?\s*(?:yards?|yds?)", s):
         return "RUSH YDS"
-    if re.search(r"rec(?:eiving)?\s*(?:yards|yds)", s):
+    if re.search(r"rec(?:eiving)?\s*(?:yards?|yds?)", s):
         return "REC YDS"
-    if re.search(r"rec(?:eiving)?\s*targets|\btgts?\b|\btargets\b", s):
+    if re.search(r"rec(?:eiving)?\s*targets?|\btgts?\b|\btargets?\b", s):
         return "REC TGTS"
-    if re.search(r"receptions|catches|\brecs?\b", s):
+    if re.search(r"receptions?|catches|\brecs?\b", s):
         return "REC"
-    if re.search(r"anytime\s*td|touchdown|\btd\b", s):
+    if re.search(r"anytime\s*td|touchdowns?|\btd\b", s):
         return "TD"
     if re.search(r"3-?pt|3pm|3-?point|three\s*pointer|threes", s):
         return "3PM"
-    if re.search(r"rebounds|\brebs?\b", s):
+    if re.search(r"rebounds?|\brebs?\b", s):
         return "REB"
-    if re.search(r"assists|\basts?\b", s):
+    if re.search(r"assists?|\basts?\b", s):
         return "AST"
-    if re.search(r"steals|\bstl\b", s):
+    if re.search(r"steals?|\bstl\b", s):
         return "STL"
-    if re.search(r"blocks|\bblk\b", s):
+    if re.search(r"blocks?|\bblk\b", s):
         return "BLK"
-    if re.search(r"points|\bpts\b", s):
+    if re.search(r"points?|\bpts\b", s):
         return "PTS"
     return up if up in _VALID_STATS else ""
 
@@ -798,9 +798,10 @@ CRITICAL ACCURACY RULES:
    - Game Total contract (e.g. "Over 47.5 total points?"):
      * "Yes" -> "type": "total", "ou": "Over", "total": 47.5.
      * "No" -> "type": "total", "ou": "Under", "total": 47.5.
-   - Player Prop contract (e.g. "Ja'Marr Chase: 70+ receiving yards"):
-     * "Yes" -> "type": "prop", "ou": "Over", "target": 70.
+   - Player Prop contract (e.g. "Ja'Marr Chase: 70+ receiving yards" or truncated "Jacory Croskey-Merritt: 40+ rushing yard 66%"):
+     * "Yes" (or combo card with no "No" tag) -> "type": "prop", "ou": "Over", "target": 70 (or 40).
      * "No" -> "type": "prop", "ou": "Under", "target": 69.5 (one half-point below the N+ threshold).
+   - On Kalshi Market Combo share cards, "COST" and "MAX PAYOUT" appear side-by-side above their "$X.XX" amounts (e.g. "$1.00" and "$2.72"); extract both. Always read ALL legs in the combo even if the final word is slightly clipped behind a percentage badge.
 5. STAT CODES (map "stat" strictly to one of these exact codes):
    - NFL: PASS YDS, PASS TD, PASS ATT, COMP, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD
    - NBA: PTS, REB, AST, 3PM, STL, BLK, PRA, PR, PA, RA
