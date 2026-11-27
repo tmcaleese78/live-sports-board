@@ -542,7 +542,7 @@
         <div id="prop-inputs" class="row-flex">
           <input id="b-player" list="player-datalist" placeholder="Type player name..." style="flex:1;min-width:190px">
           <datalist id="player-datalist"></datalist>
-          <select id="b-stat"></select>
+          <select id="b-stat" onchange="if(this.value==='TD' && !document.getElementById('b-target').value){document.getElementById('b-target').value='0.5';document.getElementById('b-prop-ou').value='Over';}"></select>
           <select id="b-prop-ou"><option value="Over">Over</option><option value="Under">Under</option></select>
           <input id="b-target" type="number" step="0.5" placeholder="Target (e.g. 50)" style="width:150px">
         </div>
@@ -1289,9 +1289,18 @@
       document.getElementById('total-inputs').style.display = type === 'total' ? 'flex' : 'none';
 
       const stats = sport === 'NBA'
-        ? ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']
-        : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'];
-      document.getElementById('b-stat').innerHTML = stats.map(s => `<option value="${s}">${s}</option>`).join('');
+        ? [
+            ['PTS', 'PTS'], ['REB', 'REB'], ['AST', 'AST'], ['3PM', '3PM'],
+            ['STL', 'STL'], ['BLK', 'BLK'], ['PRA', 'PRA'],
+            ['PR', 'PR (Pts+Reb)'], ['PA', 'PA (Pts+Ast)'], ['RA', 'RA (Reb+Ast)']
+          ]
+        : [
+            ['PASS YDS', 'Pass Yds'], ['PASS TD', 'Pass TD'], ['PASS ATT', 'Pass ATT'], ['COMP', 'Pass Comp'],
+            ['RUSH YDS', 'Rush Yds'], ['RUSH ATT', 'Rush ATT'], ['RUSH TD', 'Rush TD'],
+            ['REC', 'Receptions'], ['REC YDS', 'Rec Yds'], ['REC TGTS', 'REC Targets'], ['REC TD', 'Rec TD'],
+            ['SCRIM YDS', 'Rush + Rec Yds'], ['TD', 'Anytime TD']
+          ];
+      document.getElementById('b-stat').innerHTML = stats.map(([val, lbl]) => `<option value="${val}">${lbl}</option>`).join('');
 
       const pList = (liveData.players && liveData.players[sport]) || [];
       document.getElementById('player-datalist').innerHTML = pList.map(p => `<option value="${p.name}">`).join('');
@@ -1417,6 +1426,7 @@
       if (/(?:pts|points)\s*\+\s*(?:asts?|assists)|\bpa\b/.test(s)) return 'PA';
       if (/(?:rebs?|rebounds)\s*\+\s*(?:asts?|assists)|\bra\b/.test(s)) return 'RA';
       if (/rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage/.test(s)) return 'SCRIM YDS';
+      if (/pass(?:ing)?\s*att(?:empts)?/.test(s)) return 'PASS ATT';
       if (/pass(?:ing)?\s*comp(?:letions)?|\bcomp\b/.test(s)) return 'COMP';
       if (/pass(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'PASS TD';
       if (/rush(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'RUSH TD';
@@ -2937,10 +2947,19 @@
     function openQuickProp(sport, player, team, defaultStat) {
       pendingQuickProp = { sport, player, team };
       const stats = sport === 'NBA'
-        ? ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA']
-        : ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS', 'TD'];
+        ? [
+            ['PTS', 'PTS'], ['REB', 'REB'], ['AST', 'AST'], ['3PM', '3PM'],
+            ['STL', 'STL'], ['BLK', 'BLK'], ['PRA', 'PRA'],
+            ['PR', 'PR (Pts+Reb)'], ['PA', 'PA (Pts+Ast)'], ['RA', 'RA (Reb+Ast)']
+          ]
+        : [
+            ['PASS YDS', 'Pass Yds'], ['PASS TD', 'Pass TD'], ['PASS ATT', 'Pass ATT'], ['COMP', 'Pass Comp'],
+            ['RUSH YDS', 'Rush Yds'], ['RUSH ATT', 'Rush ATT'], ['RUSH TD', 'Rush TD'],
+            ['REC', 'Receptions'], ['REC YDS', 'Rec Yds'], ['REC TGTS', 'REC Targets'], ['REC TD', 'Rec TD'],
+            ['SCRIM YDS', 'Rush + Rec Yds'], ['TD', 'Anytime TD']
+          ];
       document.getElementById('qp-player').textContent = `${player} (${sport}${team ? ' • ' + team : ''})`;
-      document.getElementById('qp-stat').innerHTML = stats.map(s => `<option value="${s}" ${s === defaultStat ? 'selected' : ''}>${s}</option>`).join('');
+      document.getElementById('qp-stat').innerHTML = stats.map(([val, lbl]) => `<option value="${val}" ${val === defaultStat ? 'selected' : ''}>${lbl}</option>`).join('');
       document.getElementById('qp-ou').value = 'Over';
       document.getElementById('qp-target').value = '';
       const opts = [`<option value="new">New Bet Slip (${draftLegs.length} leg${draftLegs.length === 1 ? '' : 's'} in draft)</option>`]

@@ -378,8 +378,12 @@ def parse_scoreboard(sport_path, lg_code, fast=False):
                     gv = lambda k: float(st[im[k]]) if (k in im and im[k] < len(st) and str(st[im[k]]).replace(".","",1).isdigit()) else 0.0
                     if lg_code == "nfl":
                         if cname == "passing":
-                            ca = str(st[im["C/ATT"]]).split("/") if ("C/ATT" in im and im["C/ATT"] < len(st)) else ["0"]
-                            rec["stats"]["COMP"] = float(next(iter(ca), 0))
+                            ca = str(st[im["C/ATT"]]).split("/") if ("C/ATT" in im and im["C/ATT"] < len(st)) else ["0", "0"]
+                            comp_v = float(ca[0]) if len(ca) > 0 and ca[0].replace(".", "", 1).isdigit() else 0.0
+                            att_v = float(ca[1]) if len(ca) > 1 and ca[1].replace(".", "", 1).isdigit() else 0.0
+                            rec["stats"]["COMP"] = comp_v
+                            rec["stats"]["PASS COMP"] = comp_v
+                            rec["stats"]["PASS ATT"] = att_v
                             rec["stats"]["PASS YDS"] = gv("YDS")
                             rec["stats"]["PASS TD"] = gv("TD")
                         elif cname == "rushing":
@@ -580,7 +584,7 @@ def ping():
     return "ok", 200
 
 _VALID_STATS = {
-    "PASS YDS", "PASS TD", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",
+    "PASS YDS", "PASS TD", "PASS ATT", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",
     "REC YDS", "REC", "REC TGTS", "REC TD", "SCRIM YDS", "TD",
     "PTS", "REB", "AST", "3PM", "STL", "BLK", "PRA", "PR", "PA", "RA"
 }
@@ -624,6 +628,8 @@ def _normalize_stat(raw):
         return "RA"
     if re.search(r"rush(?:ing)?\s*\+\s*rec(?:eiving)?|scrimmage", s):
         return "SCRIM YDS"
+    if re.search(r"pass(?:ing)?\s*att(?:empts)?", s):
+        return "PASS ATT"
     if re.search(r"pass(?:ing)?\s*comp(?:letions)?|\bcomp\b", s):
         return "COMP"
     if re.search(r"pass(?:ing)?\s*(?:td|touchdown)", s):
@@ -796,9 +802,9 @@ CRITICAL ACCURACY RULES:
      * "Yes" -> "type": "prop", "ou": "Over", "target": 70.
      * "No" -> "type": "prop", "ou": "Under", "target": 69.5 (one half-point below the N+ threshold).
 5. STAT CODES (map "stat" strictly to one of these exact codes):
-   - NFL: PASS YDS, PASS TD, COMP, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD
+   - NFL: PASS YDS, PASS TD, PASS ATT, COMP, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD
    - NBA: PTS, REB, AST, 3PM, STL, BLK, PRA, PR, PA, RA
-   - Note: "Rush + Rec Yds" = SCRIM YDS; "Rec Targets" = REC TGTS; "Pts + Rebs + Asts" = PRA; "Pts + Rebs" = PR; "Pts + Asts" = PA; "Rebs + Asts" = RA; "Pass Completions" = COMP; "Rush + Rec TDs" = TD.
+   - Note: "Rush + Rec Yds" = SCRIM YDS; "Rec Targets" = REC TGTS; "Pass Attempts" = PASS ATT; "Pass Completions" = COMP; "Pts + Rebs + Asts" = PRA; "Pts + Rebs" = PR; "Pts + Asts" = PA; "Rebs + Asts" = RA; "Rush + Rec TDs" = TD.
 6. DEDUPLICATION & NOISE:
    - If a slip has a compact summary header at the top AND detailed leg rows below, extract each leg ONCE (do not duplicate).
    - Ignore embedded live mini-scoreboards, cashout buttons, and navigation bars.
