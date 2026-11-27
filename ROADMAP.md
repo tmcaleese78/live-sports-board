@@ -5,7 +5,7 @@
 • Frontend: Single-file HTML/CSS/JS (templates/index.html) with live polling and inline editing.
 • Hosting & Auto-Deploy: GitHub repository connected to Railway (every commit pushed to main automatically triggers a live deploy).
 • Database & Auth: Supabase (User Sign In, Sign Up, Password Reset, cross-device bet card sync, and Admin-managed Daily Sample Cards for logged-out visitors).
-• AI Vision OCR: Gemini Vision (gemini-2.5-flash) via /api/parse-slip in web_live.py using Railway environment variable GEMINI_API_KEY (with automatic fallback to local Tesseract + modular parsers).
+• AI Vision OCR: Gemini Vision (gemini-3.8-flash) via /api/parse-slip in web_live.py using Railway environment variable GEMINI_API_KEY (with automatic fallback to local Tesseract + modular parsers).
 
 2. Strict UI & Naming Conventions (Do Not Override)
 
@@ -29,7 +29,7 @@
 	• Home-screen Upload Bet Slip shortcut + Builder Upload Screenshot button with dark-mode Sportsbook Picker modal (FanDuel, DraftKings, PrizePicks).
 	• Inline target editing, 1-tap O / U toggle, leg reordering, shareable live links (?sweat=...), and audio hit chimes.
 • Hybrid Screenshot Slip Importer (web_live.py + templates/index.html):
-	• Primary parser: /api/parse-slip (gemini-2.5-flash Vision AI with MEDIA_RESOLUTION_HIGH + zoomed PrizePicks right-column crop) extracting cost, payout, and structured legs (prop, spread, ml, total).
+	• Primary parser: /api/parse-slip (gemini-3.8-flash Vision AI with MEDIA_RESOLUTION_HIGH + zoomed PrizePicks right-column crop) extracting cost, payout, and structured legs (prop, spread, ml, total).
 	• Deterministic PrizePicks pixel-geometry arrow detector (detectPrizePicksArrows) classifying white/colored ↑ (Over) and ↓ (Under) arrows with 100% precision.
 	• Supported California platforms: FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi.
 	• Offline/fallback parser (Section 7 in templates/index.html): Modularized into 7A (Router & Roster Helpers), 7B (parseFanDuelSlip), 7C (parseDraftKingsSlip), 7D (parsePrizePicksSlip), 7E (parseUnderdogSlip), and 7F (parseKalshiSlip).

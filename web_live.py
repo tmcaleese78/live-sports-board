@@ -841,31 +841,42 @@ def api_parse_slip():
         parts.append({"text": "IMAGE 2 (zoomed right-hand column showing exact arrows and prop numbers):"})
         parts.append({"inline_data": {"mime_type": crop_mime, "data": crop_b64}})
 
-    payload = {
-        "contents": [{"role": "user", "parts": parts}],
-        "generationConfig": {
-            "temperature": 0.0,
-            "responseMimeType": "application/json",
-            "mediaResolution": "MEDIA_RESOLUTION_HIGH",
-            "thinkingConfig": {"thinkingBudget": 1024}
-        }
+    base_gen_cfg = {
+        "temperature": 0.0,
+        "responseMimeType": "application/json"
+    }
+    full_gen_cfg = {
+        "temperature": 0.0,
+        "responseMimeType": "application/json",
+        "mediaResolution": "MEDIA_RESOLUTION_HIGH"
     }
 
+    env_model = os.environ.get("GEMINI_MODEL", "").strip()
+    candidate_models = [m for m in (env_model, "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite") if m]
+    last_err = "Gemini API error"
+
     try:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
-        resp = requests.post(url, json=payload, timeout=35)
-        raw_res = resp.json()
-        if "error" in raw_res and resp.status_code == 400:
-            err_msg = str(raw_res["error"].get("message", ""))
-            if any(k in err_msg for k in ("mediaResolution", "thinkingConfig", "Unknown name")):
-                payload["generationConfig"] = {
-                    "temperature": 0.0,
-                    "responseMimeType": "application/json"
-                }
+        raw_res = None
+        for model_name in candidate_models:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
+            payload = {
+                "contents": [{"role": "user", "parts": parts}],
+                "generationConfig": full_gen_cfg
+            }
+            resp = requests.post(url, json=payload, timeout=35)
+            raw_res = resp.json()
+            if "error" in raw_res and resp.status_code == 400:
+                payload["generationConfig"] = base_gen_cfg
                 resp = requests.post(url, json=payload, timeout=35)
                 raw_res = resp.json()
-        if "error" in raw_res:
-            return jsonify({"ok": False, "fallback": True, "error": raw_res["error"].get("message", "Gemini API error")}), 200
+            if "error" not in raw_res:
+                break
+            last_err = str(raw_res["error"].get("message", "Gemini API error"))
+            if resp.status_code not in (400, 404):
+                break
+
+        if not raw_res or "error" in raw_res:
+            return jsonify({"ok": False, "fallback": True, "error": last_err}), 200
         cands = raw_res.get("candidates") or []
         res_parts = (cands[0].get("content") or {}).get("parts") or [] if cands else []
         txt = next((p.get("text", "") for p in reversed(res_parts) if p.get("text") and not p.get("thought")), "")
