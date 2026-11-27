@@ -243,6 +243,7 @@
     .bk-dk { background: rgba(83, 211, 55, 0.2); color: #4ade80; border-color: rgba(83, 211, 55, 0.5); }
     .bk-pp { background: rgba(168, 85, 247, 0.22); color: #c084fc; border-color: rgba(168, 85, 247, 0.55); }
     .bk-ud { background: rgba(250, 204, 21, 0.2); color: #facc15; border-color: rgba(250, 204, 21, 0.5); }
+    .bk-kal { background: rgba(0, 210, 133, 0.2); color: #2dd4bf; border-color: rgba(0, 210, 133, 0.52); }
     .bk-mgm { background: rgba(217, 179, 108, 0.22); color: #fcd34d; border-color: rgba(217, 179, 108, 0.55); }
     .bk-czr { background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.5); }
     .sb-card { cursor: pointer; }
@@ -497,6 +498,8 @@
             <option value="FanDuel">FanDuel</option>
             <option value="DraftKings">DraftKings</option>
             <option value="PrizePicks">PrizePicks</option>
+            <option value="Underdog">Underdog</option>
+            <option value="Kalshi">Kalshi</option>
           </select>
           <div style="display:flex;gap:8px;justify-content:flex-end">
             <button class="btn-ghost" style="padding:8px 14px;font-size:13px" onclick="closeSlipBookPicker()">Cancel</button>
@@ -511,6 +514,7 @@
             <option value="DraftKings">DraftKings</option>
             <option value="PrizePicks">PrizePicks</option>
             <option value="Underdog">Underdog</option>
+            <option value="Kalshi">Kalshi</option>
             <option value="BetMGM">BetMGM</option>
             <option value="Caesars">Caesars</option>
             <option value="ESPN BET">ESPN BET</option>
@@ -998,6 +1002,7 @@
       if (s.includes('draftkings')) return 'bk-dk';
       if (s.includes('prizepicks')) return 'bk-pp';
       if (s.includes('underdog')) return 'bk-ud';
+      if (s.includes('kalshi')) return 'bk-kal';
       if (s.includes('betmgm')) return 'bk-mgm';
       if (s.includes('caesars')) return 'bk-czr';
       return '';
@@ -1225,7 +1230,7 @@
         const cardsHtml = activeList.map((c, i) => renderSingleCard(c, isDemo ? i : userCards.indexOf(c), isDemo)).join('');
         const heroHtml = isDemo ? `<div class="mission-hero">
           <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
-          <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog & more in real time.</div></div>
+          <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog, Kalshi & more in real time.</div></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
             <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="setTab('build')">+ Build Manually</button>
@@ -1534,7 +1539,7 @@
       const modal = document.getElementById('slip-book-modal');
       const sel = document.getElementById('slip-book-select');
       const mainBook = document.getElementById('b-book');
-      if (sel && mainBook && ['FanDuel', 'DraftKings', 'PrizePicks'].includes(mainBook.value)) {
+      if (sel && mainBook && ['FanDuel', 'DraftKings', 'PrizePicks', 'Underdog', 'Kalshi'].includes(mainBook.value)) {
         sel.value = mainBook.value;
       }
       if (modal) modal.style.display = 'flex';
@@ -2062,6 +2067,8 @@
 
       let parsed = { cost: '', payout: '', legs: [] };
       if (selectedBook === 'PrizePicks') parsed = parsePrizePicksSlip(ctx);
+      else if (selectedBook === 'Underdog') parsed = parseUnderdogSlip(ctx);
+      else if (selectedBook === 'Kalshi') parsed = parseKalshiSlip(ctx);
       else if (selectedBook === 'FanDuel') parsed = parseFanDuelSlip(ctx);
       else parsed = parseDraftKingsSlip(ctx);
 
@@ -2471,6 +2478,165 @@
       }
       if (window._ppArrowDirs && window._ppArrowDirs.length > 0) {
         applyPrizePicksArrowDirs(legs, window._ppArrowDirs);
+      }
+      return { cost, payout, legs };
+    }
+    // =========================================================================
+    // --- 7E. UNDERDOG PARSER (Underdog Pick'em / Higher & Lower / Scorchers) -
+    // =========================================================================
+    function parseUnderdogSlip(ctx) {
+      const { text, lines, matchPlayerInLine, nbaStats } = ctx;
+      const legs = [];
+
+      const udToWin = text.match(/(?:^|[^0-9.])\$?\s*(\d[\d,]*(?:\.\d{1,2})?)\s*to\s*win\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const costMatch = udToWin || text.match(/(?:entry|wager|risk|bet|stake|paid)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const payMatch = text.match(/(?:to\s*win|payout|potential\s*win|wins)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i);
+      const cost = (udToWin ? udToWin.at(1) : (costMatch ? costMatch.at(1) : '')).replace(/,/g, '');
+      const payout = (udToWin ? udToWin.at(2) : (payMatch ? payMatch.at(1) : '')).replace(/,/g, '');
+
+      const isUdMeta = s => /\b(underdog|standard|flex|insured|champions|pick'?em|scorchers?|gimme|to\s*win|entry|payout|multiplier|streak)\b/i.test(s);
+      const cleanUdLine = s => String(s || '')
+        .replace(/\b\d{1,2}:?\d{2}\s*(?:am|pm|est|pst|cst|mst)\b/gi, ' ')
+        .replace(/\b\d+(?:\.\d+)?x\b/gi, ' ')
+        .replace(/#\s*\d{1,2}\b/g, ' ')
+        .replace(/\$\s*\d[\d,]*(?:\.\d{1,2})?/g, ' ')
+        .replace(/\b(\d{1,3})[, ]\s*5\b/g, '$1.5');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (isUdMeta(line)) continue;
+        const stHere = mapOcrStat(line);
+        if (!stHere) continue;
+
+        const prev1 = lines[i - 1] || '', prev2 = lines[i - 2] || '', next1 = lines[i + 1] || '';
+        const mp = matchPlayerInLine(line) || matchPlayerInLine(prev1) || matchPlayerInLine(prev2);
+        let playerName = mp ? mp.name : '';
+        if (!playerName) {
+          for (const cand of [prev1, prev2, line]) {
+            if (!cand || isUdMeta(cand)) continue;
+            const stripped = cand
+              .replace(/\b(higher|lower|over|under|more|less)\b/gi, ' ')
+              .replace(/\b\d+(?:\.\d+)?x?\b/gi, ' ')
+              .replace(/[^A-Za-z'.\-\s]/g, ' ')
+              .replace(/\s+/g, ' ').trim();
+            if (/^[A-Z][a-zA-Z'.-]+\s+[A-Z][a-zA-Z'.-]+(?:\s+(?:Jr\.?|Sr\.?|II|III|IV|V))?$/.test(stripped)) {
+              playerName = stripped.toLowerCase() === 'james cook' ? 'James Cook III' : stripped;
+              break;
+            }
+          }
+        }
+        if (!playerName) continue;
+
+        const windowRaw = `${prev1} ${line} ${next1}`;
+        const cleaned = cleanUdLine(windowRaw);
+        const isLower = /\b(lower|under|less)\b/i.test(cleaned) || /[↓▼⬇]/.test(windowRaw);
+        const ou = isLower ? 'Under' : 'Over';
+
+        const dirNum = cleaned.match(/\b(?:higher|lower|over|under)\s+(\d{1,3}(?:\.\d)?)\b/i);
+        const decs = [...cleaned.matchAll(/(?:^|[^0-9.])(\d{1,3}\.\d)(?![0-9])/g)].map(m => parseFloat(m.at(1)));
+        const ints = (cleaned.match(/(?:^|[^0-9.])(\d{1,3})(?![0-9.])/g) || []).map(s => Number(s.replace(/[^0-9]/g, ''))).filter(n => n > 0 && n < 600);
+        let target = dirNum ? parseFloat(dirNum.at(1)) : (decs.length ? decs.at(-1) : (ints.at(0) || null));
+        if (/\b[1-5]\d{2}(?:\.\d)?\b/.test(cleaned) && /(?:^|\s)0\.5(?:\s|$)/.test(cleaned)) target = 0.5;
+        if (!target || target <= 0) continue;
+
+        const sport = mp ? mp.sport : (nbaStats.has(stHere) ? 'NBA' : 'NFL');
+        if (!legs.some(l => l.player === playerName && l.stat === stHere && l.target === target)) {
+          legs.push({ type: 'prop', sport, player: playerName, stat: stHere, ou, target });
+        }
+      }
+      return { cost, payout, legs };
+    }
+    // =========================================================================
+    // --- 7F. KALSHI PARSER (Yes / No Sports Event Contracts & Combos) --------
+    // =========================================================================
+    function parseKalshiSlip(ctx) {
+      const { text, lines, allPlayers, resolveAlias, matchPlayerInLine, findGameByTeamHint, resolveTeamSide, nbaStats } = ctx;
+      const legs = [];
+
+      const costMatch =
+        text.match(/(?:total\s*cost|you\s*pay|cost|spent|wager|paid)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:total\s*cost|cost|you\s*pay)/i);
+      const payMatch =
+        text.match(/(?:max\s*payout|payout\s*if\s*(?:yes|no)|potential\s*payout|est\.?\s*payout|payout|to\s*win)\s*[:$]?\s*\$?\s*(\d[\d,]*(?:\.\d{1,2})?)/i) ||
+        text.match(/\$\s*(\d[\d,]*(?:\.\d{1,2})?)\s*(?:\r?\n|\s)+(?:max\s*payout|payout)/i);
+      const cost = (costMatch ? costMatch.at(1) : '').replace(/,/g, '');
+      const payout = (payMatch ? payMatch.at(1) : '').replace(/,/g, '');
+
+      const stripKalshiNoise = s => String(s || '')
+        .replace(/\b\d{1,2}\s*[¢c]\b/gi, ' ')
+        .replace(/\$\s*0\.\d{2}\b/g, ' ')
+        .replace(/\b\d+(?:\.\d+)?%/g, ' ')
+        .replace(/\b\d[\d,]*\s*(?:contracts?|shares?)\b/gi, ' ')
+        .replace(/\b(\d{1,3})[, ]\s*5\b/g, '$1.5');
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const prev1 = lines[i - 1] || '', next1 = lines[i + 1] || '';
+        const cleaned = stripKalshiNoise(line);
+        const sideCtx = `${prev1} ${line} ${next1}`;
+        const isNo = /\b(?:bought\s+)?no\b(?:\s*[·•|-]|\s+\d{1,2}[¢c]|\s*$)/i.test(next1) || /^no\b\s*[·•|-]/i.test(line);
+
+        // 1. Kalshi Game Total ("Over 47.5 total points")
+        const totMatch = cleaned.match(/\b(over|under)\s+(\d{2,3}(?:\.\d)?)\s*(?:total\s*points|points\s*scored|combined)?\b/i);
+        if (totMatch && /total\s*points|points\s*scored|combined/i.test(sideCtx)) {
+          const rawOu = totMatch.at(1).toLowerCase();
+          const ou = isNo ? (rawOu === 'over' ? 'Under' : 'Over') : (rawOu === 'over' ? 'Over' : 'Under');
+          const total = parseFloat(totMatch.at(2));
+          const g = findGameByTeamHint(sideCtx);
+          if (g && total > 20) {
+            legs.push({ type: 'total', sport: g.sport, game: g.gameLbl, ou, total });
+            continue;
+          }
+        }
+
+        // 2. Kalshi Spread ("Team wins by over 3.5 points")
+        const spMatch = cleaned.match(/([A-Za-z .'-]{3,28})\s+wins?\s+by\s+(?:over|more\s+than)\s+(\d{1,2}(?:\.\d)?)/i);
+        if (spMatch) {
+          const g = findGameByTeamHint(`${spMatch.at(1)} ${sideCtx}`);
+          const mag = parseFloat(spMatch.at(2));
+          if (g && Number.isFinite(mag)) {
+            let team = resolveTeamSide(g, spMatch.at(1));
+            let spread = -Math.abs(mag);
+            if (isNo) {
+              team = (team === g.awayFull) ? g.homeFull : g.awayFull;
+              spread = Math.abs(mag);
+            }
+            legs.push({ type: 'spread', sport: g.sport, team, spread });
+            continue;
+          }
+        }
+
+        // 3. Kalshi Player Prop ("Player: 70+ receiving yards" / "Anytime Touchdown")
+        const mp = matchPlayerInLine(line);
+        const stHere = mapOcrStat(line) || mapOcrStat(next1);
+        if (mp && stHere) {
+          const isTd = stHere === 'TD' && /anytime|score\s+a\s+touchdown/i.test(sideCtx);
+          const mile = cleaned.match(/\b(\d{1,3}(?:\.\d)?)\s*\+/);
+          const ouNum = cleaned.match(/\b(?:over|under)\s+(\d{1,3}(?:\.\d)?)\b/i);
+          let target = isTd ? 0.5 : (mile ? parseFloat(mile.at(1)) : (ouNum ? parseFloat(ouNum.at(1)) : null));
+          if (target && target > 0 && target < 600) {
+            let ou = (ouNum && /under/i.test(ouNum.at(0))) ? 'Under' : 'Over';
+            if (isNo) {
+              ou = (ou === 'Over') ? 'Under' : 'Over';
+              if (mile && Number.isInteger(target)) target = target - 0.5;
+            }
+            legs.push({ type: 'prop', sport: mp.sport, player: mp.name, stat: stHere, ou, target });
+            continue;
+          }
+        }
+
+        // 4. Kalshi Winner / Moneyline ("Kansas City to win?" / "Yes · Chiefs")
+        const winMatch = cleaned.match(/([A-Za-z .'-]{3,28})\s+(?:to\s+win|wins?\b)/i);
+        if (winMatch && !/wins?\s+by/i.test(cleaned)) {
+          const g = findGameByTeamHint(`${winMatch.at(1)} ${sideCtx}`);
+          if (g) {
+            let team = resolveTeamSide(g, winMatch.at(1));
+            if (isNo) team = (team === g.awayFull) ? g.homeFull : g.awayFull;
+            if (!legs.some(l => l.type === 'ml' && l.team === team)) {
+              legs.push({ type: 'ml', sport: g.sport, team, spread: 0 });
+            }
+          }
+        }
       }
       return { cost, payout, legs };
     }

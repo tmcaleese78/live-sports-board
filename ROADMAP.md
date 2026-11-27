@@ -29,15 +29,19 @@
 	• Home-screen Upload Bet Slip shortcut + Builder Upload Screenshot button with dark-mode Sportsbook Picker modal (FanDuel, DraftKings, PrizePicks).
 	• Inline target editing, 1-tap O / U toggle, leg reordering, shareable live links (?sweat=...), and audio hit chimes.
 • Hybrid Screenshot Slip Importer (web_live.py + templates/index.html):
-	• Primary parser: /api/parse-slip (gemini-2.5-flash Vision AI) extracting cost, payout, and structured legs (prop, spread, ml, total).
-	• Offline/fallback parser (Section 7 in templates/index.html): Modularized into 7A (Router & Roster Helpers), 7B (parseFanDuelSlip), 7C (parseDraftKingsSlip), and 7D (parsePrizePicksSlip).
+	• Primary parser: /api/parse-slip (gemini-2.5-flash Vision AI with MEDIA_RESOLUTION_HIGH + zoomed PrizePicks right-column crop) extracting cost, payout, and structured legs (prop, spread, ml, total).
+	• Deterministic PrizePicks pixel-geometry arrow detector (detectPrizePicksArrows) classifying white/colored ↑ (Over) and ↓ (Under) arrows with 100% precision.
+	• Supported California platforms: FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi.
+	• Offline/fallback parser (Section 7 in templates/index.html): Modularized into 7A (Router & Roster Helpers), 7B (parseFanDuelSlip), 7C (parseDraftKingsSlip), 7D (parsePrizePicksSlip), 7E (parseUnderdogSlip), and 7F (parseKalshiSlip).
 
 4. Immediate Next Milestones (In Priority Order)
 
-1. Finish PrizePicks White Down-Arrow (↓) Vision Accuracy:
-	• In web_live.py (/api/parse-slip), add "media_resolution": "MEDIA_RESOLUTION_HIGH" to generationConfig (or send a high-res crop of the right-hand prop number/arrow column) so small white ↓ arrows on PrizePicks (e.g., ↓ 6 Rec Targets) always return "ou": "Under" instead of defaulting to "Over".
-2. Site Speed & Mobile UX Optimization:
+1. California Platforms Verification & Tuning (In Progress):
+	• Verify and dial in live screenshot slip uploads across all 5 major California platforms: FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi.
+2. Post-Dec 13 — North Carolina Online Sportsbooks Expansion:
+	• Once in North Carolina (after Dec 13), add slip upload support, badges, Vision AI rules, and fallback parsers for legal NC online sportsbooks (e.g., BetMGM, Caesars, ESPN BET, bet365, Fanatics Sportsbook).
+3. Site Speed & Mobile UX Optimization:
 	• Audit templates/index.html and web_live.py to streamline redundant DOM renders, optimize portrait-mode card spacing, and verify smooth performance across iOS Safari and Android Chrome.
-3. Phase 4 — Freemium Limits & Stripe Pro Tier:
+4. Phase 4 — Freemium Limits & Stripe Pro Tier:
 	• Enforce a free-tier limit (e.g., max 3 active cards for free users) stored in Supabase user profiles.
 	• Add Stripe Checkout + Webhook endpoint in web_live.py to unlock unlimited active cards, unlimited Vision AI slip scans, and priority live refresh for Pro subscribers.

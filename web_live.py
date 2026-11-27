@@ -764,27 +764,42 @@ Output schema (return ONLY valid JSON, no markdown):
 CRITICAL ACCURACY RULES:
 1. COST & PAYOUT:
    - Use plain decimal numbers without "$" or commas (e.g. "20.00", "145.50", or "" if not shown).
-   - PrizePicks: "$10 to win $50" -> cost "10.00", payout "50.00".
+   - PrizePicks / Underdog: "$10 to win $50" or "Entry $10 / Payout $50" -> cost "10.00", payout "50.00".
    - DraftKings / FanDuel: use Total Wager / Wager / Bought for "cost", and Total Payout / Est. Payout / To Pay / Potential Payout for "payout".
-2. NEVER CONFUSE AMERICAN ODDS WITH TARGETS OR SPREADS:
+   - Kalshi: use Cost / Total Cost / You Pay / Spent for "cost", and Payout / Max Payout / Payout if Yes / Payout if No for "payout".
+2. NEVER CONFUSE ODDS, CENT PRICES, MULTIPLIERS, OR CONTRACTS WITH TARGETS OR SPREADS:
    - On DraftKings and FanDuel, odds like -110, -115, -120, +105, +140, +250, -300 appear next to legs or on the right side. NEVER output odds as "target", "spread", or "total".
+   - On Kalshi, NEVER output contract prices in cents (e.g. 62¢, 38¢, $0.62), win probabilities (62%), or contract counts (100 contracts) as "target", "spread", or "total".
+   - On Underdog and PrizePicks, NEVER output payout multipliers (1.25x, 3x, 6x, 20x), jersey numbers (#8), or game kickoff times as "target".
    - Read exact decimal values carefully (e.g. 24.5, 6.5, 0.5, -3.5, +7.5, 228.5). Never drop ".5" and never turn 24.5 into 245.
    - Milestone / alt props written as "25+", "60+", "2+", "100+" -> set "ou": "Over" and "target" to that exact number (25, 60, 2, 100).
    - "Anytime TD Scorer" / "To Score a Touchdown" -> "stat": "TD", "ou": "Over", "target": 0.5. ("2+ TDs" -> "target": 2).
    - Preserve exact "+" or "-" sign on spreads (favorite is negative like -3.5, underdog is positive like +3.5).
-3. CRITICAL FOR PRIZEPICKS / DFS ARROWS & PROMOS:
-   - Directly to the left of each prop number (such as "↓ 6" or "↑ 9.5") is a vertical arrow icon (may be white, green goblin, or red/orange demon).
-   - Inspect the triangular arrowhead carefully:
+3. CRITICAL FOR PRIZEPICKS & UNDERDOG (DFS PICK'EM):
+   - PrizePicks: Directly left of each prop number (such as "↓ 6" or "↑ 9.5") is a vertical arrow icon (white, green goblin, or red/orange demon).
      * Arrowhead at the BOTTOM pointing DOWN (↓) or text "Less" -> "ou" MUST be "Under".
      * Arrowhead at the TOP pointing UP (↑) or text "More" -> "ou" MUST be "Over".
      * Do NOT default white arrows to "Over" — white arrows can point DOWN (↓) for Under!
-   - If an original number is crossed out next to a discounted promo / free square number (e.g. crossed-out 302.5 next to 0.5), ALWAYS use the active discounted number (0.5).
-   - Ignore jersey numbers (#8), game kickoff times, and payout multipliers (3x, 5x, 10x).
-4. STAT CODES (map "stat" strictly to one of these exact codes):
+   - Underdog: Uses "Higher" (or ↑) -> "ou": "Over", and "Lower" (or ↓) -> "ou": "Under". Ignore Scorcher/boost multiplier tags (e.g. 1.25x, 1.5x, chili icon).
+   - Discounted promos / Gimme picks / Free squares: if an original number is crossed out next to a discounted number (e.g. crossed-out 302.5 next to 0.5), ALWAYS use the active discounted number (0.5).
+4. CRITICAL FOR KALSHI (YES / NO PREDICTION CONTRACTS & COMBOS):
+   - Winner / Moneyline contract (e.g. "Chiefs to win?" / "Kansas City at Buffalo" with "Yes · Kansas City"):
+     * "Yes" -> "type": "ml", "team": that team, "spread": 0.
+     * "No" -> flip to the OPPOSITE team in the matchup ("type": "ml", "spread": 0).
+   - Spread contract (e.g. "Kansas City wins by over 3.5 points?"):
+     * "Yes" -> "type": "spread", "team": "Kansas City Chiefs", "spread": -3.5.
+     * "No" -> "type": "spread", "team": opponent team (if shown), "spread": +3.5.
+   - Game Total contract (e.g. "Over 47.5 total points?"):
+     * "Yes" -> "type": "total", "ou": "Over", "total": 47.5.
+     * "No" -> "type": "total", "ou": "Under", "total": 47.5.
+   - Player Prop contract (e.g. "Ja'Marr Chase: 70+ receiving yards"):
+     * "Yes" -> "type": "prop", "ou": "Over", "target": 70.
+     * "No" -> "type": "prop", "ou": "Under", "target": 69.5 (one half-point below the N+ threshold).
+5. STAT CODES (map "stat" strictly to one of these exact codes):
    - NFL: PASS YDS, PASS TD, COMP, RUSH YDS, RUSH ATT, RUSH TD, REC YDS, REC, REC TGTS, REC TD, SCRIM YDS, TD
    - NBA: PTS, REB, AST, 3PM, STL, BLK, PRA, PR, PA, RA
-   - Note: "Rush + Rec Yds" = SCRIM YDS; "Rec Targets" = REC TGTS; "Pts + Rebs + Asts" = PRA; "Pts + Rebs" = PR; "Pts + Asts" = PA; "Rebs + Asts" = RA; "Pass Completions" = COMP.
-5. DEDUPLICATION & NOISE:
+   - Note: "Rush + Rec Yds" = SCRIM YDS; "Rec Targets" = REC TGTS; "Pts + Rebs + Asts" = PRA; "Pts + Rebs" = PR; "Pts + Asts" = PA; "Rebs + Asts" = RA; "Pass Completions" = COMP; "Rush + Rec TDs" = TD.
+6. DEDUPLICATION & NOISE:
    - If a slip has a compact summary header at the top AND detailed leg rows below, extract each leg ONCE (do not duplicate).
    - Ignore embedded live mini-scoreboards, cashout buttons, and navigation bars.
    - Use full athlete names (list James Cook as "James Cook III")."""
