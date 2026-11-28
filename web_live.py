@@ -812,6 +812,9 @@ CRITICAL ACCURACY RULES:
    - Use full athlete names (list James Cook as "James Cook III")."""
 
 
+_MODEL_COOLDOWN = {}
+
+
 @app.route("/api/parse-slip", methods=["POST"])
 def api_parse_slip():
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -820,9 +823,9 @@ def api_parse_slip():
 
     body = request.get_json(silent=True) or {}
     img_b64 = str(body.get("image_b64") or "").strip()
-    mime_type = str(body.get("mime_type") or "image/png").strip()
+    mime_type = str(body.get("mime_type") or "image/jpeg").strip()
     crop_b64 = str(body.get("crop_b64") or "").strip()
-    crop_mime = str(body.get("crop_mime_type") or "image/png").strip()
+    crop_mime = str(body.get("crop_mime_type") or "image/jpeg").strip()
     book = str(body.get("book") or "PrizePicks").strip()
     if not img_b64:
         return jsonify({"ok": False, "error": "Missing image data"}), 400
@@ -845,14 +848,16 @@ def api_parse_slip():
         "temperature": 0.0,
         "responseMimeType": "application/json"
     }
-    full_gen_cfg = {
+    fast_gen_cfg = {
         "temperature": 0.0,
         "responseMimeType": "application/json",
-        "mediaResolution": "MEDIA_RESOLUTION_HIGH"
+        "thinkingConfig": {"thinkingLevel": "low"}
     }
 
     env_model = os.environ.get("GEMINI_MODEL", "").strip()
-    candidate_models = [m for m in (env_model, "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.0-flash") if m]
+    all_models = [m for m in (env_model, "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.0-flash") if m]
+    now = time.time()
+    candidate_models = [m for m in all_models if _MODEL_COOLDOWN.get(m, 0) <= now] or all_models
     last_err = "Gemini API error"
 
     try:
@@ -862,23 +867,29 @@ def api_parse_slip():
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             payload = {
                 "contents": [{"role": "user", "parts": parts}],
-                "generationConfig": full_gen_cfg
+                "generationConfig": fast_gen_cfg
             }
             try:
-                resp = requests.post(url, json=payload, timeout=22)
+                resp = requests.post(url, json=payload, timeout=14)
                 raw_res = resp.json()
             except Exception as req_err:
                 last_err = str(req_err)
+                _MODEL_COOLDOWN[model_name] = time.time() + 120
                 raw_res = None
                 continue
             if "error" in raw_res and resp.status_code == 400:
                 payload["generationConfig"] = base_gen_cfg
-                resp = requests.post(url, json=payload, timeout=22)
+                resp = requests.post(url, json=payload, timeout=14)
                 raw_res = resp.json()
             if "error" not in raw_res:
                 used_model = model_name
+                _MODEL_COOLDOWN.pop(model_name, None)
                 break
             last_err = str(raw_res["error"].get("message", "Gemini API error"))
+            if resp.status_code == 404:
+                _MODEL_COOLDOWN[model_name] = time.time() + 3600
+            elif resp.status_code in (429, 500, 503):
+                _MODEL_COOLDOWN[model_name] = time.time() + 180
             if resp.status_code in (401, 403):
                 break
 

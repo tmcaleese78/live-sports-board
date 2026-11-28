@@ -1748,7 +1748,7 @@
         img.onload = () => {
           URL.revokeObjectURL(url);
           try {
-            const maxW = 1600, maxH = 2600;
+            const maxW = 1100, maxH = 2000;
             const ratio = Math.min(1, maxW / (img.width || 1), maxH / (img.height || 1));
             const w = Math.max(1, Math.round(img.width * ratio));
             const h = Math.max(1, Math.round(img.height * ratio));
@@ -1759,33 +1759,17 @@
             ctx.imageSmoothingEnabled = true;
             ctx.imageSmoothingQuality = 'high';
             ctx.drawImage(img, 0, 0, w, h);
-            const usePng = (w * h) <= 1600000;
-            const mime_type = usePng ? 'image/png' : 'image/jpeg';
-            const image_b64 = usePng ? canvas.toDataURL('image/png') : canvas.toDataURL('image/jpeg', 0.94);
+            const mime_type = 'image/jpeg';
+            const image_b64 = canvas.toDataURL('image/jpeg', 0.86);
 
-            let crop_b64 = '', crop_mime_type = 'image/png', ppArrows = [];
+            let ppArrows = [];
             if (selectedBook === 'PrizePicks' && img.width >= 200 && img.height >= 200) {
               ppArrows = detectPrizePicksArrows(img);
               window._ppArrowDirs = ppArrows;
-              const sx = Math.floor(img.width * 0.54);
-              const sy = Math.floor(img.height * 0.08);
-              const sw = Math.max(1, img.width - sx);
-              const sh = Math.max(1, Math.floor(img.height * 0.86));
-              const zoom = sw < 500 ? 2.2 : (sw < 800 ? 1.6 : 1.2);
-              const cw = Math.min(1400, Math.round(sw * zoom));
-              const ch = Math.min(2600, Math.round(sh * zoom));
-              const cCanvas = document.createElement('canvas');
-              cCanvas.width = cw;
-              cCanvas.height = ch;
-              const cCtx = cCanvas.getContext('2d');
-              cCtx.imageSmoothingEnabled = true;
-              cCtx.imageSmoothingQuality = 'high';
-              cCtx.drawImage(img, sx, sy, sw, sh, 0, 0, cw, ch);
-              crop_b64 = cCanvas.toDataURL('image/png');
             } else {
               window._ppArrowDirs = [];
             }
-            resolve({ image_b64, mime_type, crop_b64, crop_mime_type, ppArrows });
+            resolve({ image_b64, mime_type, crop_b64: '', crop_mime_type: 'image/jpeg', ppArrows });
           } catch (_) {
             window._ppArrowDirs = [];
             blobToBase64(blob).then(b64 => resolve({ image_b64: b64, mime_type: blob.type || 'image/png', crop_b64: '', crop_mime_type: 'image/png', ppArrows: [] }));
@@ -1893,6 +1877,7 @@
       if (input && 'value' in input) input.value = '';
 
       let visionErr = '';
+      const tStart = performance.now();
       try {
         const prepared = await prepareVisionPayload(memBlob, selectedBook);
         const res = await withTimeout(
@@ -1902,12 +1887,10 @@
             body: JSON.stringify({
               image_b64: prepared.image_b64,
               mime_type: prepared.mime_type,
-              crop_b64: prepared.crop_b64,
-              crop_mime_type: prepared.crop_mime_type,
               book: selectedBook
             })
           }),
-          40000,
+          30000,
           'Vision AI scan'
         );
         const data = await res.json();
@@ -1923,9 +1906,10 @@
             applyPrizePicksArrowDirs(cleanLegs, prepared.ppArrows);
           }
           if (cleanLegs.length > 0) {
+            const secs = ((performance.now() - tStart) / 1000).toFixed(1);
             draftLegs.push(...cleanLegs);
             renderDraft();
-            if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'} via Vision AI! Review lines/payout below and click Save.</span>`;
+            if (statusEl) statusEl.innerHTML = `<span style="color:#4ade80;font-weight:800">Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'} via Vision AI (${secs}s)! Review lines/payout below and click Save.</span>`;
             showToast(`Imported ${cleanLegs.length} ${selectedBook} leg${cleanLegs.length === 1 ? '' : 's'}!`);
             return;
           }
