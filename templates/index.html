@@ -608,6 +608,21 @@
     }
     .lp-step-t { font-size: 15px; font-weight: 800; color: #f8fafc; margin-bottom: 5px; }
     .lp-step-d { font-size: 12.5px; line-height: 1.45; color: #94a3b8; }
+    .lp-split { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); margin-bottom: 18px; }
+    .lp-split-card {
+      background: linear-gradient(150deg, rgba(15, 23, 42, 0.96), rgba(11, 21, 44, 0.9));
+      border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 14px; padding: 15px 17px;
+      box-shadow: var(--shadow);
+    }
+    .lp-split-card.is-single { border-color: rgba(74, 222, 128, 0.34); }
+    .lp-split-tag {
+      display: inline-block; font-size: 10.5px; font-weight: 900; letter-spacing: 0.06em;
+      text-transform: uppercase; padding: 2px 8px; border-radius: 999px; margin-bottom: 7px;
+    }
+    .lp-split-card.is-single .lp-split-tag { background: rgba(34, 197, 94, 0.16); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.35); }
+    .lp-split-card.is-multi .lp-split-tag { background: rgba(56, 189, 248, 0.16); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); }
+    .lp-split-t { font-size: 16px; font-weight: 800; color: #f8fafc; margin-bottom: 5px; }
+    .lp-split-d { font-size: 13px; line-height: 1.5; color: #cbd5e1; }
     .lp-cmp {
       background: var(--surface); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 14px;
       padding: 16px; margin-bottom: 18px; box-shadow: var(--shadow); overflow-x: auto;
@@ -2065,9 +2080,9 @@
 
         const heroHtml = isDemo ? `
         <section class="lp-hero">
-          <div class="lp-eyebrow">Zero Passwords • Sportsbooks + DFS + Kalshi • Live in 2 Seconds</div>
-          <h1 class="lp-title">Stop Flipping Between 5 Betting Apps. <span>One Live Command Center.</span></h1>
-          <p class="lp-sub">Snap a screenshot of any slip from FanDuel, DraftKings, PrizePicks, Underdog, or Kalshi. OmniStatPro reads every leg in 2 seconds and tracks live stats, pace projections, and cross-book exposure—without ever asking for your sportsbook password.</p>
+          <div class="lp-eyebrow">Zero Passwords • One App or Multiple • Live in 2 Seconds</div>
+          <h1 class="lp-title">Bet on One App or Multiple — Track Every Slip Better. <span>One Live Command Center.</span></h1>
+          <p class="lp-sub">Whether you stick to a single platform or juggle FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi, snap a screenshot of any slip for live pace projections, injury updates, a 1-leg-away hedge calculator, and real P&amp;L analytics your betting app will never show you—with zero sportsbook passwords.</p>
           <div class="lp-books">
             <span style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-right:4px">Works with:</span>
             <span class="book-badge bk-fd">FanDuel</span>
@@ -2080,6 +2095,19 @@
             <button class="btn-primary" style="padding:11px 20px;font-size:14px" onclick="triggerQuickSlipUpload()">📷 Try Free — Upload a Bet Slip</button>
             <button class="pill" style="padding:10px 16px;border-color:rgba(56,189,248,0.5);color:#f8fafc" onclick="openAuthModal()">Sign In / Sync Devices</button>
             <button class="pill" style="padding:10px 15px;color:#cbd5e1" onclick="setTab('build')">+ Build Manually</button>
+          </div>
+        </section>
+
+        <section class="lp-split">
+          <div class="lp-split-card is-single">
+            <div class="lp-split-tag">Playing on 1 App?</div>
+            <div class="lp-split-t">Way Better Than Your Betting App's Built-In Tracker</div>
+            <div class="lp-split-d">Sportsbooks hide your real ROI and weak spots. Upgrade your game-day screen with live pace projections, L5/L10 prop hit-rate charts, injury updates &amp; outlook, a 1-leg-away hedge calculator, and permanent P&amp;L analytics by stat type.</div>
+          </div>
+          <div class="lp-split-card is-multi">
+            <div class="lp-split-tag">Playing on Multiple Apps?</div>
+            <div class="lp-split-t">Every Sportsbook, DFS Pick'em &amp; Kalshi on One Screen</div>
+            <div class="lp-split-d">Stop flipping between multiple apps on game day. Combine FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi into one unified Cross-Book Rooting Guide showing total dollars riding on every game and player.</div>
           </div>
         </section>
 
@@ -2096,8 +2124,8 @@
           </div>
           <div class="lp-step">
             <div class="lp-step-num">STEP 03</div>
-            <div class="lp-step-t">Track Everything Live</div>
-            <div class="lp-step-d">Live box scores, pace projections, audio hit chimes, and one unified Cross-Book Rooting Guide as games unfold.</div>
+            <div class="lp-step-t">Track, Research &amp; Optimize</div>
+            <div class="lp-step-d">Follow live pace projections, injury watch alerts, L5/L10 hit rates, 1-leg-away hedge math, and automatic P&amp;L analytics.</div>
           </div>
         </section>
 
@@ -2108,18 +2136,28 @@
               <tr>
                 <th>Capability</th>
                 <th class="lp-us">OmniStatPro</th>
-                <th>Other Trackers</th>
+                <th>Betting Apps &amp; Other Trackers</th>
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <td><strong>Real P&amp;L curve, ROI &amp; hit rate by stat type</strong></td>
+                <td class="lp-us">✓ Automatic &amp; Permanent</td>
+                <td class="lp-them">✕ Hidden by Sportsbooks</td>
+              </tr>
+              <tr>
+                <td><strong>1-Leg-Away Hedge Calc, L5/L10 Hit Rates &amp; Injuries</strong></td>
+                <td class="lp-us">✓ Built-In Free</td>
+                <td class="lp-them">✕ Lowball Cash-Outs / Separate Apps</td>
+              </tr>
               <tr>
                 <td><strong>Sportsbook passwords required?</strong></td>
                 <td class="lp-us">✓ Never (2s Screenshot AI)</td>
                 <td class="lp-them">✕ Login + 2FA Required</td>
               </tr>
               <tr>
-                <td><strong>Sportsbooks + DFS + Kalshi together</strong></td>
-                <td class="lp-us">✓ All on 1 Live Screen</td>
+                <td><strong>One app or multiple platforms together</strong></td>
+                <td class="lp-us">✓ Sportsbooks + DFS + Kalshi</td>
                 <td class="lp-them">✕ Fragmented / Limited</td>
               </tr>
               <tr>
@@ -2138,20 +2176,28 @@
 
         <section class="lp-feats">
           <div class="lp-feat">
+            <div class="lp-feat-t">📊 Real P&amp;L &amp; Edge Analytics</div>
+            <div class="lp-feat-d">Settled slips lock in permanently to track your cumulative P&amp;L curve, ROI by platform, hit rate by stat type, Over/Under splits, and slip-size results.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">🔥 Live Pace &amp; ⚖️ Hedge Calculator</div>
+            <div class="lp-feat-d">Real-time stat projections from the game clock, audio hit chimes, and an instant 1-Leg-Away Hedge Calculator to lock in guaranteed profit.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">📈 Pre-Bet L5 / L10 Hit-Rate Charts</div>
+            <div class="lp-feat-d">Tap any player to inspect their Last 5 &amp; Last 10 hit rate, averages, and color-coded game bars against any custom Over/Under line before betting.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">🏥 Live Injury Watch &amp; Outlook</div>
+            <div class="lp-feat-d">Automatic OUT/Q/D badges right on your active slips and builder, plus full injury updates and outlook notes so a late scratch never surprises you.</div>
+          </div>
+          <div class="lp-feat">
             <div class="lp-feat-t">🎯 Cross-Book Rooting Guide</div>
-            <div class="lp-feat-d">See total dollars riding on every game and player across all your apps at once—so you always know which game to watch.</div>
+            <div class="lp-feat-d">See total dollars riding on every game and player across one app or multiple—so you always know which game to watch next.</div>
           </div>
           <div class="lp-feat">
-            <div class="lp-feat-t">🔥 Live Pace &amp; 1-Leg-Away Alerts</div>
-            <div class="lp-feat-d">Real-time stat projections from the live game clock, green hit bars, audio chimes, and automatic highlights when a slip is 1 leg away.</div>
-          </div>
-          <div class="lp-feat">
-            <div class="lp-feat-t">📊 Automatic Edge Analytics</div>
-            <div class="lp-feat-d">Settled cards lock in permanently to show your ROI by platform, hit rate by stat type, Over/Under splits, and cumulative P&amp;L curve.</div>
-          </div>
-          <div class="lp-feat">
-            <div class="lp-feat-t">📲 Installable Mobile App &amp; Share Links</div>
-            <div class="lp-feat-d">Add straight to your iPhone or Android home screen and send live read-only sweat links to friends—no app download needed.</div>
+            <div class="lp-feat-t">📸 Card Graphics &amp; Live Share Links</div>
+            <div class="lp-feat-d">Export clean dark-mode PNG slip graphics in 1 tap, send live read-only sweat links to friends, and install straight to your home screen.</div>
           </div>
         </section>` : '';
 
