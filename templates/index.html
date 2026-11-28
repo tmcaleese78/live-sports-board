@@ -1059,7 +1059,8 @@
     }
 
     function renderPlayers() {
-      const all = (liveData.players && liveData.players[curPlg]) || [];
+      const hasAnyStat = p => Boolean(p && p.stats && Object.values(p.stats).some(v => Number(v) !== 0));
+      const all = ((liveData.players && liveData.players[curPlg]) || []).filter(hasAnyStat);
       const tSel = document.getElementById('p-team-filter');
       const prevT = tSel ? (tSel.value || 'ALL') : 'ALL';
       const teams = [...new Set(all.map(p => p.team).filter(Boolean))].sort();
@@ -1071,14 +1072,19 @@
       if (!sortCol || !cols.includes(sortCol)) { sortCol = curPlg === 'NFL' ? 'PASS YDS' : 'PTS'; sortDir = 1; }
       list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
       const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
-      const rows = list.slice(0, 120).map(p => {
-        const bg = p.bg || '#1e293b';
-        const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
-        const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
-        const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
-        const actBtn = `<td><button class="pill" style="padding:4px 9px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8;white-space:nowrap" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}')">+ Prop</button></td>`;
-        return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${nameHtml}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + actBtn + `</tr>`;
-      }).join('');
+      const emptyMsg = all.length === 0
+        ? `No ${curPlg} players have recorded stats yet.`
+        : `No matching ${curPlg} players with recorded stats.`;
+      const rows = list.length
+        ? list.slice(0, 120).map(p => {
+            const bg = p.bg || '#1e293b';
+            const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
+            const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
+            const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
+            const actBtn = `<td><button class="pill" style="padding:4px 9px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8;white-space:nowrap" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}')">+ Prop</button></td>`;
+            return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${nameHtml}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + actBtn + `</tr>`;
+          }).join('')
+        : `<tr><td colspan="${cols.length + 5}" style="padding:20px;text-align:center;color:var(--muted);font-weight:700">${emptyMsg}</td></tr>`;
       document.getElementById('p-table').innerHTML = hdr + rows;
     }
 
