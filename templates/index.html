@@ -648,6 +648,7 @@
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="pill" id="install-app-btn" onclick="triggerInstallApp()" style="display:none;border-color:rgba(74,222,128,0.5);color:#4ade80">📲 Install App</button>
+        <button class="pill" id="admin-dash-btn" onclick="openAdminDashboard()" style="display:none;border-color:rgba(250,204,21,0.55);color:#facc15">Admin</button>
         <button class="pill" onclick="openFeedbackModal()" style="border-color:rgba(148,163,184,0.4);color:#cbd5e1">Contact / Feedback</button>
         <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
       </div>
@@ -917,6 +918,19 @@
           <button class="pill" style="padding:10px 12px;font-size:12.5px" onclick="copySupportEmail()">Copy Email</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="admin-modal" onclick="if(event.target===this)closeAdminDashboard()">
+    <div class="modal-box" style="max-width:900px">
+      <div class="modal-hdr">
+        <strong style="font-size:17px;color:#facc15">Admin Dashboard — Traffic &amp; Signups</strong>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="pill" style="border-color:rgba(56,189,248,0.5);color:#38bdf8" onclick="loadAdminDashboard()">↻ Refresh</button>
+          <button class="pill" onclick="closeAdminDashboard()">✕ Close</button>
+        </div>
+      </div>
+      <div id="admin-body" style="color:var(--muted);font-size:13px">Loading admin metrics...</div>
     </div>
   </div>
 
@@ -3808,6 +3822,110 @@
       setTimeout(() => { const m = document.getElementById('fb-msg'); if (m) m.focus(); }, 40);
     }
     function closeFeedbackModal() { document.getElementById('feedback-modal').classList.remove('open'); }
+
+    function openAdminDashboard() {
+      if (!isAdminUser()) return;
+      document.getElementById('admin-modal').classList.add('open');
+      loadAdminDashboard();
+    }
+    function closeAdminDashboard() { document.getElementById('admin-modal').classList.remove('open'); }
+    async function loadAdminDashboard() {
+      const bodyEl = document.getElementById('admin-body');
+      if (!bodyEl || !sbClient) return;
+      bodyEl.innerHTML = '<p style="color:var(--muted)">Loading live traffic &amp; user signups...</p>';
+      try {
+        const { data: sessData } = await sbClient.auth.getSession();
+        const token = sessData && sessData.session && sessData.session.access_token;
+        if (!token) { bodyEl.innerHTML = '<p style="color:#f87171">Please sign in with your @omnistatpro.com admin account.</p>'; return; }
+        const res = await fetch('/api/admin/overview', { headers: { Authorization: 'Bearer ' + token } });
+        const d = await res.json();
+        if (!res.ok || !d || !d.ok) {
+          bodyEl.innerHTML = `<p style="color:#f87171">Admin access error: ${(d && d.error) || ('HTTP ' + res.status)}</p>`;
+          return;
+        }
+        const tr = d.traffic || {}, us = d.users_summary || {}, users = d.users || [];
+        const escH = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const fmtDt = iso => {
+          if (!iso) return '—';
+          const dt = new Date(iso);
+          return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: '2-digit' });
+        };
+        const mobCnt = (tr.devices && tr.devices.mobile) || 0;
+        const dskCnt = (tr.devices && tr.devices.desktop) || 0;
+        const devTot = mobCnt + dskCnt;
+        const mobPct = devTot > 0 ? Math.round((mobCnt / devTot) * 100) : 0;
+
+        const kpiHtml = `<div class="sweat-strip" style="margin-bottom:14px">
+          <div class="sweat-box"><div class="sweat-lbl">Signed-Up Users</div><div class="sweat-val">${us.configured ? us.total_users : 'Setup'}</div><div style="font-size:11px;color:#4ade80;font-weight:700">${us.configured ? `+${us.new_7d} last 7d` : 'Add service key'}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Saved Cards (All)</div><div class="sweat-val">${us.configured ? us.total_cards : '—'}</div><div style="font-size:11px;color:#94a3b8;font-weight:700">${us.configured ? `${us.active_cards} active · ${us.settled_cards} settled` : ''}</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Today Traffic</div><div class="sweat-val" style="color:#38bdf8">${tr.today_visitors || 0} <span style="font-size:14px;color:#94a3b8">visitors</span></div><div style="font-size:11px;color:#94a3b8;font-weight:700">${tr.today_views || 0} views · ${mobPct}% mobile</div></div>
+          <div class="sweat-box"><div class="sweat-lbl">Slip Scans</div><div class="sweat-val" style="color:#4ade80">${tr.scans_total || 0}</div><div style="font-size:11px;color:#94a3b8;font-weight:700">${tr.scans_vision_ok || 0} via Vision AI</div></div>
+        </div>`;
+
+        const scanRows = (tr.scans_by_book || []).length
+          ? tr.scans_by_book.map(([bk, cnt]) => {
+              const pct = tr.scans_total > 0 ? Math.round((cnt / tr.scans_total) * 100) : 0;
+              return `<div class="an-row"><div class="an-row-top"><span><span class="book-badge ${bookClass(bk)}">${bk}</span></span><span>${cnt} (${pct}%)</span></div><div class="an-bar-track"><div class="an-bar-fill" style="width:${pct}%;background:#38bdf8"></div></div></div>`;
+            }).join('')
+          : '<p style="color:var(--muted);margin:0;font-size:12.5px">No slip scans recorded since last server restart.</p>';
+
+        const refRows = (tr.referrers || []).length
+          ? tr.referrers.map(([ref, cnt]) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(56,189,248,0.1);font-size:12.5px"><span style="color:#e2e8f0;font-weight:700">${escH(ref)}</span><span style="color:#38bdf8;font-weight:800">${cnt}</span></div>`).join('')
+          : '<p style="color:var(--muted);margin:0;font-size:12.5px">No visits recorded yet.</p>';
+
+        const daysRows = (tr.days || []).length
+          ? `<table class="box-tbl" style="margin-bottom:0"><tr><th>Date (UTC)</th><th>Visitors</th><th>Page Views</th></tr>` +
+            tr.days.map(dy => `<tr><td>${dy.date}</td><td>${dy.visitors}</td><td>${dy.views}</td></tr>`).join('') + `</table>`
+          : '<p style="color:var(--muted);margin:0;font-size:12.5px">No daily traffic yet.</p>';
+
+        let usersSection = '';
+        if (!us.configured) {
+          usersSection = `<div class="an-card" style="margin-top:14px;border-color:rgba(250,204,21,0.4)">
+            <h3 style="color:#facc15">Connect Signed-Up Users Table (1-Time Setup)</h3>
+            <p style="margin:0;font-size:12.5px;color:#cbd5e1;line-height:1.5">To list all signed-up users and their card counts here, copy your <strong>service_role</strong> key from <em>Supabase → Project Settings → API</em> and add it as <code>SUPABASE_SERVICE_ROLE_KEY</code> in your Railway Variables.</p>
+          </div>`;
+        } else if (us.err) {
+          usersSection = `<div class="an-card" style="margin-top:14px"><h3 style="color:#f87171">Signed-Up Users Error</h3><p style="margin:0;color:#f87171">${us.err}</p></div>`;
+        } else {
+          const uRows = users.map(u => {
+            const bks = (u.books || []).map(b => `<span class="book-badge ${bookClass(b)}" style="font-size:9.5px;padding:1px 5px;margin-right:3px">${b}</span>`).join('') || '<span style="color:#64748b">—</span>';
+            return `<tr>
+              <td style="font-weight:700;color:#f8fafc">${escH(u.email)}</td>
+              <td>${fmtDt(u.created_at)}</td>
+              <td>${fmtDt(u.last_sign_in_at)}</td>
+              <td style="font-weight:800;color:#38bdf8">${u.cards_total} <span style="color:#94a3b8;font-weight:600">(${u.cards_active}/${u.cards_settled})</span></td>
+              <td style="text-align:left">${bks}</td>
+            </tr>`;
+          }).join('');
+          usersSection = `<div class="an-card" style="margin-top:14px">
+            <h3>Signed-Up Users (${users.length})</h3>
+            <div style="overflow-x:auto"><table class="box-tbl" style="margin-bottom:0">
+              <tr><th>Email</th><th>Signed Up</th><th>Last Active</th><th>Cards (Act/Set)</th><th style="text-align:left">Platforms</th></tr>
+              ${uRows || '<tr><td colspan="5" style="text-align:center;color:var(--muted)">No users yet.</td></tr>'}
+            </table></div>
+          </div>`;
+        }
+
+        const fbList = tr.recent_feedback || [];
+        const fbSection = fbList.length ? `<div class="an-card" style="margin-top:14px">
+          <h3>Recent Feedback (${fbList.length})</h3>
+          ${fbList.map(f => `<div style="padding:8px 10px;border-radius:9px;background:rgba(15,23,42,0.85);border:1px solid rgba(56,189,248,0.16);margin-bottom:8px">
+            <div style="display:flex;justify-content:space-between;font-size:11.5px;color:#94a3b8;margin-bottom:4px">
+              <strong style="color:#38bdf8">${escH(f.topic)} • ${escH(f.email)}</strong><span>${fmtDt(f.ts)}</span>
+            </div>
+            <div style="font-size:12.5px;color:#e2e8f0;white-space:pre-wrap">${escH(f.message)}</div>
+          </div>`).join('')}
+        </div>` : '';
+
+        bodyEl.innerHTML = kpiHtml + `<div class="an-grid" style="margin-top:0">
+          <div class="an-card"><h3>Slip Scans by Platform</h3>${scanRows}</div>
+          <div class="an-card"><h3>Traffic Sources &amp; Devices</h3><div style="font-size:12px;color:#94a3b8;margin-bottom:8px">Mobile: <strong style="color:#f8fafc">${mobCnt}</strong> • Desktop: <strong style="color:#f8fafc">${dskCnt}</strong></div>${refRows}</div>
+          <div class="an-card"><h3>Daily Traffic (Since Restart)</h3>${daysRows}</div>
+        </div>` + usersSection + fbSection;
+      } catch (e) {
+        bodyEl.innerHTML = `<p style="color:#f87171">Could not load admin dashboard: ${e.message}</p>`;
+      }
+    }
     function copySupportEmail() {
       const addr = 'info@omnistatpro.com';
       if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -3929,6 +4047,8 @@
     async function syncCloudCards(user) {
       currentUser = user;
       const btn = document.getElementById('auth-btn');
+      const admBtn = document.getElementById('admin-dash-btn');
+      if (admBtn) admBtn.style.display = isAdminUser() ? 'inline-block' : 'none';
       if (!user) {
         if (btn) btn.textContent = 'Sign In / Sign Up';
         document.getElementById('auth-logged-out').style.display = 'block';

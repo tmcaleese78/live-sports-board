@@ -3,8 +3,11 @@ import re
 import gzip
 import json
 import time
+import hashlib
 import smtplib
 import threading
+from datetime import datetime, timezone
+from urllib.parse import urlparse
 from email.message import EmailMessage
 from concurrent.futures import ThreadPoolExecutor
 import requests
@@ -22,6 +25,61 @@ _PLAYER_CACHE = {}
 _SEASON_CACHE = {}
 _PROJ_CACHE = {}
 WEB_HOST = "site.web." + "api." + "espn." + "com"
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "https://decjgnolcxnndpicztun.supabase.co").strip().rstrip("/")
+SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "sb_publishable_3c6v1nK9dALLIork-YqBWg_hK7Vi_jh").strip()
+
+_ANALYTICS_LOCK = threading.Lock()
+_ANALYTICS = {
+    "started_at": datetime.now(timezone.utc).isoformat(),
+    "days": {},
+    "referrers": {},
+    "devices": {"mobile": 0, "desktop": 0},
+    "scans_total": 0,
+    "scans_vision_ok": 0,
+    "scans_by_book": {},
+    "recent_feedback": []
+}
+
+
+def _today_utc():
+    return datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+
+def _record_page_visit():
+    ua = str(request.headers.get("User-Agent") or "")
+    if re.search(r"bot|crawler|spider|uptimerobot|pingdom|curl|python-requests|health", ua, re.I):
+        return
+    day = _today_utc()
+    ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "").split(",")[0].strip()
+    vid = hashlib.sha256(f"{day}|{ip}|{ua}".encode("utf-8", "ignore")).hexdigest()[:12]
+    is_mobile = bool(re.search(r"mobile|iphone|ipad|android", ua, re.I))
+    ref_raw = str(request.headers.get("Referer") or "").strip()
+    ref_host = "Direct"
+    if ref_raw:
+        try:
+            h = (urlparse(ref_raw).hostname or "").lower().lstrip("www.")
+            if h and "omnistatpro" not in h:
+                ref_host = h
+        except Exception:
+            pass
+    with _ANALYTICS_LOCK:
+        d = _ANALYTICS["days"].setdefault(day, {"views": 0, "visitors": set()})
+        d["views"] += 1
+        d["visitors"].add(vid)
+        if len(_ANALYTICS["days"]) > 35:
+            for old_k in sorted(_ANALYTICS["days"].keys())[:-35]:
+                _ANALYTICS["days"].pop(old_k, None)
+        _ANALYTICS["devices"]["mobile" if is_mobile else "desktop"] += 1
+        _ANALYTICS["referrers"][ref_host] = _ANALYTICS["referrers"].get(ref_host, 0) + 1
+
+
+def _record_slip_scan(book, vision_ok):
+    bk = str(book or "Other").strip() or "Other"
+    with _ANALYTICS_LOCK:
+        _ANALYTICS["scans_total"] += 1
+        if vision_ok:
+            _ANALYTICS["scans_vision_ok"] += 1
+        _ANALYTICS["scans_by_book"][bk] = _ANALYTICS["scans_by_book"].get(bk, 0) + 1
 
 def _to_num(val):
     first_part = next(iter(str(val).split("/")), "")
@@ -626,6 +684,7 @@ threading.Thread(target=get_live_payload, kwargs={"fast": False}, daemon=True).s
 
 @app.route("/")
 def index():
+    _record_page_visit()
     return render_template("index.html")
 
 @app.route("/ping")
@@ -655,6 +714,14 @@ def api_feedback():
     subject = f"[OmniStatPro] {topic}"
     full_body = f"Topic: {topic}\nFrom: {sender or 'Anonymous Visitor'}\n\nMessage:\n{message}\n"
     print(f"[FEEDBACK] {subject} | from={sender or 'anon'} | {message[:300]}", flush=True)
+    with _ANALYTICS_LOCK:
+        _ANALYTICS["recent_feedback"].insert(0, {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "topic": topic,
+            "email": sender or "Anonymous",
+            "message": message[:500]
+        })
+        _ANALYTICS["recent_feedback"] = _ANALYTICS["recent_feedback"][:25]
 
     # 1. Resend HTTP API (if RESEND_API_KEY is configured in Railway)
     resend_key = os.environ.get("RESEND_API_KEY", "").strip()
@@ -703,6 +770,109 @@ def api_feedback():
             print(f"[FEEDBACK] SMTP error: {exc}", flush=True)
 
     return jsonify({"ok": True, "sent": False, "mailto_fallback": True, "to": to_email})
+
+
+@app.route("/api/admin/overview")
+def api_admin_overview():
+    auth_hdr = str(request.headers.get("Authorization") or "").strip()
+    if not auth_hdr.lower().startswith("bearer "):
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+    token = auth_hdr.split(" ", 1)[1].strip()
+    if not token:
+        return jsonify({"ok": False, "error": "Unauthorized"}), 401
+
+    # Verify the caller's Supabase JWT server-side
+    try:
+        u_resp = requests.get(
+            f"{SUPABASE_URL}/auth/v1/user",
+            headers={"Authorization": f"Bearer {token}", "apikey": SUPABASE_ANON_KEY},
+            timeout=8,
+        )
+        if not u_resp.ok:
+            return jsonify({"ok": False, "error": "Invalid session"}), 401
+        u_data = u_resp.json()
+        caller_email = str(u_data.get("email") or "").strip().lower()
+    except Exception as exc:
+        return jsonify({"ok": False, "error": f"Auth verification failed: {exc}"}), 401
+
+    allowed_extra = {e.strip().lower() for e in os.environ.get("ADMIN_EMAILS", "").split(",") if e.strip()}
+    if not (caller_email.endswith("@omnistatpro.com") or caller_email in allowed_extra):
+        return jsonify({"ok": False, "error": "Forbidden"}), 403
+
+    # Build traffic & scan snapshot
+    today = _today_utc()
+    with _ANALYTICS_LOCK:
+        days_list = [
+            {"date": k, "views": v["views"], "visitors": len(v["visitors"])}
+            for k, v in sorted(_ANALYTICS["days"].items(), reverse=True)
+        ]
+        today_stats = _ANALYTICS["days"].get(today, {"views": 0, "visitors": set()})
+        traffic = {
+            "started_at": _ANALYTICS["started_at"],
+            "today_views": today_stats["views"],
+            "today_visitors": len(today_stats["visitors"]),
+            "total_views": sum(d["views"] for d in days_list),
+            "days": days_list[:14],
+            "devices": dict(_ANALYTICS["devices"]),
+            "referrers": sorted(_ANALYTICS["referrers"].items(), key=lambda x: x[1], reverse=True)[:8],
+            "scans_total": _ANALYTICS["scans_total"],
+            "scans_vision_ok": _ANALYTICS["scans_vision_ok"],
+            "scans_by_book": sorted(_ANALYTICS["scans_by_book"].items(), key=lambda x: x[1], reverse=True),
+            "recent_feedback": list(_ANALYTICS["recent_feedback"]),
+        }
+
+    # Fetch signed-up users & saved card counts using SUPABASE_SERVICE_ROLE_KEY
+    svc_key = os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "").strip()
+    users_out = []
+    users_summary = {"configured": bool(svc_key), "total_users": 0, "new_7d": 0, "total_cards": 0, "active_cards": 0, "settled_cards": 0, "err": ""}
+    if svc_key:
+        try:
+            svc_hdrs = {"Authorization": f"Bearer {svc_key}", "apikey": svc_key}
+            ur = requests.get(f"{SUPABASE_URL}/auth/v1/admin/users?page=1&per_page=200", headers=svc_hdrs, timeout=10)
+            cr = requests.get(f"{SUPABASE_URL}/rest/v1/user_cards?select=user_id,cards_json,updated_at", headers=svc_hdrs, timeout=10)
+            cards_by_uid = {}
+            if cr.ok:
+                for row in (cr.json() or []):
+                    uid = str(row.get("user_id") or "")
+                    clist = row.get("cards_json") if isinstance(row.get("cards_json"), list) else []
+                    cards_by_uid[uid] = {"cards": clist, "updated_at": row.get("updated_at") or ""}
+            if ur.ok:
+                raw_users = (ur.json() or {}).get("users") or []
+                now_ts = time.time()
+                for u in raw_users:
+                    uid = str(u.get("id") or "")
+                    cinfo = cards_by_uid.get(uid, {"cards": [], "updated_at": ""})
+                    clist = cinfo["cards"]
+                    settled_cnt = sum(1 for c in clist if isinstance(c, dict) and (c.get("settled") or c.get("archived")))
+                    active_cnt = max(0, len(clist) - settled_cnt)
+                    books = sorted({str(c.get("book") or "Other").strip() for c in clist if isinstance(c, dict)})
+                    created_str = str(u.get("created_at") or "")
+                    try:
+                        c_dt = datetime.fromisoformat(created_str.replace("Z", "+00:00"))
+                        if (now_ts - c_dt.timestamp()) <= 7 * 86400:
+                            users_summary["new_7d"] += 1
+                    except Exception:
+                        pass
+                    users_summary["total_cards"] += len(clist)
+                    users_summary["active_cards"] += active_cnt
+                    users_summary["settled_cards"] += settled_cnt
+                    users_out.append({
+                        "email": u.get("email") or "",
+                        "created_at": created_str,
+                        "last_sign_in_at": u.get("last_sign_in_at") or "",
+                        "cards_total": len(clist),
+                        "cards_active": active_cnt,
+                        "cards_settled": settled_cnt,
+                        "books": books,
+                    })
+                users_out.sort(key=lambda x: x["created_at"], reverse=True)
+                users_summary["total_users"] = len(users_out)
+            else:
+                users_summary["err"] = f"Supabase Admin API HTTP {ur.status_code}"
+        except Exception as exc:
+            users_summary["err"] = str(exc)
+
+    return jsonify({"ok": True, "admin": caller_email, "traffic": traffic, "users_summary": users_summary, "users": users_out})
 
 _VALID_STATS = {
     "PASS YDS", "PASS TD", "PASS ATT", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",
@@ -989,6 +1159,7 @@ def api_parse_slip():
                 break
 
         if not raw_res or "error" in raw_res:
+            _record_slip_scan(book, False)
             return jsonify({"ok": False, "fallback": True, "error": last_err}), 200
         cands = raw_res.get("candidates") or []
         res_parts = (cands[0].get("content") or {}).get("parts") or [] if cands else []
@@ -996,6 +1167,7 @@ def api_parse_slip():
         txt = re.sub(r"^```(?:json)?\s*|\s*```$", "", txt.strip(), flags=re.I)
         parsed = json.loads(txt)
         cleaned = _normalize_parsed_slip(parsed)
+        _record_slip_scan(book, True)
         return jsonify({
             "ok": True,
             "source": "vision",
@@ -1005,5 +1177,6 @@ def api_parse_slip():
             "legs": cleaned["legs"]
         })
     except Exception as e:
+        _record_slip_scan(book, False)
         return jsonify({"ok": False, "fallback": True, "error": str(e)}), 200
 
