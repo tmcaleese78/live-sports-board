@@ -327,7 +327,9 @@
     #p-table tr.p-row td.p-name-td { text-align: left; font-weight: 800; white-space: nowrap; }
     #p-table tr.p-row td.p-sub-td { color: #94a3b8; font-weight: 600; font-size: 12.5px; }
     .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img {
-      filter: drop-shadow(0 0 1.4px rgba(255, 255, 255, 0.92)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
+      filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff)
+        drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)
+        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
     }
     .builder {
       max-width: 700px; background: var(--surface); border: 1px solid var(--border);
@@ -423,11 +425,10 @@
       .card:hover, .sb-card:hover { transform: none; }
       .card-banner { position: static; font-size: 13px; padding: 8px 0; }
       .hdr-row { position: static; font-size: 10px; letter-spacing: 0.4px; padding: 6px 4px; }
-      .hdr-row, .p-main { grid-template-columns: 34px minmax(0, 1.55fr) minmax(0, 1.05fr) 42px 50px; }
+      .hdr-row, .p-main { grid-template-columns: 40px minmax(0, 1.55fr) minmax(0, 1.05fr) 42px 50px; }
       .p-main { font-size: 12.5px; min-height: 44px; padding: 5px 4px; }
       .p-main > div:nth-child(2) { padding-left: 4px; word-break: break-word; }
       .p-main .logo-cell { padding: 2px; }
-      .p-main .logo-cell img { width: 24px; height: 24px; }
       .sweat-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
       .sweat-box { padding: 9px 10px; border-radius: 10px; }
       .sweat-lbl { font-size: 10px; }
