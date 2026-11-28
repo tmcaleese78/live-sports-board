@@ -1132,7 +1132,8 @@
       const catPills = document.getElementById('p-cat-pills');
       if (catPills) catPills.style.display = curPlg === 'NFL' ? 'flex' : 'none';
 
-      const hasAnyStat = p => Boolean(p && p.stats && Object.values(p.stats).some(v => Number(v) !== 0));
+      const statVal = (p, k) => Number(p && p.stats && p.stats[k]) || 0;
+      const hasAnyStat = p => Boolean(p && p.stats && Object.values(p.stats).some(v => (Number(v) || 0) !== 0));
       const allActive = ((liveData.players && liveData.players[curPlg]) || []).filter(hasAnyStat);
 
       const catStatKeys = {
@@ -1141,7 +1142,7 @@
         REC: ['REC', 'REC YDS', 'REC TGTS', 'REC TD']
       };
       const catFiltered = (curPlg === 'NFL' && curPcat !== 'ALL' && catStatKeys[curPcat])
-        ? allActive.filter(p => catStatKeys[curPcat].some(k => Number(p.stats && p.stats[k]) !== 0))
+        ? allActive.filter(p => catStatKeys[curPcat].some(k => statVal(p, k) !== 0))
         : allActive;
 
       const tSel = document.getElementById('p-team-filter');
@@ -1174,7 +1175,7 @@
       }
 
       if (!q) {
-        list = list.filter(p => Number(p.stats && p.stats[sortCol]) !== 0);
+        list = list.filter(p => statVal(p, sortCol) !== 0);
       }
       list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
       const topList = list.slice(0, 120);
@@ -1204,11 +1205,10 @@
               const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
               const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
               const statPills = mobileOrder
-                .filter(k => k === sortCol || Number(p.stats && p.stats[k]) !== 0)
+                .filter(k => statVal(p, k) !== 0)
                 .sort((a, b) => (a === sortCol ? -1 : (b === sortCol ? 1 : 0)))
                 .map(k => {
-                  const val = (p.stats && p.stats[k]) ?? 0;
-                  if (val === 0 && k === sortCol && mobileOrder.some(ok => Number(p.stats && p.stats[ok]) !== 0)) return '';
+                  const val = statVal(p, k);
                   return `<span class="p-mstat ${k === sortCol ? 'hi' : ''}"><span class="p-mstat-v">${val}</span><span class="p-mstat-k">${k}</span></span>`;
                 }).join('');
               return `<div class="p-mcard" style="--tm-clr:${bg}">
