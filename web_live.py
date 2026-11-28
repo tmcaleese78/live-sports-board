@@ -6,7 +6,7 @@ import time
 import threading
 from concurrent.futures import ThreadPoolExecutor
 import requests
-from flask import Flask, jsonify, redirect, render_template, request
+from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
 
 app = Flask(__name__)
 app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 604800
@@ -629,6 +629,16 @@ def index():
 @app.route("/ping")
 def ping():
     return "ok", 200
+
+@app.route("/manifest.json")
+def pwa_manifest():
+    return send_from_directory(os.path.join(app.root_path, "static"), "manifest.json", mimetype="application/manifest+json")
+
+@app.route("/sw.js")
+def pwa_sw():
+    resp = send_from_directory(os.path.join(app.root_path, "static"), "sw.js", mimetype="application/javascript")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 _VALID_STATS = {
     "PASS YDS", "PASS TD", "PASS ATT", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",

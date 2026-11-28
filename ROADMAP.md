@@ -30,6 +30,11 @@
 	• Home-screen Upload Bet Slip shortcut + Builder Upload Screenshot button with dark-mode Sportsbook Picker modal (FanDuel, DraftKings, PrizePicks, Underdog, Kalshi).
 	• Inline target editing, 1-tap O / U toggle, leg reordering, shareable live links (?sweat=...), audio hit chimes, and full stat parity across Builder & Live Stats.
 	• Permanent Settled History: finished cards lock in final status + frozen leg snapshots across NFL week resets, grouped by date (newest first) with today's cards expanded by default and older days collapsed into pick dropdowns.
+	• Live Command Center Differentiators:
+		• Cross-Book Rooting Guide: aggregates all active slips by Game (sorted by dollars riding on each game) and by Player/Pick (showing every target across FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi on one card).
+		• Live Pace Projections & "1 Leg Away" Sweat Alerts: projects final stats from live ESPN game clocks (Pace badges) and highlights multi-leg cards that are 1 leg away from cashing.
+		• Personal Performance Analytics: cumulative P&L SVG curve, ROI by platform, individual leg hit rates by stat type, Over/Under splits, and slip-size breakdowns.
+		• Installable PWA: manifest.json + network-first service worker (sw.js) + 1-tap Install App prompt for native iOS/Android home-screen launch.
 	• Mobile Portrait UX & Performance: 4-column single-row mobile nav bar (Cards, + Build, Scores, Stats), 57 KB Retina logo, O(1) player index, visibility-aware smart polling, and compact mobile Live Stats cards with category pills & Sort By dropdown (showing only players with accrued stats in the active column).
 • Hybrid Screenshot Slip Importer (web_live.py + templates/index.html):
 	• Primary parser: /api/parse-slip (gemini-3.5-flash-lite Vision AI with compact JPEG uploads, book-specific prompts, and model failover) extracting cost, payout, and structured legs (prop, spread, ml, total).

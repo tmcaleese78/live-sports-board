@@ -4,7 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="theme-color" content="#02050c">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OmniStatPro">
   <title>OmniStatPro — All Your Bets. Every Sportsbook. One Live Screen</title>
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="apple-touch-icon" href="/static/favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -326,7 +330,7 @@
     }
     #p-table tr.p-row td.p-name-td { text-align: left; font-weight: 800; white-space: nowrap; }
     #p-table tr.p-row td.p-sub-td { color: #94a3b8; font-weight: 600; font-size: 12.5px; }
-    .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img, .p-mcard-logo img {
+    .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img, .p-mcard-logo img, .rg-logo img {
       filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff)
         drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)
         drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
@@ -447,6 +451,63 @@
     .p-mstat-v { font-size: 13.5px; font-weight: 900; color: #f8fafc; }
     .p-mstat.hi .p-mstat-v { color: #38bdf8; }
     .p-mstat-k { font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.03em; }
+    .card.one-away { border: 2px solid #f59e0b; box-shadow: 0 0 24px rgba(245, 158, 11, 0.28); }
+    .one-away-tag {
+      margin-left: 4px; padding: 1px 7px; border-radius: 5px; font-size: 10px; font-weight: 900;
+      background: rgba(245, 158, 11, 0.22); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.55);
+      letter-spacing: 0.03em; white-space: nowrap;
+    }
+    .pace-tag {
+      display: inline-block; margin-left: 5px; padding: 0px 5px; border-radius: 4px;
+      font-size: 9.5px; font-weight: 800; letter-spacing: 0.02em;
+    }
+    .pace-good { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+    .pace-warn { background: rgba(250, 204, 21, 0.16); color: #facc15; border: 1px solid rgba(250, 204, 21, 0.35); }
+    .pace-bad { background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .rg-games { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); margin-bottom: 18px; }
+    .rg-game-card {
+      background: var(--surface); border: 1px solid rgba(56, 189, 248, 0.24); border-radius: 13px;
+      padding: 11px 13px; cursor: pointer; transition: border-color 0.15s ease;
+    }
+    .rg-game-card:hover { border-color: #38bdf8; }
+    .rg-game-card.is-live { border-color: #22c55e; }
+    .rg-list { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); }
+    .rg-card {
+      border-radius: 14px; border: 1px solid rgba(56, 189, 248, 0.2);
+      border-left: 5px solid var(--tm-clr, #38bdf8);
+      background: linear-gradient(90deg, color-mix(in srgb, var(--tm-clr, #1e293b) 38%, #070d1a) 0%, rgba(11, 18, 34, 0.96) 55%, rgba(7, 13, 26, 0.98) 100%);
+      padding: 11px 12px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.48);
+    }
+    .rg-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; }
+    .rg-id { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .rg-logo { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .rg-logo img { width: 28px; height: 28px; object-fit: contain; display: block; }
+    .rg-riding { text-align: right; flex-shrink: 0; }
+    .rg-targets { display: flex; flex-direction: column; gap: 6px; }
+    .rg-leg-row {
+      background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 9px; padding: 7px 9px;
+    }
+    .rg-leg-row.hit { border-color: rgba(34, 197, 94, 0.55); background: rgba(22, 163, 74, 0.16); }
+    .rg-leg-row.miss { border-color: rgba(239, 68, 68, 0.5); background: rgba(220, 38, 38, 0.14); }
+    .an-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); margin-top: 12px; }
+    .an-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; box-shadow: var(--shadow);
+    }
+    .an-card h3 {
+      margin: 0 0 11px; font-family: 'Barlow Condensed', sans-serif; font-size: 16.5px;
+      letter-spacing: 0.06em; text-transform: uppercase; color: #e2e8f0;
+    }
+    .an-row { margin-bottom: 10px; }
+    .an-row:last-child { margin-bottom: 0; }
+    .an-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; margin-bottom: 4px; }
+    .an-bar-track { height: 7px; width: 100%; border-radius: 999px; background: rgba(148, 163, 184, 0.16); overflow: hidden; }
+    .an-bar-fill { height: 100%; border-radius: 999px; transition: width 0.35s ease; }
+    .an-chart-wrap {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+    }
     button { touch-action: manipulation; }
 
     /* ==========================================================================
@@ -527,6 +588,7 @@
         <img class="brand-logo logo-dark" src="/static/logo-dark-opt.jpg?v=3" alt="OmniStatPro" width="880" height="293" decoding="async" fetchpriority="high">
       </div>
       <div style="display:flex;gap:8px;align-items:center">
+        <button class="pill" id="install-app-btn" onclick="triggerInstallApp()" style="display:none;border-color:rgba(74,222,128,0.5);color:#4ade80">📲 Install App</button>
         <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
       </div>
     </div>
@@ -1237,20 +1299,43 @@
       }
     }
 
+    function calcGameProgress(sport, statusTxt) {
+      const s = String(statusTxt || '').trim();
+      if (!s) return 0;
+      const sp = String(sport || 'NFL').toUpperCase();
+      const qLen = sp === 'NBA' ? 12 : 15;
+      const total = qLen * 4;
+      if (/halftime|^half\b/i.test(s)) return 0.5;
+      if (/end\s+of\s+1st/i.test(s)) return 0.25;
+      if (/end\s+of\s+2nd/i.test(s)) return 0.50;
+      if (/end\s+of\s+3rd/i.test(s)) return 0.75;
+      if (/\bot\b/i.test(s)) return 1.0;
+      const m = s.match(/(\d{1,2}):(\d{2})\s*[-–]?\s*(\d)(?:st|nd|rd|th)/i)
+             || s.match(/(\d)(?:st|nd|rd|th)\s*[-–]?\s*(\d{1,2}):(\d{2})/i);
+      if (!m) return 0;
+      let mins, secs, q;
+      if (/^\d{1,2}:\d{2}/.test(m[0])) { mins = parseInt(m[1], 10); secs = parseInt(m[2], 10); q = parseInt(m[3], 10); }
+      else { q = parseInt(m[1], 10); mins = parseInt(m[2], 10); secs = parseInt(m[3], 10); }
+      if (q < 1 || q > 4) return 1.0;
+      const rem = mins + secs / 60;
+      const elapsed = ((q - 1) * qLen) + Math.max(0, qLen - rem);
+      return Math.max(0, Math.min(1, elapsed / total));
+    }
+
     function evalLeg(leg) {
-      if (!leg) return { name: 'Unknown Pick', stat: '—', gained: '0', needed: '—', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: 'NFL', clickType: 'player', clickKey: '' };
+      if (!leg) return { name: 'Unknown Pick', stat: '—', gained: '0', needed: '—', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: 'NFL', clickType: 'player', clickKey: '', paceTxt: '', paceCls: '', gameId: '', gameTitle: '' };
       const games = (liveData.games && liveData.games[leg.sport]) || [];
 
       if (leg.type === 'ml' || leg.type === 'spread') {
         const g = games.find(x => x.away === leg.team || x.home === leg.team || x.away_full === leg.team || x.home_full === leg.team);
         const sp = Number(leg.spread) || 0, lbl = leg.type === 'spread' ? `${sp > 0 ? '+' + sp : sp} Spread` : 'Win Game';
-        if (!g) return { name: leg.team || 'Team', stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.team || '' };
+        if (!g) return { name: leg.team || 'Team', stat: lbl, gained: '—', needed: 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.team || '', paceTxt: '', paceCls: '', gameId: '', gameTitle: '' };
         const isAway = (g.away === leg.team || g.away_full === leg.team);
         const myS = Number(isAway ? g.ascore : g.hscore) || 0, oppS = Number(isAway ? g.hscore : g.ascore) || 0;
         const margin = Math.round(((myS - oppS) + (leg.type === 'spread' ? sp : 0)) * 10) / 10;
         const hit = g.state === 'post' && margin > 0, miss = g.state === 'post' && margin <= 0;
         const needTxt = hit ? 'HIT' : (miss ? 'MISS' : (margin > 0 ? `+${margin}` : String(margin)));
-        return { name: leg.team, stat: lbl, gained: g.state === 'pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.team };
+        return { name: leg.team, stat: lbl, gained: g.state === 'pre' ? 'Sched' : `${myS}-${oppS}`, needed: needTxt, hit, miss, pct: hit ? 100 : (margin > 0 ? 75 : 25), bg: isAway ? g.bg0 : g.bg1, logo: isAway ? g.lg0 : g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.team, paceTxt: '', paceCls: '', gameId: g.id || '', gameTitle: `${g.away_full || g.away} @ ${g.home_full || g.home}`, gameObj: g };
       }
 
       if (leg.type === 'total' || (leg.game && !leg.player)) {
@@ -1259,15 +1344,26 @@
         const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const targetGame = norm(leg.game);
         const g = games.find(x => norm(`${x.away} @ ${x.home}`) === targetGame || norm(`${x.away_full} @ ${x.home_full}`) === targetGame || (targetGame && targetGame.includes(norm(x.away_full || x.away)) && targetGame.includes(norm(x.home_full || x.home))));
-        if (!g || line <= 0) return { name: leg.game || 'Game Total', stat: totLbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game || '' };
-        if (g.state === 'pre') return { name: leg.game, stat: totLbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game };
+        if (!g || line <= 0) return { name: leg.game || 'Game Total', stat: totLbl, gained: '—', needed: line <= 0 ? 'Re-add' : 'Sched', hit: false, miss: false, pct: 0, bg: '#1e293b', logo: '', statusTxt: '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game || '', paceTxt: '', paceCls: '', gameId: '', gameTitle: '' };
+        const gTitle = `${g.away_full || g.away} @ ${g.home_full || g.home}`;
+        if (g.state === 'pre') return { name: leg.game, stat: totLbl, gained: 'Sched', needed: ou === 'Under' ? `${line} left` : String(line), hit: false, miss: false, pct: 0, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: false, sport: leg.sport, clickType: 'game', clickKey: leg.game, paceTxt: '', paceCls: '', gameId: g.id || '', gameTitle: gTitle, gameObj: g };
         const comb = (Number(g.ascore) || 0) + (Number(g.hscore) || 0), isUnder = ou === 'Under';
         const diff = Math.round((isUnder ? (line - comb) : (comb - line)) * 10) / 10;
         const hit = isUnder ? (g.state === 'post' && comb < line) : (comb > line);
         const miss = isUnder ? (Number.isInteger(line) ? comb > line : comb >= line) : (g.state === 'post' && comb <= line);
         const pct = (hit || miss) ? 100 : Math.max(0, Math.min(100, (comb / line) * 100));
         const totNeed = hit ? 'HIT' : (miss ? 'MISS' : (isUnder ? `${diff} left` : (diff > 0 ? `+${diff}` : String(Math.abs(diff)))));
-        return { name: leg.game, stat: totLbl, gained: String(comb), needed: totNeed, hit, miss, pct, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.game };
+        let paceTxt = '', paceCls = '';
+        if (g.state === 'in' && !hit && !miss) {
+          const frac = calcGameProgress(leg.sport, g.status);
+          if (frac >= 0.14 && frac < 0.96) {
+            const proj = Math.round(comb / frac);
+            const good = isUnder ? (proj < line) : (proj >= line);
+            paceTxt = `Pace ${proj}`;
+            paceCls = good ? 'pace-good' : (isUnder ? 'pace-bad' : 'pace-warn');
+          }
+        }
+        return { name: leg.game, stat: totLbl, gained: String(comb), needed: totNeed, hit, miss, pct, bg: g.bg1, logo: g.lg1, statusTxt: g.status || '', isLive: g.state === 'in', sport: leg.sport, clickType: 'game', clickKey: leg.game, paceTxt, paceCls, gameId: g.id || '', gameTitle: gTitle, gameObj: g };
       }
 
       const targetName = String(leg.player || '').trim().toLowerCase();
@@ -1281,8 +1377,24 @@
       const pGame = effGames.find(x => x.away === (p && p.team) || x.home === (p && p.team));
       const pStatus = (p && p.status) || (pGame && pGame.status) || '';
       const pIsLive = Boolean((p && p.state === 'in') || (pGame && pGame.state === 'in'));
+      const gId = (pGame && pGame.id) || '';
+      const gTitle = pGame ? `${pGame.away_full || pGame.away} @ ${pGame.home_full || pGame.home}` : '';
       const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
       const isUnder = leg.ou === 'Under', propLbl = `${isUnder ? 'U' : 'O'} ${tgt} ${leg.stat || ''}`.trim();
+
+      const buildPace = (hitFlag, missFlag) => {
+        if (!pIsLive || hitFlag || missFlag || tgt <= 0 || leg.stat === 'TD') return { paceTxt: '', paceCls: '' };
+        const frac = calcGameProgress(effSport, pStatus);
+        if (frac < 0.14 || frac >= 0.96) return { paceTxt: '', paceCls: '' };
+        if (cur === 0 && frac < 0.35) return { paceTxt: '', paceCls: '' };
+        const rawProj = cur / frac;
+        const proj = tgt < 10 ? (Math.round(rawProj * 10) / 10) : Math.round(rawProj);
+        const good = isUnder ? (proj < tgt) : (proj >= tgt);
+        return {
+          paceTxt: `Pace ${proj}`,
+          paceCls: good ? 'pace-good' : (isUnder ? 'pace-bad' : 'pace-warn')
+        };
+      };
 
       if (isUnder) {
         const cushion = Math.round((tgt - cur) * 10) / 10;
@@ -1290,13 +1402,15 @@
         const hit = !miss && tgt > 0 && Boolean(p && p.state === 'post');
         const pct = (hit || miss) ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
         const underNeed = hit ? 'HIT' : (miss ? 'MISS' : `${cushion >= 0 ? cushion + ' left' : cushion}`);
-        return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: underNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: leg.sport, clickType: 'player', clickKey: leg.player || '' };
+        const { paceTxt, paceCls } = buildPace(hit, miss);
+        return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: underNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: effSport, clickType: 'player', clickKey: leg.player || '', paceTxt, paceCls, gameId: gId, gameTitle: gTitle, gameObj: pGame, statKey: leg.stat || '', ou: 'Under' };
       }
 
       const delta = Math.round((cur - tgt) * 10) / 10, hit = cur >= tgt && tgt > 0, miss = (!hit) && p && p.state === 'post';
       const pct = hit ? 100 : (tgt > 0 ? Math.max(0, Math.min(100, (cur / tgt) * 100)) : 0);
       const overNeed = delta > 0 ? `+${delta}` : (delta === 0 ? '0' : String(Math.abs(delta)));
-      return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: overNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: leg.sport, clickType: 'player', clickKey: leg.player || '' };
+      const { paceTxt, paceCls } = buildPace(hit, miss);
+      return { name: leg.player || 'Unknown Pick', stat: propLbl, gained: String(cur), needed: overNeed, hit, miss, pct, bg: p ? p.bg : '#1e293b', logo: p ? p.logo : '', statusTxt: pStatus, isLive: pIsLive, sport: effSport, clickType: 'player', clickKey: leg.player || '', paceTxt, paceCls, gameId: gId, gameTitle: gTitle, gameObj: pGame, statKey: leg.stat || '', ou: 'Over' };
     }
     /* ========================================================================
        4. BET CARD MANAGEMENT, SAMPLE CARDS & RENDERER (renderCards)
@@ -1542,11 +1656,14 @@
 
         const renderSingleCard = (c, idx, isSampleView, isHistoryMode = false) => {
           const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
-          const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
+          const hitCntAll = evals.filter(x => x.hit).length;
+          const isOneAway = !isSettled && !anyMiss && evals.length >= 2 && hitCntAll === (evals.length - 1);
+          const st = allHit ? 'hit' : (anyMiss ? 'miss' : (isOneAway ? 'one-away' : ''));
           const isExpanded = !isHistoryMode || isHistoryCardExpanded(c, idx);
           const rows = isExpanded ? evals.map(e => {
-            const stBadge = e.statusTxt
-              ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive ? '● ' : ''}${e.statusTxt}</div>`
+            const paceHtml = e.paceTxt ? `<span class="pace-tag ${e.paceCls || 'pace-warn'}">${e.paceTxt}</span>` : '';
+            const stBadge = (e.statusTxt || paceHtml)
+              ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive && e.statusTxt ? '● ' : ''}${e.statusTxt || ''}${paceHtml}</div>`
               : '';
             const safeSport = String(e.sport || '').replace(/'/g, "\\'");
             const safeType = String(e.clickType || '').replace(/'/g, "\\'");
@@ -1573,7 +1690,7 @@
 
           const statusBadge = !isSampleView && isSettled
             ? (allHit ? `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(34,197,94,0.2);color:#4ade80">WON</span>` : (anyMiss ? `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(239,68,68,0.2);color:#f87171">LOST</span>` : `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(148,163,184,0.2);color:#cbd5e1">ARCHIVED</span>`))
-            : '';
+            : (isOneAway ? `<span class="one-away-tag">🔥 1 LEG AWAY</span>` : '');
           const shortDt = isHistoryMode ? fmtShortDate(c.settledAt || c.createdAt) : '';
           const dateTag = shortDt ? `<span class="hist-date-tag">${shortDt}</span>` : '';
 
@@ -1594,10 +1711,10 @@
             const bodyHtml = isExpanded
               ? `<div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}`
               : '';
-            return `<div class="card ${st}">${topTag}<div class="card-banner ${st}" style="cursor:pointer" onclick="toggleHistoryCard(${idx})"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>${toggleBar}${bodyHtml}</div>`;
+            return `<div class="card ${st}">${topTag}<div class="card-banner ${allHit ? 'hit' : (anyMiss ? 'miss' : '')}" style="cursor:pointer" onclick="toggleHistoryCard(${idx})"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>${toggleBar}${bodyHtml}</div>`;
           }
 
-          return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
+          return `<div class="card ${st}">${topTag}<div class="card-banner ${allHit ? 'hit' : (anyMiss ? 'miss' : '')}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
             <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
         };
        
@@ -1634,24 +1751,28 @@
         </div>` : '';
 
         const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px;align-items:center;justify-content:space-between">
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="pill ${curCardView === 'active' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('active')">Active Cards (${activeAll.length})</button>
+            <button class="pill ${curCardView === 'rooting' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('rooting')">Rooting Guide</button>
             <button class="pill ${curCardView === 'history' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
+            <button class="pill ${curCardView === 'analytics' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('analytics')">Analytics</button>
           </div>
           <button class="btn-primary" style="padding:8px 15px;font-size:13px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
         </div>`;
 
-        const stripHtml = isDemo ? '' : (curCardView === 'history'
+        const roiPct = histRisk > 0 ? Math.round(((histPaid - histRisk) / histRisk) * 1000) / 10 : 0;
+        const stripHtml = isDemo ? '' : ((curCardView === 'history' || curCardView === 'analytics')
           ? `<div class="sweat-strip"><div class="sweat-box"><div class="sweat-lbl">Settled Record</div><div class="sweat-val">${wins}W - ${losses}L (${winPct}%)</div></div>
-              <div class="sweat-box"><div class="sweat-lbl">Settled Risked</div><div class="sweat-val">${money(histRisk)}</div></div>
-              <div class="sweat-box"><div class="sweat-lbl">Total Paid Out</div><div class="sweat-val" style="color:#4ade80">${money(histPaid)}</div></div>
+              <div class="sweat-box"><div class="sweat-lbl">Overall ROI</div><div class="sweat-val" style="color:${roiPct >= 0 ? '#4ade80' : '#f87171'}">${roiPct >= 0 ? '+' : ''}${roiPct}%</div></div>
+              <div class="sweat-box"><div class="sweat-lbl">Total Risked</div><div class="sweat-val">${money(histRisk)}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Net Profit / Loss</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div></div>`
           : `<div class="sweat-strip"><div class="sweat-box"><div class="sweat-lbl">Active Slips</div><div class="sweat-val">${activeAll.length}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Active Risked</div><div class="sweat-val">${money(actRisk)}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(actPot)}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Settled Net P&L</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div></div>`);
 
-        const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
+        const showBookFilters = !isDemo && (curCardView === 'active' || curCardView === 'history') && booksPresent.length > 0;
+        const filterHtml = showBookFilters ? `<div class="row-flex" style="margin-bottom:14px">
           <button class="pill ${curBookFilter === 'ALL' ? 'active' : ''}" onclick="setBookFilter('ALL')">All Platforms (${viewPool.length})</button>` +
           booksPresent.map(b => `<button class="pill ${curBookFilter === b ? 'active' : ''}" onclick="setBookFilter('${b}')">${b} (${viewPool.filter(c => normBook(c.book) === b).length})</button>`).join('') + `</div>` : '';
 
@@ -1718,8 +1839,231 @@
           } else {
             gridWrap = `<p style="color:var(--muted)">${emptyText}</p>`;
           }
+        } else if (!isDemo && curCardView === 'rooting') {
+          const gameMap = new Map();
+          const targetMap = new Map();
+          activeAll.forEach(c => {
+            const { evals } = getCardOutcome(c);
+            const bk = normBook(c.book);
+            const pay = parseAmt(c.payout);
+            const seenGamesOnCard = new Set();
+            const seenTargetsOnCard = new Set();
+            evals.forEach(e => {
+              if (e.gameTitle) {
+                const gk = `${e.sport}:${e.gameTitle}`;
+                if (!gameMap.has(gk)) {
+                  gameMap.set(gk, { sport: e.sport, title: e.gameTitle, gameId: e.gameId || '', gameObj: e.gameObj || null, statusTxt: e.statusTxt || '', isLive: e.isLive, totalPay: 0, legCount: 0, cardCount: 0 });
+                }
+                const gEntry = gameMap.get(gk);
+                gEntry.legCount++;
+                if (e.isLive) gEntry.isLive = true;
+                if (!seenGamesOnCard.has(gk)) { seenGamesOnCard.add(gk); gEntry.totalPay += pay; gEntry.cardCount++; }
+              }
+              const tk = `${e.clickType}:${String(e.name || '').toLowerCase()}`;
+              if (!targetMap.has(tk)) {
+                targetMap.set(tk, { name: e.name, bg: e.bg || '#1e293b', logo: e.logo || '', statusTxt: e.statusTxt || '', isLive: e.isLive, sport: e.sport, clickType: e.clickType, clickKey: e.clickKey, totalPay: 0, cardCount: 0, legs: [] });
+              }
+              const tEntry = targetMap.get(tk);
+              if (e.isLive) tEntry.isLive = true;
+              if (!tEntry.logo && e.logo) tEntry.logo = e.logo;
+              if (!seenTargetsOnCard.has(tk)) { seenTargetsOnCard.add(tk); tEntry.totalPay += pay; tEntry.cardCount++; }
+              tEntry.legs.push({ book: bk, pay, stat: e.stat, gained: e.gained, needed: e.needed, hit: e.hit, miss: e.miss, pct: e.pct, paceTxt: e.paceTxt, paceCls: e.paceCls });
+            });
+          });
+
+          const rankedGames = [...gameMap.values()].sort((a, b) => (b.isLive - a.isLive) || (b.totalPay - a.totalPay));
+          const rankedTargets = [...targetMap.values()].sort((a, b) => (b.isLive - a.isLive) || (b.totalPay - a.totalPay) || (b.legs.length - a.legs.length));
+
+          const gamesHtml = rankedGames.length
+            ? `<h2>Games to Watch (${rankedGames.length})</h2><div class="rg-games">` + rankedGames.map(gm => {
+                const safeTitle = String(gm.title).replace(/'/g, "\\'");
+                const clickAttr = gm.gameId ? `onclick="openBox('${gm.sport}','${gm.gameId}','${safeTitle}')"` : '';
+                const scoreLine = gm.gameObj && gm.gameObj.state !== 'pre'
+                  ? `<div style="font-size:13px;font-weight:800;color:#f8fafc;margin-top:4px">${gm.gameObj.away} ${gm.gameObj.ascore} — ${gm.gameObj.home} ${gm.gameObj.hscore}</div>`
+                  : '';
+                return `<div class="rg-game-card ${gm.isLive ? 'is-live' : ''}" ${clickAttr}>
+                  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+                    <span style="font-size:11px;font-weight:800;color:${gm.isLive ? '#4ade80' : '#94a3b8'}">${gm.isLive ? '● ' : ''}${gm.statusTxt || gm.sport}</span>
+                    <span style="font-size:12.5px;font-weight:900;color:#38bdf8">${money(gm.totalPay)} riding</span>
+                  </div>
+                  <div style="font-size:14px;font-weight:800;color:#f8fafc;margin-top:4px">${gm.title}</div>
+                  ${scoreLine}
+                  <div style="font-size:11.5px;font-weight:700;color:#94a3b8;margin-top:4px">${gm.legCount} active leg${gm.legCount === 1 ? '' : 's'} across ${gm.cardCount} slip${gm.cardCount === 1 ? '' : 's'}</div>
+                </div>`;
+              }).join('') + `</div>`
+            : '';
+
+          const targetsHtml = rankedTargets.length
+            ? `<h2>Cross-Book Player & Pick Rooting Guide (${rankedTargets.length})</h2><div class="rg-list">` + rankedTargets.map(t => {
+                const safeSport = String(t.sport || '').replace(/'/g, "\\'");
+                const safeType = String(t.clickType || '').replace(/'/g, "\\'");
+                const safeKey = String(t.clickKey || '').replace(/'/g, "\\'");
+                const legsHtml = t.legs.map(lg => {
+                  const pTag = lg.paceTxt ? `<span class="pace-tag ${lg.paceCls || 'pace-warn'}">${lg.paceTxt}</span>` : '';
+                  return `<div class="rg-leg-row ${lg.hit ? 'hit' : (lg.miss ? 'miss' : '')}">
+                    <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap">
+                      <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                        <span class="book-badge ${bookClass(lg.book)}" style="margin-right:0;font-size:9.5px;padding:1px 6px">${lg.book}</span>
+                        <span style="font-size:12.5px;font-weight:800;color:#f8fafc">${lg.stat}</span>
+                        ${pTag}
+                      </div>
+                      <span style="font-size:12px;font-weight:800;color:${lg.hit ? '#4ade80' : (lg.miss ? '#f87171' : '#cbd5e1')}">Live ${lg.gained} • ${lg.hit ? 'HIT' : (lg.miss ? 'MISS' : 'Need ' + lg.needed)}</span>
+                    </div>
+                    <div class="prog-track" style="margin-top:6px;border-radius:999px;overflow:hidden"><div class="prog-fill" style="width:${lg.pct}%;background:${lg.miss ? '#ef4444' : '#22c55e'}"></div></div>
+                  </div>`;
+                }).join('');
+                return `<div class="rg-card" style="--tm-clr:${t.bg}">
+                  <div class="rg-head" style="cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}')">
+                    <div class="rg-id">
+                      <div class="rg-logo">${t.logo ? `<img src="${t.logo}" loading="lazy" decoding="async">` : ''}</div>
+                      <div style="min-width:0">
+                        <div style="font-size:14.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+                        <div style="font-size:11px;font-weight:700;color:${t.isLive ? '#4ade80' : '#94a3b8'}">${t.isLive ? '● ' : ''}${t.statusTxt || t.sport}</div>
+                      </div>
+                    </div>
+                    <div class="rg-riding">
+                      <div style="font-size:14px;font-weight:900;color:#38bdf8">${money(t.totalPay)}</div>
+                      <div style="font-size:10.5px;font-weight:700;color:#94a3b8">${t.cardCount} slip${t.cardCount === 1 ? '' : 's'}</div>
+                    </div>
+                  </div>
+                  <div class="rg-targets">${legsHtml}</div>
+                </div>`;
+              }).join('') + `</div>`
+            : `<p style="color:var(--muted)">No active slips yet. Upload or build a bet card to populate your Cross-Book Rooting Guide!</p>`;
+
+          secTitle = '';
+          gridWrap = gamesHtml + targetsHtml;
+        } else if (!isDemo && curCardView === 'analytics') {
+          if (!historyAll.length) {
+            secTitle = `<h2>Performance Analytics</h2>`;
+            gridWrap = `<div class="an-card"><p style="color:var(--muted);margin:0">Once your first bet cards settle, your ROI by sportsbook, hit rate by stat type, Over/Under splits, and cumulative P&L curve will appear here automatically.</p></div>`;
+          } else {
+            const byBook = new Map(), byStat = new Map();
+            let ouOverH = 0, ouOverT = 0, ouUnderH = 0, ouUnderT = 0;
+            const bySize = { '1-2 Legs': { w: 0, l: 0, risk: 0, paid: 0 }, '3-4 Legs': { w: 0, l: 0, risk: 0, paid: 0 }, '5+ Legs': { w: 0, l: 0, risk: 0, paid: 0 } };
+            const chrono = [...historyAll].sort((a, b) => (Date.parse(a.settledAt || a.createdAt || '') || 0) - (Date.parse(b.settledAt || b.createdAt || '') || 0));
+            const cumPts = [{ label: 'Start', pl: 0 }];
+            let runPL = 0;
+
+            chrono.forEach(c => {
+              const { evals, allHit, anyMiss } = getCardOutcome(c);
+              const bk = normBook(c.book);
+              const costV = parseAmt(c.cost), payV = parseAmt(c.payout);
+              const cardNet = (allHit ? payV : 0) - costV;
+              runPL = Math.round((runPL + cardNet) * 100) / 100;
+              cumPts.push({ label: fmtShortDate(c.settledAt || c.createdAt) || '', pl: runPL });
+
+              if (!byBook.has(bk)) byBook.set(bk, { w: 0, l: 0, risk: 0, paid: 0 });
+              const bObj = byBook.get(bk);
+              bObj.risk += costV;
+              if (allHit) { bObj.w++; bObj.paid += payV; } else if (anyMiss) { bObj.l++; }
+
+              const nLegs = (c.legs || []).length;
+              const szKey = nLegs <= 2 ? '1-2 Legs' : (nLegs <= 4 ? '3-4 Legs' : '5+ Legs');
+              bySize[szKey].risk += costV;
+              if (allHit) { bySize[szKey].w++; bySize[szKey].paid += payV; } else if (anyMiss) { bySize[szKey].l++; }
+
+              (c.legs || []).forEach((lg, li) => {
+                const ev = evals[li];
+                if (!ev || (!ev.hit && !ev.miss)) return;
+                const stKey = lg.type === 'ml' ? 'Moneyline' : (lg.type === 'spread' ? 'Spread' : (lg.type === 'total' ? 'Game Total' : (lg.stat || 'Prop')));
+                if (!byStat.has(stKey)) byStat.set(stKey, { hit: 0, tot: 0 });
+                const sObj = byStat.get(stKey);
+                sObj.tot++;
+                if (ev.hit) sObj.hit++;
+                if (lg.type === 'prop' || lg.type === 'total') {
+                  if (lg.ou === 'Under') { ouUnderT++; if (ev.hit) ouUnderH++; }
+                  else { ouOverT++; if (ev.hit) ouOverH++; }
+                }
+              });
+            });
+
+            // Build inline SVG Cumulative P&L Chart
+            const svgW = 640, svgH = 150, padX = 12, padY = 16;
+            const vals = cumPts.map(p => p.pl);
+            const minV = Math.min(0, ...vals), maxV = Math.max(0, ...vals);
+            const spanV = Math.max(1, maxV - minV);
+            const xAt = i => padX + (cumPts.length > 1 ? (i / (cumPts.length - 1)) * (svgW - padX * 2) : (svgW - padX * 2) / 2);
+            const yAt = v => padY + ((maxV - v) / spanV) * (svgH - padY * 2);
+            const zeroY = yAt(0);
+            const polyPts = cumPts.map((p, i) => `${xAt(i).toFixed(1)},${yAt(p.pl).toFixed(1)}`).join(' ');
+            const strokeClr = runPL >= 0 ? '#4ade80' : '#f87171';
+            const areaPts = `${xAt(0).toFixed(1)},${zeroY.toFixed(1)} ${polyPts} ${xAt(cumPts.length - 1).toFixed(1)},${zeroY.toFixed(1)}`;
+            const chartHtml = `<div class="an-chart-wrap">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+                <strong style="font-family:'Barlow Condensed',sans-serif;font-size:17px;letter-spacing:0.06em;text-transform:uppercase">Cumulative Profit / Loss Curve</strong>
+                <span style="font-size:13px;font-weight:800;color:${strokeClr}">${runPL >= 0 ? '+' : '-'}${money(Math.abs(runPL))} across ${historyAll.length} settled card${historyAll.length === 1 ? '' : 's'}</span>
+              </div>
+              <svg viewBox="0 0 ${svgW} ${svgH}" style="width:100%;height:150px;display:block">
+                <line x1="${padX}" y1="${zeroY.toFixed(1)}" x2="${svgW - padX}" y2="${zeroY.toFixed(1)}" stroke="rgba(148,163,184,0.35)" stroke-dasharray="4 4" stroke-width="1"/>
+                <polygon points="${areaPts}" fill="${runPL >= 0 ? 'rgba(74,222,128,0.14)' : 'rgba(248,113,113,0.14)'}"/>
+                <polyline fill="none" stroke="${strokeClr}" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="${polyPts}"/>
+                <circle cx="${xAt(cumPts.length - 1).toFixed(1)}" cy="${yAt(runPL).toFixed(1)}" r="4" fill="${strokeClr}"/>
+              </svg>
+            </div>`;
+
+            const bookRows = [...byBook.entries()].sort((a, b) => (b[1].paid - b[1].risk) - (a[1].paid - a[1].risk)).map(([bk, d]) => {
+              const pl = Math.round((d.paid - d.risk) * 100) / 100;
+              const roi = d.risk > 0 ? Math.round((pl / d.risk) * 100) : 0;
+              const wr = (d.w + d.l) > 0 ? Math.round((d.w / (d.w + d.l)) * 100) : 0;
+              return `<div class="an-row">
+                <div class="an-row-top">
+                  <span><span class="book-badge ${bookClass(bk)}">${bk}</span> <span style="color:#94a3b8">${d.w}W-${d.l}L (${wr}%)</span></span>
+                  <span style="color:${pl >= 0 ? '#4ade80' : '#f87171'}">${pl >= 0 ? '+' : '-'}${money(Math.abs(pl))} (${roi >= 0 ? '+' : ''}${roi}% ROI)</span>
+                </div>
+                <div class="an-bar-track"><div class="an-bar-fill" style="width:${wr}%;background:${pl >= 0 ? '#22c55e' : '#ef4444'}"></div></div>
+              </div>`;
+            }).join('');
+
+            const statRows = [...byStat.entries()].sort((a, b) => b[1].tot - a[1].tot).slice(0, 10).map(([stName, d]) => {
+              const hr = d.tot > 0 ? Math.round((d.hit / d.tot) * 100) : 0;
+              return `<div class="an-row">
+                <div class="an-row-top">
+                  <span>${stName} <span style="color:#94a3b8">(${d.hit}/${d.tot} legs)</span></span>
+                  <span style="color:${hr >= 55 ? '#4ade80' : (hr >= 45 ? '#facc15' : '#f87171')}">${hr}%</span>
+                </div>
+                <div class="an-bar-track"><div class="an-bar-fill" style="width:${hr}%;background:${hr >= 55 ? '#22c55e' : (hr >= 45 ? '#eab308' : '#ef4444')}"></div></div>
+              </div>`;
+            }).join('') || `<p style="color:var(--muted);margin:0;font-size:13px">No graded individual legs recorded yet.</p>`;
+
+            const overPct = ouOverT > 0 ? Math.round((ouOverH / ouOverT) * 100) : 0;
+            const underPct = ouUnderT > 0 ? Math.round((ouUnderH / ouUnderT) * 100) : 0;
+            const sizeRows = Object.entries(bySize).filter(([, d]) => (d.w + d.l) > 0).map(([lbl, d]) => {
+              const pl = Math.round((d.paid - d.risk) * 100) / 100;
+              const wr = Math.round((d.w / (d.w + d.l)) * 100);
+              return `<div class="an-row">
+                <div class="an-row-top">
+                  <span>${lbl} <span style="color:#94a3b8">(${d.w}W-${d.l}L • ${wr}%)</span></span>
+                  <span style="color:${pl >= 0 ? '#4ade80' : '#f87171'}">${pl >= 0 ? '+' : '-'}${money(Math.abs(pl))}</span>
+                </div>
+                <div class="an-bar-track"><div class="an-bar-fill" style="width:${wr}%;background:#38bdf8"></div></div>
+              </div>`;
+            }).join('');
+
+            const splitHtml = `<div class="an-row">
+                <div class="an-row-top"><span>Overs <span style="color:#94a3b8">(${ouOverH}/${ouOverT} legs)</span></span><span style="color:#38bdf8">${overPct}%</span></div>
+                <div class="an-bar-track"><div class="an-bar-fill" style="width:${overPct}%;background:#38bdf8"></div></div>
+              </div>
+              <div class="an-row" style="margin-bottom:14px">
+                <div class="an-row-top"><span>Unders <span style="color:#94a3b8">(${ouUnderH}/${ouUnderT} legs)</span></span><span style="color:#c084fc">${underPct}%</span></div>
+                <div class="an-bar-track"><div class="an-bar-fill" style="width:${underPct}%;background:#a855f7"></div></div>
+              </div>${sizeRows}`;
+
+            secTitle = `<h2>Performance Analytics</h2>`;
+            gridWrap = chartHtml + `<div class="an-grid">
+              <div class="an-card"><h3>ROI by Platform</h3>${bookRows}</div>
+              <div class="an-card"><h3>Leg Hit Rate by Stat Type</h3>${statRows}</div>
+              <div class="an-card"><h3>Over / Under & Slip Size</h3>${splitHtml}</div>
+            </div>`;
+          }
         } else {
-          const cardsHtml = activeList.map((c, i) => renderSingleCard(c, isDemo ? i : userCards.indexOf(c), isDemo, false)).join('');
+          const sortedActive = [...activeList].sort((a, b) => {
+            const oa = getCardOutcome(a), ob = getCardOutcome(b);
+            const aOne = !oa.isSettled && !oa.anyMiss && oa.evals.length >= 2 && oa.evals.filter(x => x.hit).length === oa.evals.length - 1 ? 1 : 0;
+            const bOne = !ob.isSettled && !ob.anyMiss && ob.evals.length >= 2 && ob.evals.filter(x => x.hit).length === ob.evals.length - 1 ? 1 : 0;
+            return bOne - aOne;
+          });
+          const cardsHtml = sortedActive.map((c, i) => renderSingleCard(c, isDemo ? i : userCards.indexOf(c), isDemo, false)).join('');
           secTitle = isDemo
             ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates live — disappears once you build your first card)</span></h2>`
             : `<h2>Active Bet Cards (${activeList.length})</h2>`;
@@ -3207,6 +3551,34 @@
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && (Date.now() - lastRefreshTs) > 10000) refresh(false);
     });
+
+    // Installable PWA Service Worker & Home-Screen Prompt
+    let deferredInstallPrompt = null;
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      deferredInstallPrompt = e;
+      const btn = document.getElementById('install-app-btn');
+      if (btn) btn.style.display = 'inline-block';
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredInstallPrompt = null;
+      const btn = document.getElementById('install-app-btn');
+      if (btn) btn.style.display = 'none';
+      showToast('OmniStatPro installed to Home Screen!');
+    });
+    async function triggerInstallApp() {
+      if (!deferredInstallPrompt) return;
+      deferredInstallPrompt.prompt();
+      try { await deferredInstallPrompt.userChoice; } catch (_) {}
+      deferredInstallPrompt = null;
+      const btn = document.getElementById('install-app-btn');
+      if (btn) btn.style.display = 'none';
+    }
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
 
       /* ========================================================================
        9. SUPABASE AUTH, CLOUD SYNC & ADMIN DAILY SAMPLES
