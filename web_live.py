@@ -852,27 +852,34 @@ def api_parse_slip():
     }
 
     env_model = os.environ.get("GEMINI_MODEL", "").strip()
-    candidate_models = [m for m in (env_model, "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite") if m]
+    candidate_models = [m for m in (env_model, "gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash-lite", "gemini-3.0-flash") if m]
     last_err = "Gemini API error"
 
     try:
         raw_res = None
+        used_model = ""
         for model_name in candidate_models:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
             payload = {
                 "contents": [{"role": "user", "parts": parts}],
                 "generationConfig": full_gen_cfg
             }
-            resp = requests.post(url, json=payload, timeout=35)
-            raw_res = resp.json()
+            try:
+                resp = requests.post(url, json=payload, timeout=22)
+                raw_res = resp.json()
+            except Exception as req_err:
+                last_err = str(req_err)
+                raw_res = None
+                continue
             if "error" in raw_res and resp.status_code == 400:
                 payload["generationConfig"] = base_gen_cfg
-                resp = requests.post(url, json=payload, timeout=35)
+                resp = requests.post(url, json=payload, timeout=22)
                 raw_res = resp.json()
             if "error" not in raw_res:
+                used_model = model_name
                 break
             last_err = str(raw_res["error"].get("message", "Gemini API error"))
-            if resp.status_code not in (400, 404):
+            if resp.status_code in (401, 403):
                 break
 
         if not raw_res or "error" in raw_res:
@@ -886,6 +893,7 @@ def api_parse_slip():
         return jsonify({
             "ok": True,
             "source": "vision",
+            "model": used_model,
             "cost": cleaned["cost"],
             "payout": cleaned["payout"],
             "legs": cleaned["legs"]

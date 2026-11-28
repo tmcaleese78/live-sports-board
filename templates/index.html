@@ -1432,10 +1432,10 @@
       if (/rush(?:ing)?\s*(?:td|touchdown)/.test(s)) return 'RUSH TD';
       if (/rec(?:eiving)?\s*(?:td|touchdown)/.test(s)) return 'REC TD';
       if (/rush(?:ing)?\s*att(?:empts)?|carries|\bcar\b/.test(s)) return 'RUSH ATT';
-      if (/pass(?:ing)?\s*(?:yards?|yds?)/.test(s)) return 'PASS YDS';
-      if (/rush(?:ing)?\s*(?:yards?|yds?)/.test(s)) return 'RUSH YDS';
-      if (/rec(?:eiving)?\s*(?:yards?|yds?)/.test(s)) return 'REC YDS';
       if (/rec(?:eiving)?\s*targets?|\btgts?\b|\btargets?\b/.test(s)) return 'REC TGTS';
+      if (/pass(?:ing)?\s*(?:yards?|yds?|yar?|y\b)|passing\b/.test(s)) return 'PASS YDS';
+      if (/rush(?:ing)?\s*(?:yards?|yds?|yar?|y\b)|rushing\b/.test(s)) return 'RUSH YDS';
+      if (/rec(?:eiving)?\s*(?:yards?|yds?|yar?|y\b)|receiving\b/.test(s)) return 'REC YDS';
       if (/receptions?|catches|\brecs?\b/.test(s)) return 'REC';
       if (/anytime\s*td|touchdowns?|\btd\b/.test(s)) return 'TD';
       if (/3-?pt|3pm|3-?point|three\s*pointer|threes/.test(s)) return '3PM';
