@@ -1040,8 +1040,13 @@
 
       const targetName = String(leg.player || '').trim().toLowerCase();
       const spIdx = livePlayerIndex[leg.sport];
-      const p = (spIdx && spIdx.get(targetName)) || ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
-      const pGame = games.find(x => x.away === (p && p.team) || x.home === (p && p.team));
+      const p = (spIdx && spIdx.get(targetName))
+        || (livePlayerIndex.NFL && livePlayerIndex.NFL.get(targetName))
+        || (livePlayerIndex.NBA && livePlayerIndex.NBA.get(targetName))
+        || ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
+      const effSport = (p && p.league) || leg.sport;
+      const effGames = (liveData.games && liveData.games[effSport]) || games;
+      const pGame = effGames.find(x => x.away === (p && p.team) || x.home === (p && p.team));
       const pStatus = (p && p.status) || (pGame && pGame.status) || '';
       const pIsLive = Boolean((p && p.state === 'in') || (pGame && pGame.state === 'in'));
       const cur = p && p.stats ? (Number(p.stats[leg.stat]) || 0) : 0, tgt = Number(leg.target) || 0;
@@ -1180,11 +1185,13 @@
       if (!clickKey) return;
       const sp = sport || 'NFL';
       if (clickType === 'player') {
-        const pList = (liveData.players && liveData.players[sp]) || [];
         const target = clickKey.trim().toLowerCase();
-        const p = pList.find(x => String(x && x.name || '').trim().toLowerCase() === target);
+        const p = (livePlayerIndex[sp] && livePlayerIndex[sp].get(target))
+          || (livePlayerIndex.NFL && livePlayerIndex.NFL.get(target))
+          || (livePlayerIndex.NBA && livePlayerIndex.NBA.get(target))
+          || ((liveData.players && liveData.players[sp]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === target);
         if (p && p.id) {
-          openPlayerCard(sp, p.id, p.name);
+          openPlayerCard(p.league || sp, p.id, p.name);
         } else {
           showToast(`Player box score not active yet for ${clickKey}`);
         }
@@ -1886,15 +1893,20 @@
         const target = parseFloat(leg.target);
         if (!rawPlayer || !stat || !Number.isFinite(target) || target <= 0) return null;
         const ou = /under|less|lower|down|^u$/i.test(String(leg.ou || '')) ? 'Under' : 'Over';
-        const spList = (liveData.players && liveData.players[sport]) || [];
         const low = rawPlayer.toLowerCase();
         const aliased = aliasMap[normP(rawPlayer)] || normP(rawPlayer);
-        const hit = spList.find(p => p.name && p.name.toLowerCase() === low) ||
-                    spList.find(p => p.name && (normP(p.name) === aliased || normP(p.name) === normP(rawPlayer))) ||
-                    (low.length >= 5 && spList.find(p => p.name && (p.name.toLowerCase().includes(low) || low.includes(p.name.toLowerCase()))));
+        const searchOrder = [sport, 'NFL', 'NBA'].filter((v, i, a) => a.indexOf(v) === i);
+        let hit = null, matchedSport = sport;
+        for (const spTry of searchOrder) {
+          const spList = (liveData.players && liveData.players[spTry]) || [];
+          const found = spList.find(p => p.name && p.name.toLowerCase() === low) ||
+                        spList.find(p => p.name && (normP(p.name) === aliased || normP(p.name) === normP(rawPlayer))) ||
+                        (low.length >= 5 && spList.find(p => p.name && (p.name.toLowerCase().includes(low) || low.includes(p.name.toLowerCase()))));
+          if (found) { hit = found; matchedSport = found.league || spTry; break; }
+        }
         let player = hit ? hit.name : rawPlayer;
         if (player.toLowerCase() === 'james cook') player = 'James Cook III';
-        return { type: 'prop', sport, player, stat, ou, target };
+        return { type: 'prop', sport: matchedSport, player, stat, ou, target };
       }
 
       if (leg.type === 'ml' || leg.type === 'spread') {

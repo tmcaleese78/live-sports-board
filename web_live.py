@@ -15,6 +15,7 @@ _ESPN_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
+_TEAMS_CACHE = {}
 _PLAYER_CACHE = {}
 _SEASON_CACHE = {}
 _PROJ_CACHE = {}
@@ -376,13 +377,33 @@ def parse_scoreboard(sport_path, lg_code, fast=False):
     if fast:
         games.sort(key=lambda g: (g["rank"], g["date"]))
         return games, []
-    if lg_code == "nba" and not roster_tasks:
-        tms = fetch_json(f"https://{HOST}/apis/site/v2/sports/basketball/nba/teams", timeout=5)
-        for sp_t in tms.get("sports", [{}])[0].get("leagues", [{}])[0].get("teams", []):
-            t = sp_t.get("team", {})
-            ab = t.get("abbreviation", "")
-            meta = {"bg": clean_hex(t.get("color"), "#1e293b"), "logo": t.get("logo") or next((x.get("href", "") for x in t.get("logos", [])), ""), "tid": t.get("id", "")}
-            roster_tasks.append({"ab": ab, "meta": meta, "status": "Off Day", "state": "pre"})
+    if lg_code in ("nfl", "nba"):
+        loaded_abs = {r["ab"] for r in roster_tasks}
+        all_tms = _TEAMS_CACHE.get(sport_path)
+        if not all_tms:
+            tms = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/teams?limit=40", timeout=5)
+            parsed_tms = []
+            for s_item in tms.get("sports", []):
+                for l_item in s_item.get("leagues", []):
+                    for sp_t in l_item.get("teams", []):
+                        t = sp_t.get("team", {})
+                        ab = t.get("abbreviation", "")
+                        if ab and t.get("id"):
+                            parsed_tms.append({
+                                "ab": ab,
+                                "meta": {
+                                    "bg": clean_hex(t.get("color"), "#1e293b"),
+                                    "logo": t.get("logo") or next((x.get("href", "") for x in t.get("logos", [])), ""),
+                                    "tid": str(t.get("id", ""))
+                                }
+                            })
+            if parsed_tms:
+                _TEAMS_CACHE[sport_path] = parsed_tms
+                all_tms = parsed_tms
+        off_lbl = "Bye Week" if lg_code == "nfl" else "Off Day"
+        for tm_item in (all_tms or []):
+            if tm_item["ab"] not in loaded_abs:
+                roster_tasks.append({"ab": tm_item["ab"], "meta": tm_item["meta"], "status": off_lbl, "state": "pre"})
     with ThreadPoolExecutor(max_workers=12) as pool:
         boxes = list(pool.map(lambda t: {"box": fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/summary?event={t['eid']}", timeout=6), "meta": t["team_meta"], "status": t["status"], "state": t["state"]}, box_tasks))
         rosters = list(pool.map(lambda r: {"ab": r["ab"], "meta": r["meta"], "rlist": get_roster(sport_path, r["meta"]["tid"]), "status": r["status"], "state": r["state"]}, roster_tasks))
