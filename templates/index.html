@@ -1153,25 +1153,33 @@
       const tf = tSel ? tSel.value : 'ALL';
       let list = catFiltered.filter(p => (tf === 'ALL' || p.team === tf) && (p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)));
 
+      const statLabels = {
+        'PASS YDS': 'Pass Yds', 'PASS TD': 'Pass TD', 'PASS ATT': 'Pass ATT', 'COMP': 'Pass Comp',
+        'RUSH YDS': 'Rush Yds', 'RUSH ATT': 'Rush ATT', 'RUSH TD': 'Rush TD',
+        'REC': 'Receptions', 'REC YDS': 'Rec Yds', 'REC TGTS': 'Rec Targets', 'REC TD': 'Rec TD',
+        'SCRIM YDS': 'Rush + Rec Yds', 'TD': 'Anytime TD',
+        'PTS': 'PTS', 'REB': 'REB', 'AST': 'AST', '3PM': '3PM',
+        'STL': 'STL', 'BLK': 'BLK', 'PRA': 'PRA', 'PR': 'PR', 'PA': 'PA', 'RA': 'RA'
+      };
+      const statLbl = k => statLabels[k] || k;
+
+      const nflAllCols = ['PASS YDS', 'PASS TD', 'PASS ATT', 'COMP', 'RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS', 'TD'];
+      const nbaAllCols = ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA'];
       const nflColsByCat = {
-        ALL: ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'],
-        PASS: ['PASS YDS', 'PASS TD', 'COMP', 'PASS ATT', 'RUSH YDS'],
-        RUSH: ['RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC YDS', 'SCRIM YDS'],
-        REC: ['REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS']
+        ALL: nflAllCols,
+        PASS: ['PASS YDS', 'PASS TD', 'PASS ATT', 'COMP', 'RUSH YDS'],
+        RUSH: ['RUSH YDS', 'RUSH ATT', 'RUSH TD', 'SCRIM YDS', 'TD'],
+        REC: ['REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS', 'TD']
       };
       const cols = curPlg === 'NFL'
-        ? (nflColsByCat[curPcat] || nflColsByCat.ALL)
-        : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA'];
-      const mobileOrder = curPlg === 'NFL'
-        ? (curPcat === 'ALL'
-            ? ['PASS YDS', 'PASS TD', 'COMP', 'PASS ATT', 'RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS']
-            : cols)
-        : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA'];
+        ? (nflColsByCat[curPcat] || nflAllCols)
+        : nbaAllCols;
+      const mobileOrder = curPlg === 'NFL' ? (curPcat === 'ALL' ? nflAllCols : cols) : nbaAllCols;
 
       if (!sortCol || !cols.includes(sortCol)) { sortCol = cols[0]; sortDir = 1; }
       const mSortSel = document.getElementById('p-sort-mobile');
       if (mSortSel) {
-        mSortSel.innerHTML = cols.map(c => `<option value="${c}" ${c === sortCol ? 'selected' : ''}>${c}</option>`).join('');
+        mSortSel.innerHTML = cols.map(c => `<option value="${c}" ${c === sortCol ? 'selected' : ''}>${statLbl(c)}</option>`).join('');
       }
 
       if (!q) {
@@ -1181,19 +1189,18 @@
       const topList = list.slice(0, 120);
       const emptyMsg = allActive.length === 0
         ? `No ${curPlg} players have recorded stats yet.`
-        : (!q ? `No ${curPlg} players have recorded ${sortCol} yet.` : `No matching ${curPlg} players with recorded stats.`);
+        : (!q ? `No ${curPlg} players have recorded ${statLbl(sortCol)} yet.` : `No matching ${curPlg} players with recorded stats.`);
 
-      const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
+      const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer;white-space:nowrap" onclick="sortBy('${c}')">${statLbl(c)}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `</tr>`;
       const rows = topList.length
         ? topList.map(p => {
             const bg = p.bg || '#1e293b';
             const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
-            const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
+            const safeName = String(p.name || '').replace(/'/g, "\\'");
             const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
-            const actBtn = `<td><button class="pill" style="padding:4px 9px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8;white-space:nowrap" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}')">+ Prop</button></td>`;
-            return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${nameHtml}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${(p.stats && p.stats[c]) ?? 0}</td>`).join('') + actBtn + `</tr>`;
+            return `<tr class="p-row" style="--tm-clr:${bg}"><td class="tm-logo-td">${logoHtml}</td><td class="p-name-td">${nameHtml}</td><td class="p-sub-td">${p.team}</td><td class="p-sub-td">${p.status}</td>` + cols.map(c => `<td>${statVal(p, c)}</td>`).join('') + `</tr>`;
           }).join('')
-        : `<tr><td colspan="${cols.length + 5}" style="padding:20px;text-align:center;color:var(--muted);font-weight:700">${emptyMsg}</td></tr>`;
+        : `<tr><td colspan="${cols.length + 4}" style="padding:20px;text-align:center;color:var(--muted);font-weight:700">${emptyMsg}</td></tr>`;
       document.getElementById('p-table').innerHTML = hdr + rows;
 
       const mWrap = document.getElementById('p-cards-mobile');
@@ -1202,14 +1209,14 @@
           ? topList.map(p => {
               const bg = p.bg || '#1e293b';
               const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
-              const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
+              const safeName = String(p.name || '').replace(/'/g, "\\'");
               const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
               const statPills = mobileOrder
                 .filter(k => statVal(p, k) !== 0)
                 .sort((a, b) => (a === sortCol ? -1 : (b === sortCol ? 1 : 0)))
                 .map(k => {
                   const val = statVal(p, k);
-                  return `<span class="p-mstat ${k === sortCol ? 'hi' : ''}"><span class="p-mstat-v">${val}</span><span class="p-mstat-k">${k}</span></span>`;
+                  return `<span class="p-mstat ${k === sortCol ? 'hi' : ''}"><span class="p-mstat-v">${val}</span><span class="p-mstat-k">${statLbl(k)}</span></span>`;
                 }).join('');
               return `<div class="p-mcard" style="--tm-clr:${bg}">
                 <div class="p-mcard-top">
@@ -1220,7 +1227,6 @@
                       <div class="p-mcard-sub">${p.team || ''}${p.status ? ' • ' + p.status : ''}</div>
                     </div>
                   </div>
-                  <button class="pill" style="padding:5px 10px;font-size:11.5px;border-color:rgba(56,189,248,0.5);color:#38bdf8;flex-shrink:0" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}','${sortCol}')">+ Prop</button>
                 </div>
                 <div class="p-mstats">${statPills}</div>
               </div>`;
