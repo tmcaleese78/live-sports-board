@@ -430,6 +430,32 @@
       background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.24);
       border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
     }
+    .inj-pill {
+      display: inline-block; margin-left: 5px; padding: 1px 5px; border-radius: 5px;
+      font-size: 9.5px; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+      vertical-align: middle; line-height: 1.3;
+    }
+    .inj-out { background: rgba(239, 68, 68, 0.22); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.55); }
+    .inj-d { background: rgba(249, 115, 22, 0.22); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.55); }
+    .inj-q { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.5); }
+    .inj-p { background: rgba(56, 189, 248, 0.16); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .inj-banner {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      margin: 0 0 14px; padding: 10px 14px; border-radius: 11px; cursor: pointer;
+      background: linear-gradient(90deg, rgba(127, 29, 29, 0.42), rgba(30, 41, 59, 0.92));
+      border: 1px solid rgba(248, 113, 113, 0.45);
+    }
+    .inj-banner:hover { border-color: rgba(248, 113, 113, 0.78); }
+    .inj-card-box {
+      background: rgba(127, 29, 29, 0.24); border: 1px solid rgba(248, 113, 113, 0.42);
+      border-radius: 11px; padding: 10px 13px; margin: 0 0 14px;
+    }
+    .inj-row {
+      display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px;
+      background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(56, 189, 248, 0.16);
+      margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s ease;
+    }
+    .inj-row:hover { border-color: rgba(56, 189, 248, 0.48); }
     .hist-date-hdr {
       display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
       margin: 18px 0 10px; padding: 8px 13px; border-radius: 10px;
@@ -725,6 +751,7 @@
       <div class="row-flex">
         <button class="pill active" data-plg="NFL" onclick="setPlg('NFL')">NFL Players</button>
         <button class="pill" data-plg="NBA" onclick="setPlg('NBA')">NBA Players</button>
+        <button class="pill" onclick="openInjuriesModal(curPlg === 'NBA' ? 'NBA' : 'NFL')">🏥 Injuries</button>
         <select id="p-team-filter" onchange="renderPlayers()"><option value="ALL">All Teams</option></select>
         <input class="search-box" id="p-search" placeholder="Search player name..." oninput="debouncedRenderPlayers()">
       </div>
@@ -816,12 +843,13 @@
         </div>
 
         <div id="prop-inputs" class="row-flex">
-          <input id="b-player" list="player-datalist" placeholder="Type player name..." style="flex:1;min-width:190px">
+          <input id="b-player" list="player-datalist" placeholder="Type player name..." oninput="checkBuilderInjury()" onchange="checkBuilderInjury()" style="flex:1;min-width:190px">
           <datalist id="player-datalist"></datalist>
           <select id="b-stat" onchange="if(this.value==='TD' && !document.getElementById('b-target').value){document.getElementById('b-target').value='0.5';document.getElementById('b-prop-ou').value='Over';}"></select>
           <select id="b-prop-ou"><option value="Over">Over</option><option value="Under">Under</option></select>
           <input id="b-target" type="number" step="0.5" placeholder="Target (e.g. 50)" style="width:150px">
         </div>
+        <div id="b-inj-warn" style="display:none;margin:-4px 0 10px;padding:8px 12px;border-radius:9px;background:rgba(127,29,29,0.28);border:1px solid rgba(248,113,113,0.45);font-size:12.5px;color:#fecaca;font-weight:700"></div>
 
         <div id="ml-inputs" class="row-flex" style="display:none">
           <select id="b-team" style="flex:1;min-width:200px"></select>
@@ -992,14 +1020,44 @@
     </div>
   </div>
 
+  <div class="modal-bg" id="injuries-modal" onclick="if(event.target===this)closeInjuriesModal()">
+    <div class="modal-box" style="max-width:680px">
+      <div class="modal-hdr">
+        <strong style="font-size:18px;color:#f8fafc">🏥 Live Injury Report</strong>
+        <div style="display:flex;gap:6px;align-items:center">
+          <button class="pill" style="padding:5px 10px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="refreshInjuriesModal()">↻ Refresh</button>
+          <button class="pill" onclick="closeInjuriesModal()">✕ Close</button>
+        </div>
+      </div>
+      <div class="row-flex" style="margin-bottom:10px">
+        <button class="pill" data-injtab="MY" onclick="setInjTab('MY')">My Active Cards</button>
+        <button class="pill active" data-injtab="NFL" onclick="setInjTab('NFL')">NFL</button>
+        <button class="pill" data-injtab="NBA" onclick="setInjTab('NBA')">NBA</button>
+        <select id="inj-status-filter" onchange="renderInjuriesModal()" style="padding:6px 10px;font-size:12.5px;font-weight:700">
+          <option value="ALL">All Statuses</option>
+          <option value="OUT">Out / IR</option>
+          <option value="D">Doubtful</option>
+          <option value="Q">Questionable / DTD</option>
+        </select>
+        <input id="inj-search" placeholder="Filter player or team..." oninput="renderInjuriesModal()" style="flex:1;min-width:150px;padding:6px 10px;font-size:12.5px">
+      </div>
+      <div id="inj-list" style="max-height:62vh;overflow-y:auto;padding-right:2px"></div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
     /* ========================================================================
        1. APP STATE, NAVIGATION TABS & TOAST NOTIFICATIONS
        ======================================================================== */
-    let liveData = { games: { NFL: [], NBA: [], CFB: [] }, players: { NFL: [], NBA: [] } };
+    let liveData = { games: { NFL: [], NBA: [], CFB: [] }, players: { NFL: [], NBA: [] }, injuries: { NFL: [], NBA: [] } };
     let livePlayerIndex = { NFL: new Map(), NBA: new Map(), CFB: new Map() };
+    let liveInjuryById = { NFL: new Map(), NBA: new Map() };
+    let liveInjuryByName = { NFL: new Map(), NBA: new Map() };
+    function escInj(s) {
+      return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
     function rebuildPlayerIndex() {
       const idx = { NFL: new Map(), NBA: new Map(), CFB: new Map() };
       ['NFL', 'NBA', 'CFB'].forEach(sp => {
@@ -1010,6 +1068,67 @@
         }
       });
       livePlayerIndex = idx;
+
+      const byId = { NFL: new Map(), NBA: new Map() };
+      const byNm = { NFL: new Map(), NBA: new Map() };
+      ['NFL', 'NBA'].forEach(sp => {
+        const ilist = (liveData.injuries && liveData.injuries[sp]) || [];
+        for (let i = 0; i < ilist.length; i++) {
+          const item = ilist[i];
+          if (!item) continue;
+          if (item.id) byId[sp].set(String(item.id), item);
+          if (item.name) byNm[sp].set(String(item.name).trim().toLowerCase(), item);
+        }
+      });
+      liveInjuryById = byId;
+      liveInjuryByName = byNm;
+    }
+    function getPlayerInjury(sport, name, pid) {
+      const sp = String(sport || '').toUpperCase();
+      const idStr = pid ? String(pid) : '';
+      const nmKey = String(name || '').trim().toLowerCase();
+      if (idStr) {
+        if (liveInjuryById[sp] && liveInjuryById[sp].has(idStr)) return liveInjuryById[sp].get(idStr);
+        if (liveInjuryById.NFL && liveInjuryById.NFL.has(idStr)) return liveInjuryById.NFL.get(idStr);
+        if (liveInjuryById.NBA && liveInjuryById.NBA.has(idStr)) return liveInjuryById.NBA.get(idStr);
+      }
+      if (nmKey) {
+        if (liveInjuryByName[sp] && liveInjuryByName[sp].has(nmKey)) return liveInjuryByName[sp].get(nmKey);
+        if (liveInjuryByName.NFL && liveInjuryByName.NFL.has(nmKey)) return liveInjuryByName.NFL.get(nmKey);
+        if (liveInjuryByName.NBA && liveInjuryByName.NBA.has(nmKey)) return liveInjuryByName.NBA.get(nmKey);
+      }
+      return null;
+    }
+    function injPillClass(abbr) {
+      const a = String(abbr || '').toUpperCase();
+      if (a === 'OUT' || a === 'IR') return 'inj-out';
+      if (a === 'D') return 'inj-d';
+      if (a === 'P') return 'inj-p';
+      return 'inj-q';
+    }
+    function injBadgeHtml(inj) {
+      if (!inj || !inj.abbr) return '';
+      const tip = [inj.status, inj.type ? `(${inj.type})` : '', inj.comment ? `— ${inj.comment}` : ''].filter(Boolean).join(' ');
+      return `<span class="inj-pill ${injPillClass(inj.abbr)}" title="${escInj(tip)}">${escInj(inj.abbr)}</span>`;
+    }
+    function getActiveCardInjuries() {
+      const found = [];
+      const seen = new Set();
+      (userCards || []).forEach(c => {
+        if (!c || c.settled || c.archived) return;
+        (c.legs || []).forEach(leg => {
+          if (!leg || leg.type !== 'prop' || !leg.player) return;
+          const inj = getPlayerInjury(leg.sport, leg.player);
+          if (!inj) return;
+          const key = `${inj.league}:${String(inj.name || '').toLowerCase()}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            found.push(inj);
+          }
+        });
+      });
+      found.sort((a, b) => (a.rank ?? 5) - (b.rank ?? 5) || String(a.name).localeCompare(String(b.name)));
+      return found;
     }
     let curTab = 'cards', curLg = 'ALL', curSt = 'in', curPlg = 'NFL', draftLegs = [];
     let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]');
@@ -1846,9 +1965,10 @@
             const safeStat = String(legObj.stat || e.statKey || '').replace(/'/g, "\\'");
             const safeTgt = legObj.target != null ? Number(legObj.target) : '';
             const safeOu = String(legObj.ou || e.ou || 'Over').replace(/'/g, "\\'");
+            const injTag = (!isSettled && e.clickType === 'player') ? injBadgeHtml(getPlayerInjury(e.sport, e.clickKey)) : '';
             return `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg};cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}','${safeStat}','${safeTgt}','${safeOu}')" title="Click for live stats / L10 hit rate">
               <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}" loading="lazy" decoding="async">` : ''}</div>
-              <div><div>${e.name}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
+              <div><div>${e.name}${injTag}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
               <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
           }).join('') : '';
 
@@ -2012,15 +2132,24 @@
           </div>
         </section>` : '';
 
+        const activeInjuries = isDemo ? [] : getActiveCardInjuries();
+        const injCntBadge = activeInjuries.length ? ` <span class="inj-pill inj-out" style="margin-left:3px">${activeInjuries.length}</span>` : '';
         const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px;align-items:center;justify-content:space-between">
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="pill ${curCardView === 'active' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('active')">Active Cards (${activeAll.length})</button>
             <button class="pill ${curCardView === 'rooting' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('rooting')">Rooting Guide</button>
             <button class="pill ${curCardView === 'history' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('history')">Settled History (${historyAll.length})</button>
             <button class="pill ${curCardView === 'analytics' ? 'active' : ''}" style="font-weight:800" onclick="setCardView('analytics')">Analytics</button>
+            <button class="pill" style="font-weight:800;border-color:${activeInjuries.length ? 'rgba(248,113,113,0.55)' : 'var(--border)'};color:${activeInjuries.length ? '#fca5a5' : 'var(--text)'}" onclick="openInjuriesModal('${activeInjuries.length ? 'MY' : 'NFL'}')">🏥 Injuries${injCntBadge}</button>
           </div>
           <button class="btn-primary" style="padding:8px 15px;font-size:13px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
         </div>`;
+        const injBannerHtml = (!isDemo && curCardView === 'active' && activeInjuries.length)
+          ? `<div class="inj-banner" onclick="openInjuriesModal('MY')">
+              <div style="font-size:12.5px;font-weight:800;color:#fecaca">⚠️ Injury Watch on Your Active Cards (${activeInjuries.length}): <span style="color:#f8fafc;font-weight:700">${activeInjuries.slice(0, 4).map(x => `${escInj(x.name)} ${injBadgeHtml(x)}`).join(' · ')}${activeInjuries.length > 4 ? ` +${activeInjuries.length - 4} more` : ''}</span></div>
+              <span style="font-size:11.5px;font-weight:800;color:#38bdf8;white-space:nowrap">View Details →</span>
+            </div>`
+          : '';
 
         const roiPct = histRisk > 0 ? Math.round(((histPaid - histRisk) / histRisk) * 1000) / 10 : 0;
         const stripHtml = isDemo ? '' : ((curCardView === 'history' || curCardView === 'analytics')
@@ -2174,12 +2303,13 @@
                     <div class="prog-track" style="margin-top:6px;border-radius:999px;overflow:hidden"><div class="prog-fill" style="width:${lg.pct}%;background:${lg.miss ? '#ef4444' : '#22c55e'}"></div></div>
                   </div>`;
                 }).join('');
+                const rgInj = t.clickType === 'player' ? injBadgeHtml(getPlayerInjury(t.sport, t.clickKey)) : '';
                 return `<div class="rg-card" style="--tm-clr:${t.bg}">
                   <div class="rg-head" style="cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}')">
                     <div class="rg-id">
                       <div class="rg-logo">${t.logo ? `<img src="${t.logo}" loading="lazy" decoding="async">` : ''}</div>
                       <div style="min-width:0">
-                        <div style="font-size:14.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}</div>
+                        <div style="font-size:14.5px;font-weight:800;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.name}${rgInj}</div>
                         <div style="font-size:11px;font-weight:700;color:${t.isLive ? '#4ade80' : '#94a3b8'}">${t.isLive ? '● ' : ''}${t.statusTxt || t.sport}</div>
                       </div>
                     </div>
@@ -2347,7 +2477,7 @@
           <span> • </span>
           <a href="mailto:info@omnistatpro.com" style="color:#94a3b8;font-weight:600;text-decoration:none">info@omnistatpro.com</a>
         </footer>`;
-        container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + gridWrap + adminSampleSection + lpFooterHtml;
+        container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + injBannerHtml + filterHtml + secTitle + gridWrap + adminSampleSection + lpFooterHtml;
       } catch (err) {
         container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
       }
@@ -2404,6 +2534,8 @@
         draftLegs.push({ type, sport, player, stat, ou, target });
         document.getElementById('b-player').value = '';
         document.getElementById('b-target').value = '';
+        const bw = document.getElementById('b-inj-warn');
+        if (bw) bw.style.display = 'none';
       } else if (type === 'total') {
         const game = document.getElementById('b-game').value;
         const ou = document.getElementById('b-ou').value;
@@ -2465,7 +2597,8 @@
             <button class="pill" style="padding:3px 8px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="toggleDraftOu(${i})">${l.ou || 'Over'}</button>
             <input type="number" step="0.5" value="${l.total}" onchange="updateDraftLine(${i},this.value)" style="width:74px;padding:4px 7px;font-size:12.5px;font-weight:800"></span>`;
         } else {
-          labelHtml = `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong>${l.sport}:</strong> ${l.player} —
+          const dInj = injBadgeHtml(getPlayerInjury(l.sport, l.player));
+          labelHtml = `<span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><strong>${l.sport}:</strong> ${l.player}${dInj} —
             <button class="pill" style="padding:3px 8px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="toggleDraftOu(${i})">${l.ou || 'Over'}</button>
             <input type="number" step="0.5" value="${l.target}" onchange="updateDraftLine(${i},this.value)" style="width:74px;padding:4px 7px;font-size:12.5px;font-weight:800"> ${l.stat}</span>`;
         }
@@ -3794,6 +3927,9 @@
         if (data.partial && liveData.players && (liveData.players.NFL.length || liveData.players.NBA.length)) {
           data.players = liveData.players;
         }
+        if (data.partial && liveData.injuries && (!data.injuries || (!data.injuries.NFL.length && !data.injuries.NBA.length))) {
+          data.injuries = liveData.injuries;
+        }
         const sig = JSON.stringify(data);
         const changed = force || firstLoad || sig !== lastLiveSig;
         liveData = data;
@@ -4400,6 +4536,17 @@
           (d.logo ? `<img src="${d.logo}" style="width:42px;height:42px;object-fit:contain">` : '') +
         `</div>`;
 
+        const liveInj = getPlayerInjury(lg, d.name || name, pid) || d.injury || null;
+        if (liveInj) {
+          html += `<div class="inj-card-box">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+              <div style="font-size:13px;font-weight:900;color:#fecaca">🏥 Injury Update ${injBadgeHtml(liveInj)} <span style="color:#f8fafc">${escInj(liveInj.status || '')}${liveInj.type ? ` • ${escInj(liveInj.type)}` : ''}</span></div>
+              ${liveInj.date ? `<span style="font-size:11px;font-weight:700;color:#94a3b8">Updated ${escInj(liveInj.date)}</span>` : ''}
+            </div>
+            ${liveInj.comment ? `<div style="font-size:12.5px;line-height:1.45;color:#e2e8f0">${escInj(liveInj.comment)}</div>` : ''}
+          </div>`;
+        }
+
         if (d.season && d.season.length) {
           html += `<div style="font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Season Averages / Totals</div>` +
             `<div class="pc-stat-grid">` +
@@ -4452,8 +4599,117 @@
     }
 
     // =========================================================================
-    // 11. 1-TAP SHAREABLE CARD GRAPHIC EXPORTER & 1-LEG-AWAY HEDGE CALCULATOR
+    // 11. LIVE INJURY TRACKING MODAL, BUILDER WARNING, CARD EXPORTER & HEDGE
     // =========================================================================
+    let _curInjTab = 'NFL';
+
+    function checkBuilderInjury() {
+      const warnEl = document.getElementById('b-inj-warn');
+      const pEl = document.getElementById('b-player');
+      const spEl = document.getElementById('b-sport');
+      if (!warnEl || !pEl) return;
+      const nm = pEl.value.trim();
+      const sp = spEl ? spEl.value : 'NFL';
+      const inj = nm ? getPlayerInjury(sp, nm) : null;
+      if (inj) {
+        warnEl.innerHTML = `⚠️ <strong>${escInj(inj.name)}</strong> is listed ${injBadgeHtml(inj)} <span style="color:#f8fafc">${escInj(inj.status)}${inj.type ? ` (${escInj(inj.type)})` : ''}</span>${inj.comment ? ` — <span style="color:#cbd5e1;font-weight:600">${escInj(inj.comment)}</span>` : ''}`;
+        warnEl.style.display = 'block';
+      } else {
+        warnEl.style.display = 'none';
+      }
+    }
+
+    function openInjuriesModal(tab = 'NFL') {
+      _curInjTab = tab || 'NFL';
+      document.querySelectorAll('[data-injtab]').forEach(b => b.classList.toggle('active', b.dataset.injtab === _curInjTab));
+      const srch = document.getElementById('inj-search');
+      if (srch) srch.value = '';
+      document.getElementById('injuries-modal').classList.add('open');
+      renderInjuriesModal();
+      const hasAny = ((liveData.injuries && liveData.injuries.NFL && liveData.injuries.NFL.length) || (liveData.injuries && liveData.injuries.NBA && liveData.injuries.NBA.length));
+      if (!hasAny) refreshInjuriesModal();
+    }
+
+    function closeInjuriesModal() {
+      document.getElementById('injuries-modal').classList.remove('open');
+    }
+
+    function setInjTab(tab) {
+      _curInjTab = tab;
+      document.querySelectorAll('[data-injtab]').forEach(b => b.classList.toggle('active', b.dataset.injtab === tab));
+      renderInjuriesModal();
+    }
+
+    async function refreshInjuriesModal() {
+      const listEl = document.getElementById('inj-list');
+      if (listEl) listEl.innerHTML = '<p style="color:var(--muted)">Refreshing live NFL & NBA injury reports...</p>';
+      try {
+        const res = await fetch('/api/injuries?refresh=1');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        liveData.injuries = data || { NFL: [], NBA: [] };
+        rebuildPlayerIndex();
+        renderInjuriesModal();
+        renderCards();
+        showToast('Injury report updated');
+      } catch (e) {
+        if (listEl) listEl.innerHTML = `<p style="color:#f87171">Could not load injuries: ${escInj(e.message)}</p>`;
+      }
+    }
+
+    function renderInjuriesModal() {
+      const listEl = document.getElementById('inj-list');
+      if (!listEl) return;
+      const stFilter = (document.getElementById('inj-status-filter') && document.getElementById('inj-status-filter').value) || 'ALL';
+      const q = (document.getElementById('inj-search') && document.getElementById('inj-search').value || '').trim().toLowerCase();
+
+      const myInj = getActiveCardInjuries();
+      const myBtn = document.querySelector('[data-injtab="MY"]');
+      if (myBtn) myBtn.textContent = `My Active Cards (${myInj.length})`;
+
+      let pool = _curInjTab === 'MY'
+        ? myInj
+        : ((liveData.injuries && liveData.injuries[_curInjTab]) || []);
+
+      if (stFilter === 'OUT') pool = pool.filter(x => x.abbr === 'OUT' || x.abbr === 'IR');
+      else if (stFilter === 'D') pool = pool.filter(x => x.abbr === 'D');
+      else if (stFilter === 'Q') pool = pool.filter(x => x.abbr === 'Q' || x.abbr === 'DTD');
+
+      if (q) {
+        pool = pool.filter(x =>
+          String(x.name || '').toLowerCase().includes(q)
+          || String(x.team || '').toLowerCase().includes(q)
+          || String(x.team_name || '').toLowerCase().includes(q)
+          || String(x.type || '').toLowerCase().includes(q)
+        );
+      }
+
+      if (!pool.length) {
+        const msg = _curInjTab === 'MY'
+          ? 'All players on your active cards are currently clear of injury designations!'
+          : 'No matching injury reports found.';
+        listEl.innerHTML = `<p style="color:${_curInjTab === 'MY' ? '#4ade80' : 'var(--muted)'};font-weight:700;padding:12px 4px">${msg}</p>`;
+        return;
+      }
+
+      listEl.innerHTML = pool.slice(0, 120).map(item => {
+        const safeLg = String(item.league || 'NFL').replace(/'/g, "\\'");
+        const safeId = String(item.id || '').replace(/'/g, "\\'");
+        const safeNm = String(item.name || '').replace(/'/g, "\\'");
+        const clickAttr = item.id ? `onclick="closeInjuriesModal();openPlayerCard('${safeLg}','${safeId}','${safeNm}')"` : '';
+        return `<div class="inj-row" ${clickAttr}>
+          ${item.logo ? `<img src="${escInj(item.logo)}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;margin-top:2px" loading="lazy">` : ''}
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+              <div style="font-size:13.5px;font-weight:800;color:#f8fafc">${escInj(item.name)}${injBadgeHtml(item)} <span style="font-size:11.5px;font-weight:700;color:#94a3b8">${escInj(item.team)}${item.pos ? ` • ${escInj(item.pos)}` : ''}${_curInjTab === 'MY' ? ` • ${escInj(item.league)}` : ''}</span></div>
+              <span style="font-size:11px;font-weight:700;color:#38bdf8">${escInj(item.type || item.status)}${item.date ? ` • ${escInj(item.date)}` : ''}</span>
+            </div>
+            ${item.comment ? `<div style="font-size:12px;color:#cbd5e1;line-height:1.4;margin-top:4px">${escInj(item.comment)}</div>` : ''}
+          </div>
+        </div>`;
+      }).join('');
+    }
+
     let _hedgeCtx = null;
 
     function openHedgeModal(idx) {

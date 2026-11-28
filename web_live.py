@@ -530,6 +530,99 @@ def parse_scoreboard(sport_path, lg_code, fast=False):
     games.sort(key=lambda g: (g["rank"], g["date"]))
     return games, players
 
+_INJURY_CACHE = {"ts": 0.0, "data": {"NFL": [], "NBA": []}}
+
+def _injury_abbr_and_rank(status_str):
+    s = str(status_str or "").strip().lower()
+    if not s:
+        return ("INJ", 5)
+    if "injured reserve" in s or s == "ir" or "pup" in s or "nfi" in s:
+        return ("IR", 0)
+    if "out" in s or "inactive" in s or "suspended" in s:
+        return ("OUT", 1)
+    if "doubtful" in s:
+        return ("D", 2)
+    if "questionable" in s:
+        return ("Q", 3)
+    if "day-to-day" in s or "day to day" in s or "dtd" in s:
+        return ("DTD", 4)
+    if "probable" in s:
+        return ("P", 5)
+    return (re.sub(r"[^A-Za-z]", "", status_str).upper()[:3] or "INJ", 5)
+
+def fetch_league_injuries(sport_path, lg_code):
+    data = fetch_json(f"https://{HOST}/apis/site/v2/sports/{sport_path}/injuries", timeout=6)
+    groups = data.get("injuries") or data.get("items") or []
+    out = []
+    seen = set()
+    for grp in groups:
+        if not isinstance(grp, dict):
+            continue
+        tm_obj = grp.get("team") or {}
+        t_name = str(grp.get("displayName") or tm_obj.get("displayName") or tm_obj.get("shortDisplayName") or "").strip()
+        t_abbr = str(tm_obj.get("abbreviation") or "").strip()
+        t_logo = next((x.get("href", "") for x in tm_obj.get("logos", []) if isinstance(x, dict)), tm_obj.get("logo", ""))
+        for inj in (grp.get("injuries") or []):
+            if not isinstance(inj, dict):
+                continue
+            ath = inj.get("athlete") or {}
+            nm = str(ath.get("displayName") or ath.get("fullName") or "").strip()
+            if not nm:
+                continue
+            pid = str(ath.get("id") or "").strip()
+            ath_tm = ath.get("team") or {}
+            ab = t_abbr or str(ath_tm.get("abbreviation") or "").strip()
+            lg_logo = t_logo or next((x.get("href", "") for x in ath_tm.get("logos", []) if isinstance(x, dict)), ath_tm.get("logo", ""))
+            pos = str((ath.get("position") or {}).get("abbreviation") or "").strip()
+            status = str(inj.get("status") or (inj.get("type") or {}).get("description") or "").strip()
+            if not status or status.lower() == "active":
+                continue
+            abbr, rank = _injury_abbr_and_rank(status)
+            det = inj.get("details") or {}
+            inj_type = str(det.get("type") or det.get("location") or det.get("detail") or "").strip()
+            comment = str(inj.get("shortComment") or inj.get("longComment") or "").strip()
+            if len(comment) > 360:
+                comment = comment[:357] + "..."
+            dt = str(inj.get("date") or "")[:10]
+            dedup = pid or f"{ab}:{nm.lower()}"
+            if dedup in seen:
+                continue
+            seen.add(dedup)
+            out.append({
+                "id": pid,
+                "name": nm,
+                "team": ab or t_name,
+                "team_name": t_name or ab,
+                "logo": lg_logo,
+                "pos": pos,
+                "league": lg_code.upper(),
+                "status": status,
+                "abbr": abbr,
+                "rank": rank,
+                "type": inj_type,
+                "comment": comment,
+                "date": dt
+            })
+    out.sort(key=lambda x: (x["rank"], x["team"], x["name"]))
+    return out
+
+def get_injuries_payload(force=False):
+    now = time.time()
+    if not force and (now - _INJURY_CACHE["ts"]) < 120 and (_INJURY_CACHE["data"].get("NFL") or _INJURY_CACHE["data"].get("NBA")):
+        return _INJURY_CACHE["data"]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        f_nfl = pool.submit(fetch_league_injuries, "football/nfl", "nfl")
+        f_nba = pool.submit(fetch_league_injuries, "basketball/nba", "nba")
+        nfl_inj = f_nfl.result()
+        nba_inj = f_nba.result()
+    payload = {
+        "NFL": nfl_inj if nfl_inj else _INJURY_CACHE["data"].get("NFL", []),
+        "NBA": nba_inj if nba_inj else _INJURY_CACHE["data"].get("NBA", [])
+    }
+    _INJURY_CACHE["ts"] = now
+    _INJURY_CACHE["data"] = payload
+    return payload
+
 def get_live_payload(fast=False):
     now = time.time()
     if _CACHE["data"] and (now - _CACHE["ts"]) < 20:
@@ -543,15 +636,17 @@ def get_live_payload(fast=False):
             nfl_g, _ = f_nfl.result()
             nba_g, _ = f_nba.result()
             cfb_g, _ = f_cfb.result()
-        return {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": [], "NBA": []}, "partial": True}
-    with ThreadPoolExecutor(max_workers=3) as pool:
+        return {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": [], "NBA": []}, "injuries": _INJURY_CACHE["data"], "partial": True}
+    with ThreadPoolExecutor(max_workers=4) as pool:
         f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl", False)
         f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba", False)
         f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb", False)
+        f_inj = pool.submit(get_injuries_payload, False)
         nfl_g, nfl_p = f_nfl.result()
         nba_g, nba_p = f_nba.result()
         cfb_g, _ = f_cfb.result()
-    payload = {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": nfl_p, "NBA": nba_p}}
+        inj_data = f_inj.result()
+    payload = {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": nfl_p, "NBA": nba_p}, "injuries": inj_data}
     _CACHE["ts"], _CACHE["data"] = now, payload
     return payload
 
@@ -659,6 +754,10 @@ def api_player(lg, pid):
                 }
     games_log = sorted(games_by_id.values(), key=lambda x: x["date"], reverse=True)
 
+    inj_list = get_injuries_payload().get(lg.upper(), [])
+    ath_name_l = str(ath.get("displayName", "")).strip().lower()
+    p_inj = next((x for x in inj_list if (pid and x.get("id") == str(pid)) or (ath_name_l and x.get("name", "").lower() == ath_name_l)), None)
+
     payload = {
         "id": pid,
         "name": ath.get("displayName", ""),
@@ -669,11 +768,17 @@ def api_player(lg, pid):
         "abbr": tm.get("abbreviation", ""),
         "bg": clean_hex(tm.get("color"), "#1e293b"),
         "logo": next((x.get("href", "") for x in tm.get("logos", [])), ""),
+        "injury": p_inj,
         "season": season_stats,
         "gamelog": {"labels": gl_labels, "games": games_log[:10]}
     }
     _PLAYER_CACHE[ck] = {"ts": now, "data": payload}
     return jsonify(payload)
+
+@app.route("/api/injuries")
+def api_injuries():
+    force = request.args.get("refresh") == "1"
+    return jsonify(get_injuries_payload(force=force))
 
 @app.route("/api/live")
 def api_live():
