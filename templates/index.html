@@ -1148,23 +1148,34 @@
        ======================================================================== */
     let customSamples = [];
     let curBookFilter = 'ALL', curCardView = 'active';
-    let expandedHistoryCards = new Set();
+    let historyExpandOverrides = new Map();
     let editingCardIdx = -1, editingSampleIdx = -1;
     const isAdminUser = () => Boolean(currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@omnistatpro.com'));
 
+    function getLocalDateKey(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d.getTime())) return '';
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    }
+
+    function isHistoryCardExpanded(c, idx) {
+      if (historyExpandOverrides.has(idx)) return historyExpandOverrides.get(idx);
+      const todayKey = getLocalDateKey(new Date().toISOString());
+      const cardKey = getLocalDateKey(c && (c.settledAt || c.createdAt));
+      return Boolean(cardKey && cardKey === todayKey);
+    }
+
     function toggleHistoryCard(idx) {
-      if (expandedHistoryCards.has(idx)) expandedHistoryCards.delete(idx);
-      else expandedHistoryCards.add(idx);
+      const c = userCards[idx];
+      historyExpandOverrides.set(idx, !isHistoryCardExpanded(c, idx));
       renderCards();
     }
 
     function setAllHistoryExpanded(expand) {
-      expandedHistoryCards.clear();
-      if (expand) {
-        userCards.forEach((c, idx) => {
-          if (c && (c.settled || c.archived)) expandedHistoryCards.add(idx);
-        });
-      }
+      userCards.forEach((c, idx) => {
+        if (c && (c.settled || c.archived)) historyExpandOverrides.set(idx, Boolean(expand));
+      });
       renderCards();
     }
 
@@ -1245,7 +1256,7 @@
         delete c.settledResult;
         delete c.settledAt;
         delete c.settledEvals;
-        expandedHistoryCards.delete(i);
+        historyExpandOverrides.delete(i);
       } else {
         const evals = (c.legs || []).map(evalLeg);
         const allHit = evals.length > 0 && evals.every(x => x.hit);
@@ -1377,7 +1388,7 @@
         const renderSingleCard = (c, idx, isSampleView, isHistoryMode = false) => {
           const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
           const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-          const isExpanded = !isHistoryMode || expandedHistoryCards.has(idx);
+          const isExpanded = !isHistoryMode || isHistoryCardExpanded(c, idx);
           const rows = isExpanded ? evals.map(e => {
             const stBadge = e.statusTxt
               ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive ? '● ' : ''}${e.statusTxt}</div>`
@@ -1498,7 +1509,7 @@
         let secTitle = '';
         let gridWrap = '';
         if (!isDemo && curCardView === 'history') {
-          const anyExpanded = activeList.some(c => expandedHistoryCards.has(userCards.indexOf(c)));
+          const anyExpanded = activeList.some(c => isHistoryCardExpanded(c, userCards.indexOf(c)));
           const toggleAllBtn = activeList.length
             ? `<button class="pill" style="padding:4px 11px;font-size:11.5px;margin-left:auto" onclick="setAllHistoryExpanded(${anyExpanded ? 'false' : 'true'})">${anyExpanded ? 'Collapse All' : 'Expand All'}</button>`
             : '';
