@@ -508,6 +508,59 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
       padding: 14px 16px; margin-bottom: 14px; box-shadow: var(--shadow);
     }
+    .lp-hero {
+      background: radial-gradient(ellipse 90% 80% at 15% 0%, rgba(29, 140, 248, 0.22), transparent 65%),
+        linear-gradient(135deg, rgba(15, 23, 42, 0.96) 0%, rgba(7, 13, 26, 0.99) 100%);
+      border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 18px;
+      padding: 26px 24px; margin: 12px 0 18px; box-shadow: var(--shadow);
+    }
+    .lp-eyebrow {
+      display: inline-block; padding: 4px 10px; border-radius: 999px; margin-bottom: 12px;
+      font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+      background: rgba(56, 189, 248, 0.16); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .lp-title {
+      font-family: 'Barlow Condensed', sans-serif; font-size: 36px; line-height: 1.05;
+      font-weight: 900; color: #f8fafc; letter-spacing: 0.015em; margin: 0 0 10px;
+      text-transform: uppercase; max-width: 780px;
+    }
+    .lp-title span { color: #38bdf8; }
+    .lp-sub { color: #cbd5e1; font-size: 14.5px; line-height: 1.5; max-width: 680px; margin: 0 0 16px; }
+    .lp-books { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 18px; }
+    .lp-ctas { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .lp-steps { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); margin-bottom: 18px; }
+    .lp-step {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+      padding: 15px 16px; box-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
+    }
+    .lp-step-num {
+      font-family: 'Barlow Condensed', sans-serif; font-size: 13px; font-weight: 900;
+      color: #38bdf8; letter-spacing: 0.08em; margin-bottom: 4px;
+    }
+    .lp-step-t { font-size: 15px; font-weight: 800; color: #f8fafc; margin-bottom: 5px; }
+    .lp-step-d { font-size: 12.5px; line-height: 1.45; color: #94a3b8; }
+    .lp-cmp {
+      background: var(--surface); border: 1px solid rgba(56, 189, 248, 0.28); border-radius: 14px;
+      padding: 16px; margin-bottom: 18px; box-shadow: var(--shadow); overflow-x: auto;
+    }
+    .lp-cmp-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lp-cmp-tbl th, .lp-cmp-tbl td { padding: 10px 10px; border-bottom: 1px solid rgba(56, 189, 248, 0.14); text-align: left; }
+    .lp-cmp-tbl tr:last-child td { border-bottom: none; }
+    .lp-cmp-tbl th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; }
+    .lp-cmp-tbl th.lp-us, .lp-cmp-tbl td.lp-us { background: rgba(29, 140, 248, 0.1); font-weight: 800; color: #4ade80; }
+    .lp-cmp-tbl th.lp-us { color: #38bdf8; }
+    .lp-cmp-tbl td.lp-them { color: #94a3b8; font-weight: 600; }
+    .lp-feats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); margin-bottom: 20px; }
+    .lp-feat {
+      background: rgba(15, 23, 42, 0.9); border: 1px solid rgba(56, 189, 248, 0.2);
+      border-radius: 14px; padding: 14px 16px;
+    }
+    .lp-feat-t { font-size: 14.5px; font-weight: 800; color: #f8fafc; margin-bottom: 4px; }
+    .lp-feat-d { font-size: 12.5px; line-height: 1.45; color: #94a3b8; }
+    .lp-footer {
+      margin-top: 26px; padding: 16px; border-top: 1px solid rgba(56, 189, 248, 0.18);
+      text-align: center; color: #64748b; font-size: 11.5px; line-height: 1.5;
+    }
     button { touch-action: manipulation; }
 
     /* ==========================================================================
@@ -547,6 +600,12 @@
       .sweat-lbl { font-size: 10px; }
       .sweat-val { font-size: 20px; }
       .mission-hero { padding: 14px; gap: 10px; }
+      .lp-hero { padding: 18px 14px; border-radius: 14px; margin: 8px 0 14px; }
+      .lp-title { font-size: 27px; }
+      .lp-sub { font-size: 13.5px; }
+      .lp-cmp { padding: 12px 10px; }
+      .lp-cmp-tbl { font-size: 12px; }
+      .lp-cmp-tbl th, .lp-cmp-tbl td { padding: 8px 6px; }
       .builder { padding: 14px; border-radius: 14px; }
       .row-flex { gap: 8px; margin-bottom: 10px; }
       input, select, .search-box { font-size: 16px !important; }
@@ -1544,29 +1603,45 @@
 
     function buildSampleCards() {
       if (customSamples && customSamples.length > 0) return customSamples.map(c => ({ ...c, isSample: true }));
-      const nbaP = (liveData.players && liveData.players.NBA) || [];
-      const nflP = (liveData.players && liveData.players.NFL) || [];
+      const isActiveSlate = p => p && p.name && !/bye\s*week|off\s*day/i.test(String(p.status || ''));
+      const rawNba = (liveData.players && liveData.players.NBA) || [];
+      const rawNfl = (liveData.players && liveData.players.NFL) || [];
+      const nbaP = rawNba.filter(isActiveSlate).length >= 3 ? rawNba.filter(isActiveSlate) : rawNba;
+      const nflP = rawNfl.filter(isActiveSlate).length >= 4 ? rawNfl.filter(isActiveSlate) : rawNfl;
       const samples = [];
-      if (nbaP.length >= 3) {
+
+      const qbs = nflP.filter(p => p.pos === 'QB');
+      const rbs = nflP.filter(p => p.pos === 'RB');
+      const wrs = nflP.filter(p => p.pos === 'WR' || p.pos === 'TE');
+
+      if (qbs[0] && rbs[0] && wrs[0]) {
         samples.push({
-          book: 'FanDuel', title: 'NBA 3-Leg Sweat', cost: 25, payout: 145, isSample: true,
+          book: 'PrizePicks', title: 'NFL 3-Pick Power Play', cost: 20, payout: 100, isSample: true,
           legs: [
-            { type: 'prop', sport: 'NBA', player: nbaP.at(0).name, stat: 'PTS', target: 20 },
-            { type: 'prop', sport: 'NBA', player: nbaP.at(1).name, stat: 'REB', target: 6 },
-            { type: 'prop', sport: 'NBA', player: nbaP.at(2).name, stat: 'AST', target: 5 }
+            { type: 'prop', sport: 'NFL', player: qbs[0].name, stat: 'PASS YDS', ou: 'Over', target: 235.5 },
+            { type: 'prop', sport: 'NFL', player: rbs[0].name, stat: 'RUSH YDS', ou: 'Over', target: 64.5 },
+            { type: 'prop', sport: 'NFL', player: wrs[0].name, stat: 'REC YDS', ou: 'Under', target: 72.5 }
           ]
         });
       }
-      const qb = nflP.find(p => p.pos === 'QB') || nflP.at(0);
-      const rb = nflP.find(p => p.pos === 'RB') || nflP.at(1);
-      const wr = nflP.find(p => p.pos === 'WR') || nflP.at(2);
-      if (qb && rb) {
+      if ((wrs[1] || wrs[0]) && (rbs[1] || rbs[0])) {
+        const p1 = wrs[1] || wrs[0], p2 = rbs[1] || rbs[0], p3 = qbs[1] || qbs[0];
         samples.push({
-          book: 'PrizePicks', title: 'NFL Core Slip', cost: 20, payout: 60, isSample: true,
+          book: 'Kalshi', title: 'NFL Market Combo', cost: 10, payout: 34.5, isSample: true,
           legs: [
-            { type: 'prop', sport: 'NFL', player: qb.name, stat: 'PASS YDS', target: 225 },
-            { type: 'prop', sport: 'NFL', player: rb.name, stat: 'RUSH YDS', target: 65 },
-            ...(wr ? [{ type: 'prop', sport: 'NFL', player: wr.name, stat: 'REC YDS', target: 55 }] : [])
+            { type: 'prop', sport: 'NFL', player: p1.name, stat: 'REC YDS', ou: 'Over', target: 50 },
+            { type: 'prop', sport: 'NFL', player: p2.name, stat: 'RUSH YDS', ou: 'Over', target: 40 },
+            ...(p3 ? [{ type: 'prop', sport: 'NFL', player: p3.name, stat: 'PASS TD', ou: 'Over', target: 1.5 }] : [])
+          ]
+        });
+      }
+      if (nbaP.length >= 3) {
+        samples.push({
+          book: 'FanDuel', title: 'NBA 3-Leg Parlay', cost: 25, payout: 145, isSample: true,
+          legs: [
+            { type: 'prop', sport: 'NBA', player: nbaP.at(0).name, stat: 'PTS', ou: 'Over', target: 20.5 },
+            { type: 'prop', sport: 'NBA', player: nbaP.at(1).name, stat: 'REB', ou: 'Over', target: 6.5 },
+            { type: 'prop', sport: 'NBA', player: nbaP.at(2).name, stat: 'AST', ou: 'Over', target: 5.5 }
           ]
         });
       }
@@ -1740,15 +1815,97 @@
         const netPL = Math.round((histPaid - histRisk) * 100) / 100;
         const winPct = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
-        const heroHtml = isDemo ? `<div class="mission-hero">
-          <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
-          <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog, Kalshi & more in real time.</div></div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap">
-            <button class="btn-primary" style="padding:10px 16px;font-size:13.5px" onclick="triggerQuickSlipUpload()">📷 Upload Bet Slip</button>
-            <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="setTab('build')">+ Build Manually</button>
-            <button class="pill" style="padding:10px 14px;border-color:rgba(56,189,248,0.45);color:#f8fafc" onclick="openAuthModal()">Sign In to Sync</button>
+        const heroHtml = isDemo ? `
+        <section class="lp-hero">
+          <div class="lp-eyebrow">Zero Passwords • Sportsbooks + DFS + Kalshi • Live in 2 Seconds</div>
+          <h1 class="lp-title">Stop Flipping Between 5 Betting Apps. <span>One Live Command Center.</span></h1>
+          <p class="lp-sub">Snap a screenshot of any slip from FanDuel, DraftKings, PrizePicks, Underdog, or Kalshi. OmniStatPro reads every leg in 2 seconds and tracks live stats, pace projections, and cross-book exposure—without ever asking for your sportsbook password.</p>
+          <div class="lp-books">
+            <span style="font-size:11px;font-weight:800;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;margin-right:4px">Works with:</span>
+            <span class="book-badge bk-fd">FanDuel</span>
+            <span class="book-badge bk-dk">DraftKings</span>
+            <span class="book-badge bk-pp">PrizePicks</span>
+            <span class="book-badge bk-ud">Underdog</span>
+            <span class="book-badge bk-kal">Kalshi</span>
           </div>
-        </div>` : '';
+          <div class="lp-ctas">
+            <button class="btn-primary" style="padding:11px 20px;font-size:14px" onclick="triggerQuickSlipUpload()">📷 Try Free — Upload a Bet Slip</button>
+            <button class="pill" style="padding:10px 16px;border-color:rgba(56,189,248,0.5);color:#f8fafc" onclick="openAuthModal()">Sign In / Sync Devices</button>
+            <button class="pill" style="padding:10px 15px;color:#cbd5e1" onclick="setTab('build')">+ Build Manually</button>
+          </div>
+        </section>
+
+        <section class="lp-steps">
+          <div class="lp-step">
+            <div class="lp-step-num">STEP 01</div>
+            <div class="lp-step-t">Snap a Screenshot</div>
+            <div class="lp-step-d">Never hand over sportsbook passwords or 2FA codes. Just upload a bet slip screenshot straight from your phone.</div>
+          </div>
+          <div class="lp-step">
+            <div class="lp-step-num">STEP 02</div>
+            <div class="lp-step-t">2-Second Vision AI Scan</div>
+            <div class="lp-step-d">Instantly extracts every player, stat, Over/Under arrow, cost, and payout across sportsbooks, DFS, and Kalshi.</div>
+          </div>
+          <div class="lp-step">
+            <div class="lp-step-num">STEP 03</div>
+            <div class="lp-step-t">Track Everything Live</div>
+            <div class="lp-step-d">Live box scores, pace projections, audio hit chimes, and one unified Cross-Book Rooting Guide as games unfold.</div>
+          </div>
+        </section>
+
+        <section class="lp-cmp">
+          <h2 style="margin:0 0 10px;font-size:18px">Why Bettors Switch to OmniStatPro</h2>
+          <table class="lp-cmp-tbl">
+            <thead>
+              <tr>
+                <th>Capability</th>
+                <th class="lp-us">OmniStatPro</th>
+                <th>Other Trackers</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>Sportsbook passwords required?</strong></td>
+                <td class="lp-us">✓ Never (2s Screenshot AI)</td>
+                <td class="lp-them">✕ Login + 2FA Required</td>
+              </tr>
+              <tr>
+                <td><strong>Sportsbooks + DFS + Kalshi together</strong></td>
+                <td class="lp-us">✓ All on 1 Live Screen</td>
+                <td class="lp-them">✕ Fragmented / Limited</td>
+              </tr>
+              <tr>
+                <td><strong>Cross-Book Rooting Guide &amp; Live Pace</strong></td>
+                <td class="lp-us">✓ Built for Live Game Day</td>
+                <td class="lp-them">✕ Post-Game Accounting Only</td>
+              </tr>
+              <tr>
+                <td><strong>Try instantly without an account</strong></td>
+                <td class="lp-us">✓ Start Free in 5 Seconds</td>
+                <td class="lp-them">✕ Account &amp; Sync Wall</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section class="lp-feats">
+          <div class="lp-feat">
+            <div class="lp-feat-t">🎯 Cross-Book Rooting Guide</div>
+            <div class="lp-feat-d">See total dollars riding on every game and player across all your apps at once—so you always know which game to watch.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">🔥 Live Pace &amp; 1-Leg-Away Alerts</div>
+            <div class="lp-feat-d">Real-time stat projections from the live game clock, green hit bars, audio chimes, and automatic highlights when a slip is 1 leg away.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">📊 Automatic Edge Analytics</div>
+            <div class="lp-feat-d">Settled cards lock in permanently to show your ROI by platform, hit rate by stat type, Over/Under splits, and cumulative P&amp;L curve.</div>
+          </div>
+          <div class="lp-feat">
+            <div class="lp-feat-t">📲 Installable Mobile App &amp; Share Links</div>
+            <div class="lp-feat-d">Add straight to your iPhone or Android home screen and send live read-only sweat links to friends—no app download needed.</div>
+          </div>
+        </section>` : '';
 
         const viewSwitchHtml = isDemo ? '' : `<div class="row-flex" style="margin-bottom:12px;align-items:center;justify-content:space-between">
           <div style="display:flex;gap:6px;flex-wrap:wrap">
@@ -2071,7 +2228,14 @@
             ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px;align-items:start">${cardsHtml}</div>`
             : `<p style="color:var(--muted)">${emptyText}</p>`;
         }
-        container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + gridWrap + adminSampleSection;
+        const lpFooterHtml = isDemo ? `<footer class="lp-footer">
+          <div style="margin-bottom:10px">
+            <button class="btn-primary" style="padding:9px 18px;font-size:13.5px" onclick="triggerQuickSlipUpload()">📷 Upload Your First Bet Slip — Free</button>
+          </div>
+          <div>OmniStatPro is an independent live sports tracking tool for informational and entertainment purposes only. Not affiliated with, endorsed by, or sponsored by the NFL, NBA, NCAA, FanDuel, DraftKings, PrizePicks, Underdog, or Kalshi.</div>
+          <div style="margin-top:4px">Must be 21+ (18+ where permitted). Gambling problem? Call 1-800-GAMBLER.</div>
+        </footer>` : '';
+        container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + gridWrap + adminSampleSection + lpFooterHtml;
       } catch (err) {
         container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
       }
