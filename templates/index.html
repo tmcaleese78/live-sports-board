@@ -397,6 +397,25 @@
     }
     .pc-stat-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
     .pc-stat-val { font-size: 16px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
+    .hist-date-hdr {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+      margin: 18px 0 10px; padding: 8px 13px; border-radius: 10px;
+      background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.24);
+      font-size: 12.5px; font-weight: 800; color: #e2e8f0; letter-spacing: 0.03em;
+    }
+    .hist-date-meta { display: flex; align-items: center; gap: 10px; font-size: 12px; font-weight: 800; }
+    .hist-toggle-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 8px;
+      padding: 8px 12px; background: rgba(17, 27, 51, 0.94); color: #cbd5e1;
+      font-size: 12px; font-weight: 700; cursor: pointer; user-select: none;
+      border-top: 1px solid rgba(56, 189, 248, 0.14); transition: background 0.15s ease, color 0.15s ease;
+    }
+    .hist-toggle-bar:hover { background: rgba(30, 41, 59, 0.96); color: #38bdf8; }
+    .hist-date-tag {
+      font-size: 10.5px; font-weight: 700; color: #94a3b8;
+      background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(148, 163, 184, 0.25);
+      padding: 1px 6px; border-radius: 5px; margin-left: 4px;
+    }
     button { touch-action: manipulation; }
 
     /* ==========================================================================
@@ -823,10 +842,67 @@
 
     let knownHitKeys = new Set();
     let hitTrackerSeeded = false;
+    function snapshotLegEval(ev) {
+      return {
+        name: ev.name, stat: ev.stat, gained: ev.gained, needed: ev.needed,
+        hit: Boolean(ev.hit), miss: Boolean(ev.miss), pct: Number(ev.pct) || 0,
+        bg: ev.bg || '#1e293b', logo: ev.logo || '', statusTxt: ev.statusTxt || '',
+        isLive: false, sport: ev.sport || 'NFL', clickType: ev.clickType || 'player', clickKey: ev.clickKey || ''
+      };
+    }
+
+    function persistSettledCards() {
+      let dirty = false;
+      const nowIso = new Date().toISOString();
+      userCards.forEach(c => {
+        if (!c || !Array.isArray(c.legs) || !c.legs.length) return;
+        const liveEvals = c.legs.map(evalLeg);
+        const liveAllHit = liveEvals.every(x => x.hit);
+        const liveAnyMiss = liveEvals.some(x => x.miss);
+
+        if (!c.settled && (liveAllHit || liveAnyMiss || c.archived)) {
+          c.settled = true;
+          c.settledResult = liveAllHit ? 'won' : (liveAnyMiss ? 'lost' : 'archived');
+          c.settledAt = c.settledAt || c.createdAt || nowIso;
+          c.settledEvals = liveEvals.map(snapshotLegEval);
+          dirty = true;
+        } else if (c.settled) {
+          if (!c.settledAt) { c.settledAt = c.createdAt || nowIso; dirty = true; }
+          if (!c.settledResult) {
+            c.settledResult = liveAllHit ? 'won' : (liveAnyMiss ? 'lost' : 'archived');
+            dirty = true;
+          }
+          // Merge fresher live stats into settledEvals while the week's games finish,
+          // but never overwrite a previously recorded HIT/MISS/non-zero stat with 0 after week reset.
+          if (!Array.isArray(c.settledEvals) || c.settledEvals.length !== liveEvals.length) {
+            c.settledEvals = liveEvals.map(snapshotLegEval);
+            dirty = true;
+          } else {
+            const ageMs = Date.now() - Date.parse(c.settledAt || nowIso);
+            if (ageMs < 48 * 3600 * 1000) {
+              for (let i = 0; i < liveEvals.length; i++) {
+                const prev = c.settledEvals[i], cur = liveEvals[i];
+                const prevFinal = prev && (prev.hit || prev.miss || (parseFloat(prev.gained) || 0) > 0);
+                const curFinal = cur && (cur.hit || cur.miss || (parseFloat(cur.gained) || 0) > 0);
+                if (curFinal && (!prevFinal || cur.gained !== prev.gained || cur.hit !== prev.hit || cur.miss !== prev.miss)) {
+                  c.settledEvals[i] = snapshotLegEval(cur);
+                  dirty = true;
+                }
+              }
+            }
+          }
+        }
+      });
+      if (dirty) {
+        try { localStorage.setItem('osp_cards', JSON.stringify(userCards)); } catch (_) {}
+        pushCardsToCloud();
+      }
+    }
+
     function checkNewLegHits() {
       const currentHits = new Set();
       userCards.forEach((c, ci) => {
-        if (c.archived) return;
+        if (c.archived || c.settled) return;
         (c.legs || []).forEach((leg, li) => {
           const ev = evalLeg(leg);
           if (ev.hit) {
@@ -841,6 +917,7 @@
       });
       knownHitKeys = currentHits;
       hitTrackerSeeded = true;
+      persistSettledCards();
     }
 
     /* ========================================================================
@@ -1071,8 +1148,25 @@
        ======================================================================== */
     let customSamples = [];
     let curBookFilter = 'ALL', curCardView = 'active';
+    let expandedHistoryCards = new Set();
     let editingCardIdx = -1, editingSampleIdx = -1;
     const isAdminUser = () => Boolean(currentUser && currentUser.email && currentUser.email.toLowerCase().endsWith('@omnistatpro.com'));
+
+    function toggleHistoryCard(idx) {
+      if (expandedHistoryCards.has(idx)) expandedHistoryCards.delete(idx);
+      else expandedHistoryCards.add(idx);
+      renderCards();
+    }
+
+    function setAllHistoryExpanded(expand) {
+      expandedHistoryCards.clear();
+      if (expand) {
+        userCards.forEach((c, idx) => {
+          if (c && (c.settled || c.archived)) expandedHistoryCards.add(idx);
+        });
+      }
+      renderCards();
+    }
 
     function bookClass(bk) {
       const s = String(bk || '').toLowerCase();
@@ -1144,11 +1238,28 @@
     function toggleArchiveCard(i) {
       const c = userCards[i];
       if (!c) return;
-      c.archived = !c.archived;
+      const isCurrentlySettled = Boolean(c.archived || c.settled);
+      if (isCurrentlySettled) {
+        c.archived = false;
+        c.settled = false;
+        delete c.settledResult;
+        delete c.settledAt;
+        delete c.settledEvals;
+        expandedHistoryCards.delete(i);
+      } else {
+        const evals = (c.legs || []).map(evalLeg);
+        const allHit = evals.length > 0 && evals.every(x => x.hit);
+        const anyMiss = evals.some(x => x.miss);
+        c.archived = true;
+        c.settled = true;
+        c.settledResult = allHit ? 'won' : (anyMiss ? 'lost' : 'archived');
+        c.settledAt = c.settledAt || c.createdAt || new Date().toISOString();
+        c.settledEvals = evals.map(snapshotLegEval);
+      }
       localStorage.setItem('osp_cards', JSON.stringify(userCards));
       pushCardsToCloud();
       renderCards();
-      showToast(c.archived ? 'Card moved to Settled History' : 'Card restored to Active Cards');
+      showToast(c.settled ? 'Card moved to Settled History' : 'Card restored to Active Cards');
     }
 
     function buildSampleCards() {
@@ -1226,6 +1337,16 @@
         const outcomeCache = new WeakMap();
         const getCardOutcome = c => {
           if (outcomeCache.has(c)) return outcomeCache.get(c);
+          if (c.settled) {
+            const evals = (Array.isArray(c.settledEvals) && c.settledEvals.length === (c.legs || []).length)
+              ? c.settledEvals
+              : (c.legs || []).map(evalLeg);
+            const allHit = c.settledResult === 'won' || (!c.settledResult && evals.length > 0 && evals.every(x => x.hit));
+            const anyMiss = c.settledResult === 'lost' || (!c.settledResult && evals.some(x => x.miss));
+            const out = { evals, allHit, anyMiss, isSettled: true };
+            outcomeCache.set(c, out);
+            return out;
+          }
           const evals = (c.legs || []).map(evalLeg);
           const allHit = evals.length > 0 && evals.every(x => x.hit);
           const anyMiss = evals.some(x => x.miss);
@@ -1247,11 +1368,18 @@
           ? viewPool.filter(c => normBook(c.book) === curBookFilter)
           : viewPool;
 
-        const renderSingleCard = (c, idx, isSampleView) => {
+        const fmtShortDate = iso => {
+          if (!iso) return '';
+          const d = new Date(iso);
+          return isNaN(d.getTime()) ? '' : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        };
+
+        const renderSingleCard = (c, idx, isSampleView, isHistoryMode = false) => {
           const { evals, allHit, anyMiss, isSettled } = getCardOutcome(c);
           const st = allHit ? 'hit' : (anyMiss ? 'miss' : '');
-          const rows = evals.map(e => {
-          const stBadge = e.statusTxt
+          const isExpanded = !isHistoryMode || expandedHistoryCards.has(idx);
+          const rows = isExpanded ? evals.map(e => {
+            const stBadge = e.statusTxt
               ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive ? '● ' : ''}${e.statusTxt}</div>`
               : '';
             const safeSport = String(e.sport || '').replace(/'/g, "\\'");
@@ -1261,7 +1389,7 @@
               <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}" loading="lazy" decoding="async">` : ''}</div>
               <div><div>${e.name}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
               <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
-          }).join('');
+          }).join('') : '';
 
           const bk = normBook(c.book);
           let actionBtns = '';
@@ -1278,13 +1406,31 @@
           }
 
           const statusBadge = !isSampleView && isSettled
-            ? (allHit ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(34,197,94,0.2);color:#4ade80">WON</span>` : (anyMiss ? `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(239,68,68,0.2);color:#f87171">LOST</span>` : `<span style="margin-left:6px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(148,163,184,0.2);color:#cbd5e1">ARCHIVED</span>`))
+            ? (allHit ? `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(34,197,94,0.2);color:#4ade80">WON</span>` : (anyMiss ? `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(239,68,68,0.2);color:#f87171">LOST</span>` : `<span style="margin-left:4px;padding:1px 6px;border-radius:5px;font-size:10px;font-weight:900;background:rgba(148,163,184,0.2);color:#cbd5e1">ARCHIVED</span>`))
             : '';
+          const shortDt = isHistoryMode ? fmtShortDate(c.settledAt || c.createdAt) : '';
+          const dateTag = shortDt ? `<span class="hist-date-tag">${shortDt}</span>` : '';
 
           const topTag = `<div style="padding:7px 12px;font-size:11.5px;font-weight:800;color:#cbd5e1;background:rgba(15,23,42,0.92);border-bottom:1px solid rgba(56,189,248,0.18);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
-            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="book-badge ${bookClass(bk)}">${bk}</span>${statusBadge}${(isSampleView || c.isSample) ? '<span class="sample-tag">Live Sample</span>' : ''}</div>
+            <div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap"><span class="book-badge ${bookClass(bk)}">${bk}</span>${statusBadge}${dateTag}${(isSampleView || c.isSample) ? '<span class="sample-tag">Live Sample</span>' : ''}</div>
             <div style="display:flex;align-items:center">${actionBtns}</div>
           </div>`;
+
+          if (isHistoryMode) {
+            const hitCnt = evals.filter(x => x.hit).length;
+            const missCnt = evals.filter(x => x.miss).length;
+            const summaryParts = [`${evals.length} Pick${evals.length === 1 ? '' : 's'}`];
+            if (hitCnt || missCnt) summaryParts.push(`${hitCnt} Hit${missCnt ? ' · ' + missCnt + ' Miss' : ''}`);
+            const toggleBar = `<div class="hist-toggle-bar" onclick="toggleHistoryCard(${idx})">
+              <span>${isExpanded ? '▾' : '▸'} ${summaryParts.join(' • ')}</span>
+              <span style="color:#38bdf8;font-size:11.5px">${isExpanded ? 'Hide Picks' : 'Show Picks'}</span>
+            </div>`;
+            const bodyHtml = isExpanded
+              ? `<div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}`
+              : '';
+            return `<div class="card ${st}">${topTag}<div class="card-banner ${st}" style="cursor:pointer" onclick="toggleHistoryCard(${idx})"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>${toggleBar}${bodyHtml}</div>`;
+          }
+
           return `<div class="card ${st}">${topTag}<div class="card-banner ${st}"><div>Cost: ${money(parseAmt(c.cost))}</div><div>Payout: ${money(parseAmt(c.payout))}</div></div>
             <div class="hdr-row"><div></div><div>Pick</div><div>Target</div><div>Live</div><div>Need</div></div>${rows}</div>`;
         };
@@ -1311,7 +1457,6 @@
         const netPL = Math.round((histPaid - histRisk) * 100) / 100;
         const winPct = (wins + losses) > 0 ? Math.round((wins / (wins + losses)) * 100) : 0;
 
-        const cardsHtml = activeList.map((c, i) => renderSingleCard(c, isDemo ? i : userCards.indexOf(c), isDemo)).join('');
         const heroHtml = isDemo ? `<div class="mission-hero">
           <div><div style="font-family:'Barlow Condensed',sans-serif;font-size:24px;font-weight:900;color:#fff;letter-spacing:0.02em">ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.</div>
           <div style="color:#cbd5e1;font-size:13px;margin-top:3px">Track props, spreads, and totals across FanDuel, DraftKings, PrizePicks, Underdog, Kalshi & more in real time.</div></div>
@@ -1340,22 +1485,82 @@
               <div class="sweat-box"><div class="sweat-lbl">Live Potential Payout</div><div class="sweat-val" style="color:#38bdf8">${money(actPot)}</div></div>
               <div class="sweat-box"><div class="sweat-lbl">Settled Net P&L</div><div class="sweat-val" style="color:${netPL >= 0 ? '#4ade80' : '#f87171'}">${netPL >= 0 ? '+' : '-'}${money(Math.abs(netPL))}</div></div></div>`);
 
-          const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
+        const filterHtml = (!isDemo && booksPresent.length > 0) ? `<div class="row-flex" style="margin-bottom:14px">
           <button class="pill ${curBookFilter === 'ALL' ? 'active' : ''}" onclick="setBookFilter('ALL')">All Platforms (${viewPool.length})</button>` +
           booksPresent.map(b => `<button class="pill ${curBookFilter === b ? 'active' : ''}" onclick="setBookFilter('${b}')">${b} (${viewPool.filter(c => normBook(c.book) === b).length})</button>`).join('') + `</div>` : '';
 
         const adminSampleSection = isAdminUser() ? `<div style="margin-top:28px;padding-top:18px;border-top:1px solid rgba(56,189,248,0.2)">
           <h2>Daily Sample Cards Manager <span style="font-size:12.5px;font-weight:600;color:#facc15">(Admin — Visible to all logged-out visitors)</span></h2>
-          ${customSamples.length ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true)).join('')}</div>` : `<p style="color:var(--muted)">No custom daily samples published yet. Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
+          ${customSamples.length ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px;align-items:start">${customSamples.map((sc, si) => renderSingleCard(sc, si, true, false)).join('')}</div>` : `<p style="color:var(--muted)">No custom daily samples published yet. Click <strong>+ Sample</strong> on any card above to publish it!</p>`}
         </div>` : '';
 
         const emptyText = curCardView === 'history' ? 'No settled or archived bet cards yet.' : 'No active bet cards right now. Build a new card or check Settled History!';
-        const secTitle = isDemo
-          ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates live — disappears once you build your first card)</span></h2>`
-          : `<h2>${curCardView === 'history' ? 'Settled History' : 'Active Bet Cards'} (${activeList.length})</h2>`;
-        const gridWrap = cardsHtml
-          ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr));gap:16px;align-items:start">${cardsHtml}</div>`
-          : `<p style="color:var(--muted)">${emptyText}</p>`;
+        let secTitle = '';
+        let gridWrap = '';
+        if (!isDemo && curCardView === 'history') {
+          const anyExpanded = activeList.some(c => expandedHistoryCards.has(userCards.indexOf(c)));
+          const toggleAllBtn = activeList.length
+            ? `<button class="pill" style="padding:4px 11px;font-size:11.5px;margin-left:auto" onclick="setAllHistoryExpanded(${anyExpanded ? 'false' : 'true'})">${anyExpanded ? 'Collapse All' : 'Expand All'}</button>`
+            : '';
+          secTitle = `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><h2 style="margin-bottom:8px">Settled History (${activeList.length})</h2>${toggleAllBtn}</div>`;
+
+          if (activeList.length) {
+            const sortedHist = [...activeList].sort((a, b) => {
+              const ta = Date.parse(a.settledAt || a.createdAt || '') || 0;
+              const tb = Date.parse(b.settledAt || b.createdAt || '') || 0;
+              if (tb !== ta) return tb - ta;
+              return userCards.indexOf(b) - userCards.indexOf(a);
+            });
+            const groups = [];
+            const groupMap = new Map();
+            sortedHist.forEach(c => {
+              const rawTs = c.settledAt || c.createdAt || '';
+              const d = rawTs ? new Date(rawTs) : null;
+              const valid = d && !isNaN(d.getTime());
+              const key = valid
+                ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+                : 'earlier';
+              const label = valid
+                ? d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })
+                : 'Earlier Settled Cards';
+              if (!groupMap.has(key)) {
+                const grp = { key, label, cards: [] };
+                groupMap.set(key, grp);
+                groups.push(grp);
+              }
+              groupMap.get(key).cards.push(c);
+            });
+            gridWrap = groups.map(grp => {
+              let gWins = 0, gLosses = 0, gRisk = 0, gPaid = 0;
+              grp.cards.forEach(c => {
+                const o = getCardOutcome(c);
+                gRisk += parseAmt(c.cost);
+                if (o.allHit) { gWins++; gPaid += parseAmt(c.payout); }
+                else if (o.anyMiss) { gLosses++; }
+              });
+              const gNet = Math.round((gPaid - gRisk) * 100) / 100;
+              const gCardsHtml = grp.cards.map(c => renderSingleCard(c, userCards.indexOf(c), false, true)).join('');
+              return `<div class="hist-date-hdr">
+                <span>${grp.label} <span style="color:#94a3b8;font-weight:700">(${grp.cards.length})</span></span>
+                <span class="hist-date-meta">
+                  <span style="color:#cbd5e1">${gWins}W-${gLosses}L</span>
+                  <span style="color:${gNet >= 0 ? '#4ade80' : '#f87171'}">${gNet >= 0 ? '+' : '-'}${money(Math.abs(gNet))}</span>
+                </span>
+              </div>
+              <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:12px;align-items:start">${gCardsHtml}</div>`;
+            }).join('');
+          } else {
+            gridWrap = `<p style="color:var(--muted)">${emptyText}</p>`;
+          }
+        } else {
+          const cardsHtml = activeList.map((c, i) => renderSingleCard(c, isDemo ? i : userCards.indexOf(c), isDemo, false)).join('');
+          secTitle = isDemo
+            ? `<h2>Live Demo Slips <span style="font-size:13px;font-weight:600;color:var(--muted)">(Updates live — disappears once you build your first card)</span></h2>`
+            : `<h2>Active Bet Cards (${activeList.length})</h2>`;
+          gridWrap = cardsHtml
+            ? `<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:16px;align-items:start">${cardsHtml}</div>`
+            : `<p style="color:var(--muted)">${emptyText}</p>`;
+        }
         container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + gridWrap + adminSampleSection;
       } catch (err) {
         container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
@@ -2769,10 +2974,14 @@
       if (!confirm(`${actionWord} this bet card?\n\n${summary}`)) return;
 
       if (isEdit) {
-        userCards[editingCardIdx] = { ...userCards[editingCardIdx], book, cost, payout, legs: draftLegs };
+        const prev = userCards[editingCardIdx];
+        const legsChanged = JSON.stringify(prev.legs || []) !== JSON.stringify(draftLegs);
+        const updated = { ...prev, book, cost, payout, legs: draftLegs, createdAt: prev.createdAt || new Date().toISOString() };
+        if (legsChanged) delete updated.settledEvals;
+        userCards[editingCardIdx] = updated;
         editingCardIdx = -1;
       } else {
-        userCards.push({ book, cost, payout, legs: draftLegs });
+        userCards.push({ book, cost, payout, legs: draftLegs, createdAt: new Date().toISOString() });
       }
 
       localStorage.setItem('osp_cards', JSON.stringify(userCards));
@@ -2944,6 +3153,7 @@
       } else if (userCards.length > 0) {
         await pushCardsToCloud();
       }
+      persistSettledCards();
       document.getElementById('card-cnt').textContent = userCards.length;
       if (curTab === 'cards') renderCards();
     }
