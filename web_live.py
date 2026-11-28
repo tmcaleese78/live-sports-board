@@ -3,7 +3,9 @@ import re
 import gzip
 import json
 import time
+import smtplib
 import threading
+from email.message import EmailMessage
 from concurrent.futures import ThreadPoolExecutor
 import requests
 from flask import Flask, jsonify, redirect, render_template, request, send_from_directory
@@ -639,6 +641,68 @@ def pwa_sw():
     resp = send_from_directory(os.path.join(app.root_path, "static"), "sw.js", mimetype="application/javascript")
     resp.headers["Cache-Control"] = "no-cache"
     return resp
+
+@app.route("/api/feedback", methods=["POST"])
+def api_feedback():
+    body = request.get_json(silent=True) or {}
+    topic = re.sub(r"[\r\n]+", " ", str(body.get("topic") or "General Feedback").strip())[:80]
+    sender = re.sub(r"[\r\n]+", " ", str(body.get("email") or "").strip())[:120]
+    message = str(body.get("message") or "").strip()[:4000]
+    if not message:
+        return jsonify({"ok": False, "error": "Please enter a message before sending."}), 400
+
+    to_email = os.environ.get("FEEDBACK_TO_EMAIL", "info@omnistatpro.com").strip() or "info@omnistatpro.com"
+    subject = f"[OmniStatPro] {topic}"
+    full_body = f"Topic: {topic}\nFrom: {sender or 'Anonymous Visitor'}\n\nMessage:\n{message}\n"
+    print(f"[FEEDBACK] {subject} | from={sender or 'anon'} | {message[:300]}", flush=True)
+
+    # 1. Resend HTTP API (if RESEND_API_KEY is configured in Railway)
+    resend_key = os.environ.get("RESEND_API_KEY", "").strip()
+    if resend_key:
+        try:
+            from_addr = os.environ.get("FEEDBACK_FROM_EMAIL", "OmniStatPro <onboarding@resend.dev>").strip()
+            r_payload = {"from": from_addr, "to": [to_email], "subject": subject, "text": full_body}
+            if sender and "@" in sender:
+                r_payload["reply_to"] = sender
+            r = requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}", "Content-Type": "application/json"},
+                json=r_payload,
+                timeout=10,
+            )
+            if r.ok:
+                return jsonify({"ok": True, "sent": True, "to": to_email})
+        except Exception as exc:
+            print(f"[FEEDBACK] Resend error: {exc}", flush=True)
+
+    # 2. SMTP delivery (if SMTP_HOST, SMTP_USER, SMTP_PASS are configured in Railway)
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_pass = os.environ.get("SMTP_PASS", "").strip()
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+            msg = EmailMessage()
+            msg["Subject"] = subject
+            msg["From"] = os.environ.get("FEEDBACK_FROM_EMAIL", smtp_user).strip()
+            msg["To"] = to_email
+            if sender and "@" in sender:
+                msg["Reply-To"] = sender
+            msg.set_content(full_body)
+            if smtp_port == 465:
+                with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=10) as srv:
+                    srv.login(smtp_user, smtp_pass)
+                    srv.send_message(msg)
+            else:
+                with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as srv:
+                    srv.starttls()
+                    srv.login(smtp_user, smtp_pass)
+                    srv.send_message(msg)
+            return jsonify({"ok": True, "sent": True, "to": to_email})
+        except Exception as exc:
+            print(f"[FEEDBACK] SMTP error: {exc}", flush=True)
+
+    return jsonify({"ok": True, "sent": False, "mailto_fallback": True, "to": to_email})
 
 _VALID_STATS = {
     "PASS YDS", "PASS TD", "PASS ATT", "COMP", "RUSH YDS", "RUSH ATT", "RUSH TD",

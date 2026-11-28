@@ -608,7 +608,7 @@
       .lp-cmp-tbl th, .lp-cmp-tbl td { padding: 8px 6px; }
       .builder { padding: 14px; border-radius: 14px; }
       .row-flex { gap: 8px; margin-bottom: 10px; }
-      input, select, .search-box { font-size: 16px !important; }
+      input, select, textarea, .search-box { font-size: 16px !important; }
       #b-cost, #b-pay, #b-target, #b-spread, #b-total, #b-player, #b-stat, #b-prop-ou, #b-book, #b-type, #b-sport {
         flex: 1 1 130px; min-width: 0; width: auto !important;
       }
@@ -646,8 +646,9 @@
       <div class="logo-box">
         <img class="brand-logo logo-dark" src="/static/logo-dark-opt.jpg?v=3" alt="OmniStatPro" width="880" height="293" decoding="async" fetchpriority="high">
       </div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <button class="pill" id="install-app-btn" onclick="triggerInstallApp()" style="display:none;border-color:rgba(74,222,128,0.5);color:#4ade80">📲 Install App</button>
+        <button class="pill" onclick="openFeedbackModal()" style="border-color:rgba(148,163,184,0.4);color:#cbd5e1">Contact / Feedback</button>
         <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
       </div>
     </div>
@@ -890,6 +891,31 @@
         <input type="number" id="qp-target" step="0.5" placeholder="Target Line (e.g. 24.5)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:#fff;font-weight:700;font-size:14px">
         <select id="qp-dest" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:13.5px"></select>
         <button class="btn-primary" style="width:100%;padding:11px;font-size:14px;margin-top:4px" onclick="confirmQuickProp()">+ Add Prop to Card</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="feedback-modal" onclick="if(event.target===this)closeFeedbackModal()">
+    <div class="modal-box" style="max-width:460px">
+      <div class="modal-hdr">
+        <strong style="font-size:17px">Contact &amp; Feedback</strong>
+        <button class="pill" onclick="closeFeedbackModal()">✕ Close</button>
+      </div>
+      <p style="color:var(--muted);font-size:13px;margin-top:0">Have a feature idea, sportsbook request, or bug to report? Send it straight to <a href="mailto:info@omnistatpro.com" style="color:#38bdf8;font-weight:700;text-decoration:none">info@omnistatpro.com</a>.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
+        <select id="fb-topic" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-weight:700;font-size:14px">
+          <option value="Feature Request">Feature Request</option>
+          <option value="Bug / Slip Upload Issue">Bug / Slip Upload Issue</option>
+          <option value="Sportsbook Request">Sportsbook Request</option>
+          <option value="General Question">General Question</option>
+        </select>
+        <input id="fb-email" type="email" placeholder="Your email (optional, for reply)" style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px">
+        <textarea id="fb-msg" rows="4" placeholder="Tell us what you'd like to see or what went wrong..." style="padding:10px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-family:inherit;font-size:14px;resize:vertical;outline:none"></textarea>
+        <div id="fb-status" style="font-size:12.5px;display:none"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:2px">
+          <button id="fb-send-btn" class="btn-primary" style="flex:1;padding:10px 16px;font-size:14px" onclick="submitFeedback()">Send Feedback</button>
+          <button class="pill" style="padding:10px 12px;font-size:12.5px" onclick="copySupportEmail()">Copy Email</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2229,12 +2255,19 @@
             : `<p style="color:var(--muted)">${emptyText}</p>`;
         }
         const lpFooterHtml = isDemo ? `<footer class="lp-footer">
-          <div style="margin-bottom:10px">
+          <div style="margin-bottom:10px;display:flex;justify-content:center;gap:8px;flex-wrap:wrap">
             <button class="btn-primary" style="padding:9px 18px;font-size:13.5px" onclick="triggerQuickSlipUpload()">📷 Upload Your First Bet Slip — Free</button>
+            <button class="pill" style="padding:9px 16px;font-size:13px" onclick="openFeedbackModal()">Contact / Feedback</button>
           </div>
-          <div>OmniStatPro is an independent live sports tracking tool for informational and entertainment purposes only. Not affiliated with, endorsed by, or sponsored by the NFL, NBA, NCAA, FanDuel, DraftKings, PrizePicks, Underdog, or Kalshi.</div>
+          <div>Questions or suggestions? Email <a href="mailto:info@omnistatpro.com" style="color:#38bdf8;font-weight:700;text-decoration:none">info@omnistatpro.com</a></div>
+          <div style="margin-top:6px">OmniStatPro is an independent live sports tracking tool for informational and entertainment purposes only. Not affiliated with, endorsed by, or sponsored by the NFL, NBA, NCAA, FanDuel, DraftKings, PrizePicks, Underdog, or Kalshi.</div>
           <div style="margin-top:4px">Must be 21+ (18+ where permitted). Gambling problem? Call 1-800-GAMBLER.</div>
-        </footer>` : '';
+        </footer>` : `<footer class="lp-footer" style="margin-top:24px">
+          <span>Have a feature idea or slip issue? </span>
+          <a href="#" onclick="openFeedbackModal();return false" style="color:#38bdf8;font-weight:700;text-decoration:none">Send Feedback</a>
+          <span> • </span>
+          <a href="mailto:info@omnistatpro.com" style="color:#94a3b8;font-weight:600;text-decoration:none">info@omnistatpro.com</a>
+        </footer>`;
         container.innerHTML = heroHtml + viewSwitchHtml + stripHtml + filterHtml + secTitle + gridWrap + adminSampleSection + lpFooterHtml;
       } catch (err) {
         container.innerHTML = `<p style="color:#f87171;padding:16px">Card render error: ${err.message}</p>`;
@@ -3765,6 +3798,67 @@
 
     function openAuthModal() { document.getElementById('auth-modal').classList.add('open'); }
     function closeAuthModal() { document.getElementById('auth-modal').classList.remove('open'); }
+
+    function openFeedbackModal() {
+      const em = document.getElementById('fb-email');
+      if (em && !em.value && currentUser && currentUser.email) em.value = currentUser.email;
+      const st = document.getElementById('fb-status');
+      if (st) { st.style.display = 'none'; st.textContent = ''; }
+      document.getElementById('feedback-modal').classList.add('open');
+      setTimeout(() => { const m = document.getElementById('fb-msg'); if (m) m.focus(); }, 40);
+    }
+    function closeFeedbackModal() { document.getElementById('feedback-modal').classList.remove('open'); }
+    function copySupportEmail() {
+      const addr = 'info@omnistatpro.com';
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(addr).then(() => showToast('Copied info@omnistatpro.com'));
+      } else {
+        prompt('Copy support email:', addr);
+      }
+    }
+    async function submitFeedback() {
+      const topic = (document.getElementById('fb-topic') && document.getElementById('fb-topic').value) || 'General Feedback';
+      const email = (document.getElementById('fb-email') && document.getElementById('fb-email').value || '').trim();
+      const msgEl = document.getElementById('fb-msg');
+      const message = (msgEl && msgEl.value || '').trim();
+      const st = document.getElementById('fb-status');
+      const btn = document.getElementById('fb-send-btn');
+      if (!message) {
+        if (st) { st.style.display = 'block'; st.style.color = '#f87171'; st.textContent = 'Please enter a message before sending.'; }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending...'; }
+      try {
+        const res = await fetch('/api/feedback', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ topic, email, message })
+        });
+        const data = await res.json();
+        if (data && data.ok) {
+          if (data.sent) {
+            if (msgEl) msgEl.value = '';
+            closeFeedbackModal();
+            showToast('Feedback sent to info@omnistatpro.com!');
+          } else {
+            const subj = encodeURIComponent(`[OmniStatPro] ${topic}`);
+            const bodyTxt = encodeURIComponent(`${email ? 'From: ' + email + '\n\n' : ''}${message}`);
+            window.location.href = `mailto:info@omnistatpro.com?subject=${subj}&body=${bodyTxt}`;
+            if (st) { st.style.display = 'block'; st.style.color = '#4ade80'; st.textContent = 'Opening your email app to send to info@omnistatpro.com...'; }
+            if (msgEl) msgEl.value = '';
+          }
+        } else {
+          if (st) { st.style.display = 'block'; st.style.color = '#f87171'; st.textContent = (data && data.error) || 'Could not send feedback.'; }
+        }
+      } catch (e) {
+        const subj = encodeURIComponent(`[OmniStatPro] ${topic}`);
+        const bodyTxt = encodeURIComponent(`${email ? 'From: ' + email + '\n\n' : ''}${message}`);
+        window.location.href = `mailto:info@omnistatpro.com?subject=${subj}&body=${bodyTxt}`;
+        if (st) { st.style.display = 'block'; st.style.color = '#4ade80'; st.textContent = 'Opening your email app to send to info@omnistatpro.com...'; }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Send Feedback'; }
+      }
+    }
 
     async function pushCardsToCloud() {
       localStorage.setItem('osp_cards', JSON.stringify(userCards));
