@@ -447,9 +447,23 @@
     }
     .inj-banner:hover { border-color: rgba(248, 113, 113, 0.78); }
     .inj-card-box {
-      background: rgba(127, 29, 29, 0.24); border: 1px solid rgba(248, 113, 113, 0.42);
-      border-radius: 11px; padding: 10px 13px; margin: 0 0 14px;
+      background: rgba(127, 29, 29, 0.22); border: 1px solid rgba(248, 113, 113, 0.42);
+      border-radius: 12px; padding: 12px 14px; margin: 0 0 14px;
     }
+    .inj-advice {
+      margin-top: 9px; padding: 8px 11px; border-radius: 8px;
+      background: rgba(15, 23, 42, 0.72); border-left: 3px solid #38bdf8;
+      font-size: 12.5px; line-height: 1.5; color: #cbd5e1;
+    }
+    .inj-advice-lbl {
+      display: block; font-size: 10.5px; font-weight: 900; letter-spacing: 0.05em;
+      text-transform: uppercase; color: #38bdf8; margin-bottom: 3px;
+    }
+    .inj-toggle-btn {
+      background: none; border: none; color: #38bdf8; font-size: 11.5px; font-weight: 800;
+      padding: 4px 0 0; cursor: pointer; font-family: inherit;
+    }
+    .inj-toggle-btn:hover { text-decoration: underline; }
     .inj-row {
       display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-radius: 10px;
       background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(56, 189, 248, 0.16);
@@ -1057,6 +1071,15 @@
     let liveInjuryByName = { NFL: new Map(), NBA: new Map() };
     function escInj(s) {
       return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+    function fmtInjTime(iso, fallbackDate) {
+      if (iso) {
+        const d = new Date(iso);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        }
+      }
+      return fallbackDate || '';
     }
     function rebuildPlayerIndex() {
       const idx = { NFL: new Map(), NBA: new Map(), CFB: new Map() };
@@ -4536,14 +4559,18 @@
           (d.logo ? `<img src="${d.logo}" style="width:42px;height:42px;object-fit:contain">` : '') +
         `</div>`;
 
-        const liveInj = getPlayerInjury(lg, d.name || name, pid) || d.injury || null;
+        const cachedInj = getPlayerInjury(lg, d.name || name, pid);
+        const liveInj = (cachedInj || d.injury) ? Object.assign({}, cachedInj || {}, d.injury || {}) : null;
         if (liveInj) {
+          const tsTxt = fmtInjTime(liveInj.updated_at, liveInj.date);
+          const retTxt = liveInj.return_date ? ` • Est. Return ${escInj(liveInj.return_date)}` : '';
           html += `<div class="inj-card-box">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:4px">
-              <div style="font-size:13px;font-weight:900;color:#fecaca">🏥 Injury Update ${injBadgeHtml(liveInj)} <span style="color:#f8fafc">${escInj(liveInj.status || '')}${liveInj.type ? ` • ${escInj(liveInj.type)}` : ''}</span></div>
-              ${liveInj.date ? `<span style="font-size:11px;font-weight:700;color:#94a3b8">Updated ${escInj(liveInj.date)}</span>` : ''}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+              <div style="font-size:13.5px;font-weight:900;color:#fecaca">🏥 Injury Update ${injBadgeHtml(liveInj)} <span style="color:#f8fafc">${escInj(liveInj.status || '')}${liveInj.type ? ` • ${escInj(liveInj.type)}` : ''}</span></div>
+              ${(tsTxt || retTxt) ? `<span style="font-size:11px;font-weight:700;color:#94a3b8">${escInj(tsTxt)}${retTxt}</span>` : ''}
             </div>
-            ${liveInj.comment ? `<div style="font-size:12.5px;line-height:1.45;color:#e2e8f0">${escInj(liveInj.comment)}</div>` : ''}
+            ${liveInj.comment ? `<div style="font-size:13px;line-height:1.5;color:#f1f5f9">${escInj(liveInj.comment)}</div>` : ''}
+            ${liveInj.advice ? `<div class="inj-advice"><span class="inj-advice-lbl">Outlook / Advice</span>${escInj(liveInj.advice)}</div>` : ''}
           </div>`;
         }
 
@@ -4602,6 +4629,8 @@
     // 11. LIVE INJURY TRACKING MODAL, BUILDER WARNING, CARD EXPORTER & HEDGE
     // =========================================================================
     let _curInjTab = 'NFL';
+    let _injFullData = null;
+    let _injExpandedKeys = new Set();
 
     function checkBuilderInjury() {
       const warnEl = document.getElementById('b-inj-warn');
@@ -4626,8 +4655,7 @@
       if (srch) srch.value = '';
       document.getElementById('injuries-modal').classList.add('open');
       renderInjuriesModal();
-      const hasAny = ((liveData.injuries && liveData.injuries.NFL && liveData.injuries.NFL.length) || (liveData.injuries && liveData.injuries.NBA && liveData.injuries.NBA.length));
-      if (!hasAny) refreshInjuriesModal();
+      if (!_injFullData) refreshInjuriesModal(false);
     }
 
     function closeInjuriesModal() {
@@ -4640,20 +4668,29 @@
       renderInjuriesModal();
     }
 
-    async function refreshInjuriesModal() {
+    function toggleInjAdvice(key) {
+      if (_injExpandedKeys.has(key)) _injExpandedKeys.delete(key);
+      else _injExpandedKeys.add(key);
+      renderInjuriesModal();
+    }
+
+    async function refreshInjuriesModal(forceRefresh = true) {
       const listEl = document.getElementById('inj-list');
-      if (listEl) listEl.innerHTML = '<p style="color:var(--muted)">Refreshing live NFL & NBA injury reports...</p>';
+      if (forceRefresh && listEl) listEl.innerHTML = '<p style="color:var(--muted)">Refreshing live NFL & NBA injury reports...</p>';
       try {
-        const res = await fetch('/api/injuries?refresh=1');
+        const res = await fetch(forceRefresh ? '/api/injuries?refresh=1' : '/api/injuries');
         if (!res.ok) throw new Error('HTTP ' + res.status);
         const data = await res.json();
-        liveData.injuries = data || { NFL: [], NBA: [] };
+        _injFullData = data || { NFL: [], NBA: [] };
+        liveData.injuries = _injFullData;
         rebuildPlayerIndex();
         renderInjuriesModal();
-        renderCards();
-        showToast('Injury report updated');
+        if (forceRefresh) {
+          renderCards();
+          showToast('Injury report & outlook updated');
+        }
       } catch (e) {
-        if (listEl) listEl.innerHTML = `<p style="color:#f87171">Could not load injuries: ${escInj(e.message)}</p>`;
+        if (forceRefresh && listEl) listEl.innerHTML = `<p style="color:#f87171">Could not load injuries: ${escInj(e.message)}</p>`;
       }
     }
 
@@ -4667,9 +4704,15 @@
       const myBtn = document.querySelector('[data-injtab="MY"]');
       if (myBtn) myBtn.textContent = `My Active Cards (${myInj.length})`;
 
+      const src = _injFullData || liveData.injuries || { NFL: [], NBA: [] };
       let pool = _curInjTab === 'MY'
-        ? myInj
-        : ((liveData.injuries && liveData.injuries[_curInjTab]) || []);
+        ? myInj.map(x => {
+            if (x.advice || !_injFullData) return x;
+            const fullList = _injFullData[x.league] || [];
+            const m = fullList.find(f => (x.id && f.id === x.id) || String(f.name || '').toLowerCase() === String(x.name || '').toLowerCase());
+            return m ? Object.assign({}, x, m) : x;
+          })
+        : (src[_curInjTab] || []);
 
       if (stFilter === 'OUT') pool = pool.filter(x => x.abbr === 'OUT' || x.abbr === 'IR');
       else if (stFilter === 'D') pool = pool.filter(x => x.abbr === 'D');
@@ -4697,14 +4740,26 @@
         const safeId = String(item.id || '').replace(/'/g, "\\'");
         const safeNm = String(item.name || '').replace(/'/g, "\\'");
         const clickAttr = item.id ? `onclick="closeInjuriesModal();openPlayerCard('${safeLg}','${safeId}','${safeNm}')"` : '';
+        const rowKey = `${item.league || ''}:${item.id || item.name || ''}`;
+        const safeRowKey = rowKey.replace(/'/g, "\\'");
+        const showAdv = Boolean(item.advice) && (_curInjTab === 'MY' || _injExpandedKeys.has(rowKey));
+        const tsTxt = fmtInjTime(item.updated_at, item.date);
+        const advToggle = (item.advice && _curInjTab !== 'MY')
+          ? `<button class="inj-toggle-btn" onclick="event.stopPropagation();toggleInjAdvice('${safeRowKey}')">${showAdv ? '▴ Hide Outlook / Advice' : '▾ Read Outlook / Advice'}</button>`
+          : '';
+        const advBox = showAdv
+          ? `<div class="inj-advice" onclick="event.stopPropagation()"><span class="inj-advice-lbl">Outlook / Advice</span>${escInj(item.advice)}</div>`
+          : '';
         return `<div class="inj-row" ${clickAttr}>
           ${item.logo ? `<img src="${escInj(item.logo)}" style="width:28px;height:28px;object-fit:contain;flex-shrink:0;margin-top:2px" loading="lazy">` : ''}
           <div style="flex:1;min-width:0">
             <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
               <div style="font-size:13.5px;font-weight:800;color:#f8fafc">${escInj(item.name)}${injBadgeHtml(item)} <span style="font-size:11.5px;font-weight:700;color:#94a3b8">${escInj(item.team)}${item.pos ? ` • ${escInj(item.pos)}` : ''}${_curInjTab === 'MY' ? ` • ${escInj(item.league)}` : ''}</span></div>
-              <span style="font-size:11px;font-weight:700;color:#38bdf8">${escInj(item.type || item.status)}${item.date ? ` • ${escInj(item.date)}` : ''}</span>
+              <span style="font-size:11px;font-weight:700;color:#38bdf8">${escInj(item.type || item.status)}${tsTxt ? ` • ${escInj(tsTxt)}` : ''}</span>
             </div>
-            ${item.comment ? `<div style="font-size:12px;color:#cbd5e1;line-height:1.4;margin-top:4px">${escInj(item.comment)}</div>` : ''}
+            ${item.comment ? `<div style="font-size:12.5px;color:#e2e8f0;line-height:1.45;margin-top:5px">${escInj(item.comment)}</div>` : ''}
+            ${advToggle}
+            ${advBox}
           </div>
         </div>`;
       }).join('');

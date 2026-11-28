@@ -580,10 +580,15 @@ def fetch_league_injuries(sport_path, lg_code):
             abbr, rank = _injury_abbr_and_rank(status)
             det = inj.get("details") or {}
             inj_type = str(det.get("type") or det.get("location") or det.get("detail") or "").strip()
-            comment = str(inj.get("shortComment") or inj.get("longComment") or "").strip()
-            if len(comment) > 360:
-                comment = comment[:357] + "..."
-            dt = str(inj.get("date") or "")[:10]
+            short_c = str(inj.get("shortComment") or "").strip()
+            long_c = str(inj.get("longComment") or "").strip()
+            if short_c and long_c and long_c.startswith(short_c):
+                long_c = long_c[len(short_c):].strip()
+            comment = short_c or long_c
+            advice = long_c if (short_c and long_c and long_c != short_c) else ""
+            raw_dt = str(inj.get("date") or "").strip()
+            dt = raw_dt[:10]
+            ret_dt = str(det.get("returnDate") or "")[:10]
             dedup = pid or f"{ab}:{nm.lower()}"
             if dedup in seen:
                 continue
@@ -601,15 +606,24 @@ def fetch_league_injuries(sport_path, lg_code):
                 "rank": rank,
                 "type": inj_type,
                 "comment": comment,
-                "date": dt
+                "advice": advice,
+                "date": dt,
+                "updated_at": raw_dt,
+                "return_date": ret_dt
             })
     out.sort(key=lambda x: (x["rank"], x["team"], x["name"]))
     return out
 
-def get_injuries_payload(force=False):
+def _compact_injuries(full_data):
+    out = {}
+    for lg, items in (full_data or {}).items():
+        out[lg] = [{k: v for k, v in x.items() if k != "advice"} for x in (items or [])]
+    return out
+
+def get_injuries_payload(force=False, compact=False):
     now = time.time()
     if not force and (now - _INJURY_CACHE["ts"]) < 120 and (_INJURY_CACHE["data"].get("NFL") or _INJURY_CACHE["data"].get("NBA")):
-        return _INJURY_CACHE["data"]
+        return _compact_injuries(_INJURY_CACHE["data"]) if compact else _INJURY_CACHE["data"]
     with ThreadPoolExecutor(max_workers=2) as pool:
         f_nfl = pool.submit(fetch_league_injuries, "football/nfl", "nfl")
         f_nba = pool.submit(fetch_league_injuries, "basketball/nba", "nba")
@@ -621,7 +635,7 @@ def get_injuries_payload(force=False):
     }
     _INJURY_CACHE["ts"] = now
     _INJURY_CACHE["data"] = payload
-    return payload
+    return _compact_injuries(payload) if compact else payload
 
 def get_live_payload(fast=False):
     now = time.time()
@@ -636,12 +650,12 @@ def get_live_payload(fast=False):
             nfl_g, _ = f_nfl.result()
             nba_g, _ = f_nba.result()
             cfb_g, _ = f_cfb.result()
-        return {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": [], "NBA": []}, "injuries": _INJURY_CACHE["data"], "partial": True}
+        return {"games": {"NFL": nfl_g, "NBA": nba_g, "CFB": cfb_g}, "players": {"NFL": [], "NBA": []}, "injuries": _compact_injuries(_INJURY_CACHE["data"]), "partial": True}
     with ThreadPoolExecutor(max_workers=4) as pool:
         f_nfl = pool.submit(parse_scoreboard, "football/nfl", "nfl", False)
         f_nba = pool.submit(parse_scoreboard, "basketball/nba", "nba", False)
         f_cfb = pool.submit(parse_scoreboard, "football/college-football", "cfb", False)
-        f_inj = pool.submit(get_injuries_payload, False)
+        f_inj = pool.submit(get_injuries_payload, False, True)
         nfl_g, nfl_p = f_nfl.result()
         nba_g, nba_p = f_nba.result()
         cfb_g, _ = f_cfb.result()
@@ -701,7 +715,7 @@ def api_player(lg, pid):
     sp = paths.get(lg.lower())
     if not sp or not pid:
         return jsonify({"error": "Invalid player"}), 400
-    ck = f"v4:{lg.lower()}:{pid}"
+    ck = f"v5:{lg.lower()}:{pid}"
     now = time.time()
     if ck in _PLAYER_CACHE and (now - _PLAYER_CACHE[ck]["ts"]) < 900:
         return jsonify(_PLAYER_CACHE[ck]["data"])
