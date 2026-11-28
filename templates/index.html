@@ -2,13 +2,14 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#02050c">
   <title>OmniStatPro — All Your Bets. Every Sportsbook. One Live Screen</title>
   <link rel="icon" type="image/png" href="/static/favicon.png">
   <link rel="apple-touch-icon" href="/static/favicon.png">
-  <link rel="preconnect" href="https://googleapis.com">
-  <link rel="preconnect" href="https://gstatic.com" crossorigin>
-  <link href="https://googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@700;800;900&family=Inter:wght@500;600;700;800&display=swap" rel="stylesheet">
   <style>
     /* ==========================================================================
        1. THEME COLORS & GLOBAL RESET
@@ -108,6 +109,7 @@
       border: 1px solid var(--border); border-radius: 999px;
       padding: 8px 16px; font-weight: 700; font-size: 13px;
       letter-spacing: 0.2px; cursor: pointer; transition: all .18s ease;
+      touch-action: manipulation; white-space: nowrap;
     }
     .tab-btn:hover, .pill:hover {
       border-color: var(--accent); color: var(--text); transform: translateY(-1px);
@@ -133,7 +135,7 @@
     }
     .grid {
       display: grid; gap: 16px;
-      grid-template-columns: repeat(auto-fill, minmax(365px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
     }
     #view-cards .grid {
       display: grid; gap: 16px; align-items: start;
@@ -154,7 +156,7 @@
     .card.hit { border: 2px solid var(--hit-bdr); }
     .card.miss { border: 2px solid var(--miss-bdr); }
     .card-banner {
-      display: grid; grid-template-columns: 1fr 1fr 40px;
+      display: grid; grid-template-columns: 1fr 1fr;
       background: linear-gradient(90deg, #0b152c, #172e63);
       color: #fff; font-weight: 800; font-size: 14px;
       text-align: center; align-items: center; padding: 10px 0;
@@ -325,9 +327,7 @@
     #p-table tr.p-row td.p-name-td { text-align: left; font-weight: 800; white-space: nowrap; }
     #p-table tr.p-row td.p-sub-td { color: #94a3b8; font-weight: 600; font-size: 12.5px; }
     .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img {
-      filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff)
-        drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)
-        drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
+      filter: drop-shadow(0 0 1.4px rgba(255, 255, 255, 0.92)) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.55));
     }
     .builder {
       max-width: 700px; background: var(--surface); border: 1px solid var(--border);
@@ -395,6 +395,60 @@
     }
     .pc-stat-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
     .pc-stat-val { font-size: 16px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
+    button { touch-action: manipulation; }
+
+    /* ==========================================================================
+       7. MOBILE PORTRAIT UX & GPU PERFORMANCE OPTIMIZATIONS
+       ========================================================================== */
+    @media (max-width: 768px) {
+      .arena-beams { filter: none; opacity: 0.7; }
+      .arena-orb, .arena-floor { display: none; }
+      .nav-bar { backdrop-filter: none; background: rgba(5, 9, 20, 0.96); }
+      .modal-bg { backdrop-filter: none; }
+    }
+    @media (max-width: 640px) {
+      body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
+      .hero-header { padding: 6px 12px; }
+      .nav-bar { padding: 8px 10px; }
+      .nav {
+        flex-wrap: nowrap; overflow-x: auto; gap: 6px;
+        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+      }
+      .nav::-webkit-scrollbar { display: none; }
+      .tab-btn { padding: 7px 13px; font-size: 12.5px; flex-shrink: 0; }
+      .pill { padding: 7px 12px; font-size: 12px; }
+      .main-wrap { padding: 6px 10px 0; }
+      h2 { font-size: 17px; margin: 16px 0 10px; }
+      .card { max-height: none; overflow-y: visible; border-radius: 14px; }
+      .card:hover, .sb-card:hover { transform: none; }
+      .card-banner { position: static; font-size: 13px; padding: 8px 0; }
+      .hdr-row { position: static; font-size: 10px; letter-spacing: 0.4px; padding: 6px 4px; }
+      .hdr-row, .p-main { grid-template-columns: 34px minmax(0, 1.55fr) minmax(0, 1.05fr) 42px 50px; }
+      .p-main { font-size: 12.5px; min-height: 44px; padding: 5px 4px; }
+      .p-main > div:nth-child(2) { padding-left: 4px; word-break: break-word; }
+      .p-main .logo-cell { padding: 2px; }
+      .p-main .logo-cell img { width: 24px; height: 24px; }
+      .sweat-strip { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
+      .sweat-box { padding: 9px 10px; border-radius: 10px; }
+      .sweat-lbl { font-size: 10px; }
+      .sweat-val { font-size: 20px; }
+      .mission-hero { padding: 14px; gap: 10px; }
+      .builder { padding: 14px; border-radius: 14px; }
+      .row-flex { gap: 8px; margin-bottom: 10px; }
+      input, select, .search-box { font-size: 16px !important; }
+      #b-cost, #b-pay, #b-target, #b-spread, #b-total, #b-player, #b-stat, #b-prop-ou, #b-book, #b-type, #b-sport {
+        flex: 1 1 130px; min-width: 0; width: auto !important;
+      }
+      .leg-chip { padding: 8px 10px; font-size: 12.5px; }
+      .modal-bg { padding: 10px; }
+      .modal-box { padding: 14px; max-height: 90dvh; border-radius: 14px; }
+      .sb-team { padding: 9px 12px; font-size: 14px; }
+      .sb-score { font-size: 22px; }
+      .toast {
+        left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+        text-align: center; font-size: 12.5px;
+      }
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 </head>
@@ -412,8 +466,7 @@
   <header class="hero-header">
     <div class="hero-inner">
       <div class="logo-box">
-        <img class="brand-logo logo-dark" src="/static/logo-dark.png?v=2" alt="OmniStatPro">
-        <img class="brand-logo logo-light" src="/static/logo-light.png" alt="OmniStatPro">
+        <img class="brand-logo logo-dark" src="/static/logo-dark-opt.jpg?v=3" alt="OmniStatPro" width="880" height="293" decoding="async" fetchpriority="high">
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <button class="pill" id="auth-btn" onclick="openAuthModal()" style="border-color:rgba(56,189,248,0.45);color:#f8fafc">Sign In / Sign Up</button>
@@ -463,7 +516,7 @@
         <button class="pill active" data-plg="NFL" onclick="setPlg('NFL')">NFL Players</button>
         <button class="pill" data-plg="NBA" onclick="setPlg('NBA')">NBA Players</button>
         <select id="p-team-filter" onchange="renderPlayers()"><option value="ALL">All Teams</option></select>
-        <input class="search-box" id="p-search" placeholder="Search player name..." oninput="renderPlayers()">
+        <input class="search-box" id="p-search" placeholder="Search player name..." oninput="debouncedRenderPlayers()">
       </div>
       <div class="tbl-wrap"><table id="p-table"></table></div>
     </div>
@@ -656,6 +709,18 @@
        1. APP STATE, NAVIGATION TABS & TOAST NOTIFICATIONS
        ======================================================================== */
     let liveData = { games: { NFL: [], NBA: [], CFB: [] }, players: { NFL: [], NBA: [] } };
+    let livePlayerIndex = { NFL: new Map(), NBA: new Map(), CFB: new Map() };
+    function rebuildPlayerIndex() {
+      const idx = { NFL: new Map(), NBA: new Map(), CFB: new Map() };
+      ['NFL', 'NBA', 'CFB'].forEach(sp => {
+        const list = (liveData.players && liveData.players[sp]) || [];
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          if (p && p.name) idx[sp].set(String(p.name).trim().toLowerCase(), p);
+        }
+      });
+      livePlayerIndex = idx;
+    }
     let curTab = 'cards', curLg = 'ALL', curSt = 'in', curPlg = 'NFL', draftLegs = [];
     let userCards = JSON.parse(localStorage.getItem('osp_cards') || '[]');
     let sortCol = 'PASS YDS', sortDir = 1;
@@ -663,7 +728,7 @@
     document.body.classList.remove('light');
     try {
       const cachedLive = JSON.parse(localStorage.getItem('osp_live_cache') || 'null');
-      if (cachedLive && cachedLive.games) liveData = cachedLive;
+      if (cachedLive && cachedLive.games) { liveData = cachedLive; rebuildPlayerIndex(); }
     } catch (_) {}
 
     function showToast(msg) {
@@ -842,11 +907,11 @@
           return `<div class="sb-card ${isLive ? 'is-live' : ''}" style="cursor:pointer" onclick="openBox('${lg}','${g.id}','${gameLbl}')">
             <div class="sb-top"><span class="sb-badge">${stLabel}</span><span>${g.tv || g.league}</span></div>
             <div class="sb-team" style="--tm-clr:${g.bg0}">
-              <div class="sb-left">${g.lg0 ? `<img src="${g.lg0}">` : ''}<span class="sb-name">${awayDisp}${g.arec ? `<span class="sb-rec">(${g.arec})</span>` : ''}</span>${g.aposs ? '<span class="sb-poss" title="Possession"></span>' : ''}</div>
+              <div class="sb-left">${g.lg0 ? `<img src="${g.lg0}" loading="lazy" decoding="async">` : ''}<span class="sb-name">${awayDisp}${g.arec ? `<span class="sb-rec">(${g.arec})</span>` : ''}</span>${g.aposs ? '<span class="sb-poss" title="Possession"></span>' : ''}</div>
               <div class="sb-right"><span class="sb-score">${g.state === 'pre' ? '—' : g.ascore}</span></div>
             </div>
             <div class="sb-team" style="--tm-clr:${g.bg1}">
-              <div class="sb-left">${g.lg1 ? `<img src="${g.lg1}">` : ''}<span class="sb-name">${homeDisp}${g.hrec ? `<span class="sb-rec">(${g.hrec})</span>` : ''}</span>${g.hposs ? '<span class="sb-poss" title="Possession"></span>' : ''}</div>
+              <div class="sb-left">${g.lg1 ? `<img src="${g.lg1}" loading="lazy" decoding="async">` : ''}<span class="sb-name">${homeDisp}${g.hrec ? `<span class="sb-rec">(${g.hrec})</span>` : ''}</span>${g.hposs ? '<span class="sb-poss" title="Possession"></span>' : ''}</div>
               <div class="sb-right"><span class="sb-score">${g.state === 'pre' ? '—' : g.hscore}</span></div>
             </div>
             ${footHtml}
@@ -909,6 +974,12 @@
       renderPlayers();
     }
 
+    let _pSearchTm = null;
+    function debouncedRenderPlayers() {
+      clearTimeout(_pSearchTm);
+      _pSearchTm = setTimeout(renderPlayers, 120);
+    }
+
     function renderPlayers() {
       const all = (liveData.players && liveData.players[curPlg]) || [];
       const tSel = document.getElementById('p-team-filter');
@@ -924,7 +995,7 @@
       const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
       const rows = list.slice(0, 120).map(p => {
         const bg = p.bg || '#1e293b';
-        const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}">` : '';
+        const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
         const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
         const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
         const actBtn = `<td><button class="pill" style="padding:4px 9px;font-size:11.5px;border-color:rgba(56,189,248,0.45);color:#38bdf8;white-space:nowrap" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}')">+ Prop</button></td>`;
@@ -967,7 +1038,8 @@
       }
 
       const targetName = String(leg.player || '').trim().toLowerCase();
-      const p = ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
+      const spIdx = livePlayerIndex[leg.sport];
+      const p = (spIdx && spIdx.get(targetName)) || ((liveData.players && liveData.players[leg.sport]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === targetName);
       const pGame = games.find(x => x.away === (p && p.team) || x.home === (p && p.team));
       const pStatus = (p && p.status) || (pGame && pGame.status) || '';
       const pIsLive = Boolean((p && p.state === 'in') || (pGame && pGame.state === 'in'));
@@ -1143,12 +1215,16 @@
         const isDemo = userCards.length === 0;
         const parseAmt = v => parseFloat(String(v ?? 0).replace(/[^0-9.-]/g, '')) || 0;
 
+        const outcomeCache = new WeakMap();
         const getCardOutcome = c => {
+          if (outcomeCache.has(c)) return outcomeCache.get(c);
           const evals = (c.legs || []).map(evalLeg);
           const allHit = evals.length > 0 && evals.every(x => x.hit);
           const anyMiss = evals.some(x => x.miss);
           const isSettled = Boolean(c.archived) || allHit || anyMiss;
-          return { evals, allHit, anyMiss, isSettled };
+          const out = { evals, allHit, anyMiss, isSettled };
+          outcomeCache.set(c, out);
+          return out;
         };
 
         const rawList = isDemo ? buildSampleCards() : userCards;
@@ -1174,7 +1250,7 @@
             const safeType = String(e.clickType || '').replace(/'/g, "\\'");
             const safeKey = String(e.clickKey || '').replace(/'/g, "\\'");
             return `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg};cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}')" title="Click for live stats / box score">
-              <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}">` : ''}</div>
+              <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}" loading="lazy" decoding="async">` : ''}</div>
               <div><div>${e.name}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
               <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
           }).join('');
@@ -2697,8 +2773,11 @@
       showToast(isEdit ? 'Bet card updated' : 'Bet card saved');
     }
 
-    let firstLoad = true;
-    async function refresh() {
+    let firstLoad = true, isRefreshing = false, lastLiveSig = '', lastRefreshTs = 0;
+    async function refresh(force = false) {
+      if (isRefreshing) return;
+      if (!force && !firstLoad && document.hidden) return;
+      isRefreshing = true;
       try {
         const url = firstLoad ? '/api/live?fast=1&t=' + Date.now() : '/api/live?t=' + Date.now();
         const res = await fetch(url);
@@ -2707,25 +2786,39 @@
         if (data.partial && liveData.players && (liveData.players.NFL.length || liveData.players.NBA.length)) {
           data.players = liveData.players;
         }
+        const sig = JSON.stringify(data);
+        const changed = force || firstLoad || sig !== lastLiveSig;
         liveData = data;
-        try { localStorage.setItem('osp_live_cache', JSON.stringify(data)); } catch (_) {}
-        checkNewLegHits();
-        document.getElementById('card-cnt').textContent = userCards.length;
-        if (curTab === 'scoreboard') renderGames();
-        if (curTab === 'stats') renderPlayers();
-        if (curTab === 'cards') renderCards();
+        lastRefreshTs = Date.now();
+        if (changed) {
+          lastLiveSig = sig;
+          rebuildPlayerIndex();
+          try { localStorage.setItem('osp_live_cache', sig); } catch (_) {}
+          checkNewLegHits();
+          document.getElementById('card-cnt').textContent = userCards.length;
+          if (curTab === 'scoreboard') renderGames();
+          if (curTab === 'stats') renderPlayers();
+          if (curTab === 'cards') renderCards();
+        }
         if (firstLoad) {
           firstLoad = false;
-          if (data.partial) setTimeout(refresh, 400);
+          if (data.partial) setTimeout(() => refresh(true), 400);
         }
       } catch (e) {
-        document.getElementById('games-area').innerHTML = `<p style="color:#f87171">Sync issue: ${e.message}</p>`;
+        if (curTab === 'scoreboard') {
+          document.getElementById('games-area').innerHTML = `<p style="color:#f87171">Sync issue: ${e.message}</p>`;
+        }
+      } finally {
+        isRefreshing = false;
       }
     }
 
     renderCards();
-    refresh();
-    setInterval(refresh, 15000);
+    refresh(true);
+    setInterval(() => refresh(false), 15000);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && (Date.now() - lastRefreshTs) > 10000) refresh(false);
+    });
 
       /* ========================================================================
        9. SUPABASE AUTH, CLOUD SYNC & ADMIN DAILY SAMPLES

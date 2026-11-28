@@ -36,12 +36,8 @@
 
 4. Immediate Next Milestones (In Priority Order)
 
-1. California Platforms Verification & Tuning (In Progress):
-	• Verify and dial in live screenshot slip uploads across all 5 major California platforms: FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi.
-2. Post-Dec 13 — North Carolina Online Sportsbooks Expansion:
+1. Post-Dec 13 — North Carolina Online Sportsbooks Expansion:
 	• Once in North Carolina (after Dec 13), add slip upload support, badges, Vision AI rules, and fallback parsers for legal NC online sportsbooks (e.g., BetMGM, Caesars, ESPN BET, bet365, Fanatics Sportsbook).
-3. Site Speed & Mobile UX Optimization:
-	• Audit templates/index.html and web_live.py to streamline redundant DOM renders, optimize portrait-mode card spacing, and verify smooth performance across iOS Safari and Android Chrome.
-4. Phase 4 — Freemium Limits & Stripe Pro Tier:
+2. Phase 4 — Freemium Limits & Stripe Pro Tier:
 	• Enforce a free-tier limit (e.g., max 3 active cards for free users) stored in Supabase user profiles.
 	• Add Stripe Checkout + Webhook endpoint in web_live.py to unlock unlimited active cards, unlimited Vision AI slip scans, and priority live refresh for Pro subscribers.

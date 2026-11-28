@@ -1,5 +1,6 @@
 import os
 import re
+import gzip
 import json
 import time
 import threading
@@ -8,6 +9,9 @@ import requests
 from flask import Flask, jsonify, redirect, render_template, request
 
 app = Flask(__name__)
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 604800
+_ESPN_SESSION = requests.Session()
+_ESPN_SESSION.headers.update({"User-Agent": "Mozilla/5.0"})
 HOST = "site." + "api." + "espn." + "com"
 _CACHE = {"ts": 0.0, "data": None}
 _ROSTER_CACHE = {}
@@ -267,9 +271,31 @@ def upgrade_to_https():
     if request.headers.get("X-Forwarded-Proto") == "http":
         return redirect(f"https://{request.host}{request.full_path.rstrip('?')}", code=301)
 
+@app.after_request
+def optimize_response(resp):
+    if request.path.startswith("/static/"):
+        resp.headers.setdefault("Cache-Control", "public, max-age=604800, immutable")
+        return resp
+    if (
+        resp.status_code == 200
+        and not resp.direct_passthrough
+        and "gzip" in request.headers.get("Accept-Encoding", "").lower()
+        and "Content-Encoding" not in resp.headers
+        and any(ct in (resp.content_type or "") for ct in ("application/json", "text/html", "text/css", "javascript"))
+    ):
+        raw = resp.get_data()
+        if len(raw) >= 1024:
+            resp.set_data(gzip.compress(raw, compresslevel=5))
+            resp.headers["Content-Encoding"] = "gzip"
+            resp.headers["Content-Length"] = str(len(resp.get_data()))
+            vary = resp.headers.get("Vary", "")
+            if "Accept-Encoding" not in vary:
+                resp.headers["Vary"] = (f"{vary}, Accept-Encoding" if vary else "Accept-Encoding")
+    return resp
+
 def fetch_json(url, timeout=6):
     try:
-        return requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=timeout).json()
+        return _ESPN_SESSION.get(url, timeout=timeout).json()
     except Exception:
         return {}
 
