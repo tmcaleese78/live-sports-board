@@ -326,7 +326,7 @@
     }
     #p-table tr.p-row td.p-name-td { text-align: left; font-weight: 800; white-space: nowrap; }
     #p-table tr.p-row td.p-sub-td { color: #94a3b8; font-weight: 600; font-size: 12.5px; }
-    .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img {
+    .sb-left img, .logo-cell img, td.tm-logo-td img, .box-tbl img, .p-mcard-logo img {
       filter: drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff)
         drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)
         drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6)) !important;
@@ -416,6 +416,37 @@
       background: rgba(30, 41, 59, 0.85); border: 1px solid rgba(148, 163, 184, 0.25);
       padding: 1px 6px; border-radius: 5px; margin-left: 4px;
     }
+    .p-cards-mobile { display: none; }
+    .p-sort-wrap { display: none; align-items: center; gap: 6px; }
+    .p-mcard {
+      border-radius: 13px; border: 1px solid rgba(56, 189, 248, 0.2);
+      border-left: 5px solid var(--tm-clr, #38bdf8);
+      background: linear-gradient(90deg,
+        color-mix(in srgb, var(--tm-clr, #1e293b) 42%, #070d1a) 0%,
+        rgba(11, 18, 34, 0.96) 58%, rgba(7, 13, 26, 0.98) 100%);
+      padding: 10px 11px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    }
+    .p-mcard-top {
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      margin-bottom: 8px;
+    }
+    .p-mcard-id { display: flex; align-items: center; gap: 9px; min-width: 0; flex: 1; }
+    .p-mcard-logo { width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .p-mcard-logo img { width: 28px; height: 28px; object-fit: contain; display: block; }
+    .p-mcard-name { font-size: 14.5px; font-weight: 800; color: #f8fafc; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .p-mcard-sub { font-size: 11px; font-weight: 700; color: #94a3b8; margin-top: 2px; }
+    .p-mstats { display: flex; flex-wrap: wrap; gap: 6px; }
+    .p-mstat {
+      display: inline-flex; align-items: baseline; gap: 5px;
+      background: rgba(15, 23, 42, 0.88); border: 1px solid rgba(148, 163, 184, 0.24);
+      border-radius: 8px; padding: 4px 8px;
+    }
+    .p-mstat.hi {
+      background: rgba(29, 140, 248, 0.18); border-color: rgba(56, 189, 248, 0.55);
+    }
+    .p-mstat-v { font-size: 13.5px; font-weight: 900; color: #f8fafc; }
+    .p-mstat.hi .p-mstat-v { color: #38bdf8; }
+    .p-mstat-k { font-size: 10px; font-weight: 800; color: #94a3b8; letter-spacing: 0.03em; }
     button { touch-action: manipulation; }
 
     /* ==========================================================================
@@ -464,6 +495,11 @@
       .modal-box { padding: 14px; max-height: 90dvh; border-radius: 14px; }
       .sb-team { padding: 9px 12px; font-size: 14px; }
       .sb-score { font-size: 22px; }
+      #view-stats .tbl-wrap { display: none; }
+      .p-cards-mobile { display: flex; flex-direction: column; gap: 9px; }
+      .p-sort-wrap { display: flex; flex: 1 1 160px; }
+      #p-sort-mobile { flex: 1; min-width: 0; }
+      #p-team-filter, #p-search { flex: 1 1 140px; min-width: 0; }
       .toast {
         left: 14px; right: 14px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
         text-align: center; font-size: 12.5px;
@@ -538,7 +574,20 @@
         <select id="p-team-filter" onchange="renderPlayers()"><option value="ALL">All Teams</option></select>
         <input class="search-box" id="p-search" placeholder="Search player name..." oninput="debouncedRenderPlayers()">
       </div>
+      <div class="row-flex" id="p-cat-row" style="align-items:center;justify-content:space-between;margin-top:-4px">
+        <div id="p-cat-pills" style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="pill active" data-pcat="ALL" onclick="setPcat('ALL')">All</button>
+          <button class="pill" data-pcat="PASS" onclick="setPcat('PASS')">Passing</button>
+          <button class="pill" data-pcat="RUSH" onclick="setPcat('RUSH')">Rushing</button>
+          <button class="pill" data-pcat="REC" onclick="setPcat('REC')">Receiving</button>
+        </div>
+        <div class="p-sort-wrap">
+          <span style="font-size:12px;font-weight:800;color:var(--muted);white-space:nowrap">Sort:</span>
+          <select id="p-sort-mobile" onchange="setMobileSort(this.value)"></select>
+        </div>
+      </div>
       <div class="tbl-wrap"><table id="p-table"></table></div>
+      <div id="p-cards-mobile" class="p-cards-mobile"></div>
     </div>
 
     <!-- ======================================================================
@@ -784,11 +833,32 @@
       renderGames();
     }
 
+    let curPcat = 'ALL';
     function setPlg(lg) {
       curPlg = lg;
+      curPcat = 'ALL';
       sortCol = lg === 'NFL' ? 'PASS YDS' : 'PTS';
       sortDir = 1;
       document.querySelectorAll('[data-plg]').forEach(b => b.classList.toggle('active', b.dataset.plg === lg));
+      document.querySelectorAll('[data-pcat]').forEach(b => b.classList.toggle('active', b.dataset.pcat === 'ALL'));
+      renderPlayers();
+    }
+
+    function setPcat(cat) {
+      curPcat = cat;
+      if (cat === 'PASS') sortCol = 'PASS YDS';
+      else if (cat === 'RUSH') sortCol = 'RUSH YDS';
+      else if (cat === 'REC') sortCol = 'REC YDS';
+      else sortCol = curPlg === 'NFL' ? 'PASS YDS' : 'PTS';
+      sortDir = 1;
+      document.querySelectorAll('[data-pcat]').forEach(b => b.classList.toggle('active', b.dataset.pcat === cat));
+      renderPlayers();
+    }
+
+    function setMobileSort(col) {
+      if (!col) return;
+      sortCol = col;
+      sortDir = 1;
       renderPlayers();
     }
 
@@ -1059,24 +1129,59 @@
     }
 
     function renderPlayers() {
+      const catPills = document.getElementById('p-cat-pills');
+      if (catPills) catPills.style.display = curPlg === 'NFL' ? 'flex' : 'none';
+
       const hasAnyStat = p => Boolean(p && p.stats && Object.values(p.stats).some(v => Number(v) !== 0));
-      const all = ((liveData.players && liveData.players[curPlg]) || []).filter(hasAnyStat);
+      const allActive = ((liveData.players && liveData.players[curPlg]) || []).filter(hasAnyStat);
+
+      const catStatKeys = {
+        PASS: ['PASS YDS', 'PASS TD', 'COMP', 'PASS ATT'],
+        RUSH: ['RUSH YDS', 'RUSH ATT', 'RUSH TD'],
+        REC: ['REC', 'REC YDS', 'REC TGTS', 'REC TD']
+      };
+      const catFiltered = (curPlg === 'NFL' && curPcat !== 'ALL' && catStatKeys[curPcat])
+        ? allActive.filter(p => catStatKeys[curPcat].some(k => Number(p.stats && p.stats[k]) !== 0))
+        : allActive;
+
       const tSel = document.getElementById('p-team-filter');
       const prevT = tSel ? (tSel.value || 'ALL') : 'ALL';
-      const teams = [...new Set(all.map(p => p.team).filter(Boolean))].sort();
+      const teams = [...new Set(catFiltered.map(p => p.team).filter(Boolean))].sort();
       if (tSel) tSel.innerHTML = `<option value="ALL">All Teams</option>` + teams.map(t => `<option value="${t}" ${t === prevT ? 'selected' : ''}>${t}</option>`).join('');
       const q = (document.getElementById('p-search').value || '').toLowerCase();
       const tf = tSel ? tSel.value : 'ALL';
-      let list = all.filter(p => (tf === 'ALL' || p.team === tf) && (p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)));
-      const cols = curPlg === 'NFL' ? ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'] : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA'];
-      if (!sortCol || !cols.includes(sortCol)) { sortCol = curPlg === 'NFL' ? 'PASS YDS' : 'PTS'; sortDir = 1; }
+      let list = catFiltered.filter(p => (tf === 'ALL' || p.team === tf) && (p.name.toLowerCase().includes(q) || p.team.toLowerCase().includes(q)));
+
+      const nflColsByCat = {
+        ALL: ['PASS YDS', 'PASS TD', 'RUSH YDS', 'RUSH TD', 'REC', 'REC YDS', 'REC TD', 'SCRIM YDS'],
+        PASS: ['PASS YDS', 'PASS TD', 'COMP', 'PASS ATT', 'RUSH YDS'],
+        RUSH: ['RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC YDS', 'SCRIM YDS'],
+        REC: ['REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS']
+      };
+      const cols = curPlg === 'NFL'
+        ? (nflColsByCat[curPcat] || nflColsByCat.ALL)
+        : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA'];
+      const mobileOrder = curPlg === 'NFL'
+        ? (curPcat === 'ALL'
+            ? ['PASS YDS', 'PASS TD', 'COMP', 'PASS ATT', 'RUSH YDS', 'RUSH ATT', 'RUSH TD', 'REC', 'REC YDS', 'REC TGTS', 'REC TD', 'SCRIM YDS']
+            : cols)
+        : ['PTS', 'REB', 'AST', '3PM', 'STL', 'BLK', 'PRA', 'PR', 'PA', 'RA'];
+
+      if (!sortCol || !cols.includes(sortCol)) { sortCol = cols[0]; sortDir = 1; }
+      const mSortSel = document.getElementById('p-sort-mobile');
+      if (mSortSel) {
+        mSortSel.innerHTML = cols.map(c => `<option value="${c}" ${c === sortCol ? 'selected' : ''}>${c}</option>`).join('');
+      }
+
       list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
-      const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
-      const emptyMsg = all.length === 0
+      const topList = list.slice(0, 120);
+      const emptyMsg = allActive.length === 0
         ? `No ${curPlg} players have recorded stats yet.`
         : `No matching ${curPlg} players with recorded stats.`;
-      const rows = list.length
-        ? list.slice(0, 120).map(p => {
+
+      const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
+      const rows = topList.length
+        ? topList.map(p => {
             const bg = p.bg || '#1e293b';
             const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
             const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
@@ -1086,6 +1191,39 @@
           }).join('')
         : `<tr><td colspan="${cols.length + 5}" style="padding:20px;text-align:center;color:var(--muted);font-weight:700">${emptyMsg}</td></tr>`;
       document.getElementById('p-table').innerHTML = hdr + rows;
+
+      const mWrap = document.getElementById('p-cards-mobile');
+      if (mWrap) {
+        mWrap.innerHTML = topList.length
+          ? topList.map(p => {
+              const bg = p.bg || '#1e293b';
+              const logoHtml = p.logo ? `<img src="${p.logo}" alt="${p.team || ''}" loading="lazy" decoding="async">` : '';
+              const safeName = String(p.name || '').replace(/'/g, "\\'"), safeTeam = String(p.team || '').replace(/'/g, "\\'");
+              const nameHtml = p.id ? `<span class="p-link" onclick="openPlayerCard('${curPlg}','${p.id}','${safeName}')">${p.name}</span>` : p.name;
+              const statPills = mobileOrder
+                .filter(k => k === sortCol || Number(p.stats && p.stats[k]) !== 0)
+                .sort((a, b) => (a === sortCol ? -1 : (b === sortCol ? 1 : 0)))
+                .map(k => {
+                  const val = (p.stats && p.stats[k]) ?? 0;
+                  if (val === 0 && k === sortCol && mobileOrder.some(ok => Number(p.stats && p.stats[ok]) !== 0)) return '';
+                  return `<span class="p-mstat ${k === sortCol ? 'hi' : ''}"><span class="p-mstat-v">${val}</span><span class="p-mstat-k">${k}</span></span>`;
+                }).join('');
+              return `<div class="p-mcard" style="--tm-clr:${bg}">
+                <div class="p-mcard-top">
+                  <div class="p-mcard-id">
+                    <div class="p-mcard-logo">${logoHtml}</div>
+                    <div style="min-width:0">
+                      <div class="p-mcard-name">${nameHtml}</div>
+                      <div class="p-mcard-sub">${p.team || ''}${p.status ? ' • ' + p.status : ''}</div>
+                    </div>
+                  </div>
+                  <button class="pill" style="padding:5px 10px;font-size:11.5px;border-color:rgba(56,189,248,0.5);color:#38bdf8;flex-shrink:0" onclick="openQuickProp('${curPlg}','${safeName}','${safeTeam}','${sortCol}')">+ Prop</button>
+                </div>
+                <div class="p-mstats">${statPills}</div>
+              </div>`;
+            }).join('')
+          : `<div style="padding:22px 14px;text-align:center;color:var(--muted);font-weight:700;background:var(--surface);border:1px solid var(--border);border-radius:14px">${emptyMsg}</div>`;
+      }
     }
 
     function evalLeg(leg) {
