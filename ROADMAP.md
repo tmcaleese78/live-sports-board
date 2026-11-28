@@ -34,7 +34,11 @@
 		• Cross-Book Rooting Guide: aggregates all active slips by Game (sorted by dollars riding on each game) and by Player/Pick (showing every target across FanDuel, DraftKings, PrizePicks, Underdog, and Kalshi on one card).
 		• Live Pace Projections & "1 Leg Away" Sweat Alerts: projects final stats from live ESPN game clocks (Pace badges) and highlights multi-leg cards that are 1 leg away from cashing.
 		• Personal Performance Analytics: cumulative P&L SVG curve, ROI by platform, individual leg hit rates by stat type, Over/Under splits, and slip-size breakdowns.
+		• 1-Tap Shareable Card Graphic Exporter (📸): client-side high-res dark-mode PNG bet card export with OMNISTATPRO.COM watermark and native mobile Web Share API / desktop PNG download.
+		• Pre-Bet Last 5 / Last 10 Prop Hit-Rate Checker: interactive L5/L10 hit rate, averages, and 10-game green/red bar chart inside the Player Profile modal (auto-prefilled when clicking any player leg on a card).
+		• 1-Leg-Away Hedge Calculator (⚖️ Hedge): built directly onto 1-leg-away active cards with Equal Guaranteed Profit, Break-Even Free Roll, and Custom Stake P&L comparison.
 		• Installable PWA: manifest.json + network-first service worker (sw.js) + 1-tap Install App prompt for native iOS/Android home-screen launch.
+		• Landing Page, Contact/Feedback & Private Admin Dashboard: high-converting dark-mode logged-out landing page, Feedback/Contact modal routing to info@omnistatpro.com, and private @omnistatpro.com Admin Dashboard with live traffic, scans-by-book, feedback inbox, and Supabase user overview.
 	• Mobile Portrait UX & Performance: 4-column single-row mobile nav bar (Cards, + Build, Scores, Stats), 57 KB Retina logo, O(1) player index, visibility-aware smart polling, and compact mobile Live Stats cards with category pills & Sort By dropdown (showing only players with accrued stats in the active column).
 • Hybrid Screenshot Slip Importer (web_live.py + templates/index.html):
 	• Primary parser: /api/parse-slip (gemini-3.5-flash-lite Vision AI with compact JPEG uploads, book-specific prompts, and model failover) extracting cost, payout, and structured legs (prop, spread, ml, total).

@@ -401,6 +401,32 @@
     }
     .pc-stat-lbl { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
     .pc-stat-val { font-size: 16px; font-weight: 900; color: #f8fafc; margin-top: 2px; }
+    .hr-box {
+      background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.28);
+      border-radius: 12px; padding: 12px 14px; margin: 12px 0 14px;
+    }
+    .hr-kpis {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+      gap: 8px; margin: 10px 0;
+    }
+    .hr-kpi {
+      background: rgba(17, 27, 51, 0.94); border: 1px solid rgba(56, 189, 248, 0.16);
+      border-radius: 9px; padding: 7px 8px; text-align: center;
+    }
+    .hr-bars {
+      display: flex; align-items: flex-end; gap: 5px; height: 92px; padding-top: 14px;
+      margin-top: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    }
+    .hr-bar-col {
+      flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;
+    }
+    .hr-bar-fill { width: 100%; max-width: 32px; border-radius: 5px 5px 0 0; min-height: 4px; transition: height 0.25s ease; }
+    .hr-bar-val { font-size: 10px; font-weight: 800; color: #e2e8f0; margin-bottom: 2px; }
+    .hr-bar-opp { font-size: 9px; font-weight: 700; color: #94a3b8; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .hg-card {
+      background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.24);
+      border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
+    }
     .hist-date-hdr {
       display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
       margin: 18px 0 10px; padding: 8px 13px; border-radius: 10px;
@@ -931,6 +957,35 @@
         </div>
       </div>
       <div id="admin-body" style="color:var(--muted);font-size:13px">Loading admin metrics...</div>
+    </div>
+  </div>
+
+  <div class="modal-bg" id="hedge-modal" onclick="if(event.target===this)closeHedgeModal()">
+    <div class="modal-box" style="max-width:480px">
+      <div class="modal-hdr">
+        <strong style="font-size:17px;color:#fbbf24">⚖️ 1-Leg-Away Hedge Calculator</strong>
+        <button class="pill" onclick="closeHedgeModal()">✕ Close</button>
+      </div>
+      <div id="hedge-summary" style="margin-bottom:12px"></div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:12px;font-weight:800;color:var(--muted);margin-bottom:6px">OPPOSITE SIDE AMERICAN ODDS</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <input id="hg-odds" type="number" value="-110" step="5" oninput="recalcHedge()" style="width:110px;font-weight:800">
+          <button class="pill" style="padding:5px 9px;font-size:11.5px" onclick="setHedgeOdds(-120)">-120</button>
+          <button class="pill" style="padding:5px 9px;font-size:11.5px" onclick="setHedgeOdds(-110)">-110</button>
+          <button class="pill" style="padding:5px 9px;font-size:11.5px" onclick="setHedgeOdds(100)">+100</button>
+          <button class="pill" style="padding:5px 9px;font-size:11.5px" onclick="setHedgeOdds(125)">+125</button>
+          <button class="pill" style="padding:5px 9px;font-size:11.5px" onclick="setHedgeOdds(150)">+150</button>
+        </div>
+      </div>
+      <div id="hedge-results"></div>
+      <div class="hg-card" style="margin-bottom:0">
+        <div style="font-size:11.5px;font-weight:800;color:#94a3b8;text-transform:uppercase;margin-bottom:6px">Custom Hedge Stake ($)</div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <input id="hg-custom" type="number" step="1" min="0" placeholder="Enter stake ($)" oninput="recalcHedge()" style="width:140px;font-weight:800">
+          <div id="hg-custom-out" style="font-size:12.5px;font-weight:700;color:#cbd5e1;flex:1"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1687,7 +1742,7 @@
       }
       return samples;
     }
-    function openCardLegModal(sport, clickType, clickKey) {
+    function openCardLegModal(sport, clickType, clickKey, statKey, targetVal, ouVal) {
       if (!clickKey) return;
       const sp = sport || 'NFL';
       if (clickType === 'player') {
@@ -1697,7 +1752,8 @@
           || (livePlayerIndex.NBA && livePlayerIndex.NBA.get(target))
           || ((liveData.players && liveData.players[sp]) || []).find(x => String(x && x.name || '').trim().toLowerCase() === target);
         if (p && p.id) {
-          openPlayerCard(p.league || sp, p.id, p.name);
+          const prefill = statKey ? { stat: statKey, target: targetVal, ou: ouVal || 'Over' } : null;
+          openPlayerCard(p.league || sp, p.id, p.name, prefill);
         } else {
           showToast(`Player box score not active yet for ${clickKey}`);
         }
@@ -1775,7 +1831,8 @@
           const isOneAway = !isSettled && !anyMiss && evals.length >= 2 && hitCntAll === (evals.length - 1);
           const st = allHit ? 'hit' : (anyMiss ? 'miss' : (isOneAway ? 'one-away' : ''));
           const isExpanded = !isHistoryMode || isHistoryCardExpanded(c, idx);
-          const rows = isExpanded ? evals.map(e => {
+          const rows = isExpanded ? evals.map((e, li) => {
+            const legObj = (c.legs && c.legs[li]) || {};
             const paceHtml = e.paceTxt ? `<span class="pace-tag ${e.paceCls || 'pace-warn'}">${e.paceTxt}</span>` : '';
             const stBadge = (e.statusTxt || paceHtml)
               ? `<div style="font-size:10.5px;font-weight:700;margin-top:2px;color:${e.isLive ? '#4ade80' : '#94a3b8'}">${e.isLive && e.statusTxt ? '● ' : ''}${e.statusTxt || ''}${paceHtml}</div>`
@@ -1783,7 +1840,10 @@
             const safeSport = String(e.sport || '').replace(/'/g, "\\'");
             const safeType = String(e.clickType || '').replace(/'/g, "\\'");
             const safeKey = String(e.clickKey || '').replace(/'/g, "\\'");
-            return `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg};cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}')" title="Click for live stats / box score">
+            const safeStat = String(legObj.stat || e.statKey || '').replace(/'/g, "\\'");
+            const safeTgt = legObj.target != null ? Number(legObj.target) : '';
+            const safeOu = String(legObj.ou || e.ou || 'Over').replace(/'/g, "\\'");
+            return `<div class="p-wrap ${e.hit ? 'hit' : (e.miss ? 'miss' : '')}" style="--tm-clr:${e.bg};cursor:pointer" onclick="openCardLegModal('${safeSport}','${safeType}','${safeKey}','${safeStat}','${safeTgt}','${safeOu}')" title="Click for live stats / L10 hit rate">
               <div class="p-main"><div class="logo-cell">${e.logo ? `<img src="${e.logo}" loading="lazy" decoding="async">` : ''}</div>
               <div><div>${e.name}</div>${stBadge}</div><div>${e.stat}</div><div>${e.gained}</div><div>${e.needed}</div></div>
               <div class="prog-track"><div class="prog-fill" style="width:${e.pct}%;background:${e.miss ? '#ef4444' : '#22c55e'}"></div></div></div>`;
@@ -1796,11 +1856,13 @@
               actionBtns = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.5);color:#fde047" onclick="editSampleCard(${idx})">Edit Sample</button><button class="del-btn" style="margin:0" onclick="delSampleCard(${idx})">✕</button>`;
             }
           } else {
-            const shareBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="shareCard(${idx})">Share</button>`;
-            const archBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(148,163,184,0.4);color:#cbd5e1" onclick="toggleArchiveCard(${idx})">${isSettled ? 'Reopen' : 'Archive'}</button>`;
-            const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
-            const promoteBtn = isAdminUser() ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:6px;border-color:rgba(250,204,21,0.45);color:#fde047" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>` : '';
-            actionBtns = `${shareBtn}${archBtn}${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
+            const hedgeBtn = isOneAway ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:5px;border-color:rgba(245,158,11,0.65);color:#fbbf24" onclick="openHedgeModal(${idx})" title="Calculate guaranteed-profit hedge">⚖️ Hedge</button>` : '';
+            const imgBtn = `<button class="pill" style="padding:2px 7px;font-size:11px;margin-right:5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="exportCardGraphic(${idx})" title="Save / Share Card Graphic">📸</button>`;
+            const shareBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:5px;border-color:rgba(74,222,128,0.45);color:#4ade80" onclick="shareCard(${idx})">Share</button>`;
+            const archBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:5px;border-color:rgba(148,163,184,0.4);color:#cbd5e1" onclick="toggleArchiveCard(${idx})">${isSettled ? 'Reopen' : 'Archive'}</button>`;
+            const editBtn = `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:5px;border-color:rgba(56,189,248,0.45);color:#38bdf8" onclick="editCard(${idx})">Edit</button>`;
+            const promoteBtn = isAdminUser() ? `<button class="pill" style="padding:2px 8px;font-size:11px;margin-right:5px;border-color:rgba(250,204,21,0.45);color:#fde047" onclick="promoteCardToSample(${idx})" title="Publish as Daily Sample">+ Sample</button>` : '';
+            actionBtns = `${hedgeBtn}${imgBtn}${shareBtn}${archBtn}${editBtn}${promoteBtn}<button class="del-btn" style="margin:0" onclick="delCard(${idx})">✕</button>`;
           }
 
           const statusBadge = !isSampleView && isSettled
@@ -4128,7 +4190,136 @@
       document.getElementById('player-modal').classList.remove('open');
     }
 
-    async function openPlayerCard(lg, pid, name) {
+    let _activeHitRateState = null;
+
+    function extractGamelogMetrics(lg, gl) {
+      const labels = (gl && gl.labels || []).map(x => String(x || '').toUpperCase().trim());
+      const games = (gl && gl.games || []);
+      if (!labels.length || !games.length) return [];
+      const numAt = (row, idx) => {
+        if (idx < 0 || idx >= row.length) return 0;
+        const first = String(row[idx] || '').split('/')[0].split('-')[0].replace(/,/g, '').trim();
+        const v = parseFloat(first);
+        return isNaN(v) ? 0 : v;
+      };
+      const secondAt = (row, idx) => {
+        if (idx < 0 || idx >= row.length) return 0;
+        const parts = String(row[idx] || '').split('/');
+        const v = parseFloat((parts[1] || '0').replace(/,/g, '').trim());
+        return isNaN(v) ? 0 : v;
+      };
+      const idxOf = (...names) => {
+        for (const nm of names) {
+          const i = labels.indexOf(nm);
+          if (i >= 0) return i;
+        }
+        return -1;
+      };
+      const metrics = [];
+      const addMetric = (key, label, fn) => {
+        const vals = games.map(g => ({ opp: g.opp || g.date || '', date: g.date || '', val: fn(g.stats || []) }));
+        if (vals.some(x => x.val !== 0)) metrics.push({ key, label, vals });
+      };
+
+      if (String(lg || '').toUpperCase() === 'NBA') {
+        const iPts = idxOf('PTS'), iReb = idxOf('REB'), iAst = idxOf('AST'), i3 = idxOf('3PT', '3PM'), iStl = idxOf('STL'), iBlk = idxOf('BLK');
+        if (iPts >= 0) addMetric('PTS', 'PTS', r => numAt(r, iPts));
+        if (iReb >= 0) addMetric('REB', 'REB', r => numAt(r, iReb));
+        if (iAst >= 0) addMetric('AST', 'AST', r => numAt(r, iAst));
+        if (i3 >= 0) addMetric('3PM', '3PM', r => numAt(r, i3));
+        if (iStl >= 0) addMetric('STL', 'STL', r => numAt(r, iStl));
+        if (iBlk >= 0) addMetric('BLK', 'BLK', r => numAt(r, iBlk));
+        if (iPts >= 0 && iReb >= 0 && iAst >= 0) addMetric('PRA', 'PRA', r => numAt(r, iPts) + numAt(r, iReb) + numAt(r, iAst));
+        if (iPts >= 0 && iReb >= 0) addMetric('PR', 'PR', r => numAt(r, iPts) + numAt(r, iReb));
+        if (iPts >= 0 && iAst >= 0) addMetric('PA', 'PA', r => numAt(r, iPts) + numAt(r, iAst));
+        if (iReb >= 0 && iAst >= 0) addMetric('RA', 'RA', r => numAt(r, iReb) + numAt(r, iAst));
+      } else {
+        const iYds = idxOf('YDS'), iTd = idxOf('TD'), iCmp = idxOf('CMP'), iAtt = idxOf('ATT'), iCA = idxOf('C/ATT');
+        const iCar = idxOf('CAR'), iRec = idxOf('REC'), iTgts = idxOf('TGTS');
+        const isPasser = iCmp >= 0 || iCA >= 0 || (iAtt >= 0 && iCar < 0 && iRec < 0);
+        const isRusher = iCar >= 0;
+        const isReceiver = iRec >= 0 || iTgts >= 0;
+        if (iYds >= 0) {
+          const yKey = isPasser ? 'PASS YDS' : (isReceiver && !isRusher ? 'REC YDS' : 'RUSH YDS');
+          const yLbl = isPasser ? 'Pass Yds' : (isReceiver && !isRusher ? 'Rec Yds' : 'Rush Yds');
+          addMetric(yKey, yLbl, r => numAt(r, iYds));
+        }
+        if (iCmp >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, iCmp));
+        else if (iCA >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, iCA));
+        if (isPasser && iAtt >= 0) addMetric('PASS ATT', 'Pass ATT', r => numAt(r, iAtt));
+        else if (iCA >= 0) addMetric('PASS ATT', 'Pass ATT', r => secondAt(r, iCA));
+        if (iCar >= 0) addMetric('RUSH ATT', 'Rush ATT', r => numAt(r, iCar));
+        if (iRec >= 0) addMetric('REC', 'Receptions', r => numAt(r, iRec));
+        if (iTgts >= 0) addMetric('REC TGTS', 'Rec Targets', r => numAt(r, iTgts));
+        if (iTd >= 0) {
+          const tdKey = isPasser ? 'PASS TD' : 'TD';
+          addMetric(tdKey, isPasser ? 'Pass TD' : 'Touchdowns', r => numAt(r, iTd));
+        }
+      }
+      return metrics;
+    }
+
+    function updatePlayerHitRate() {
+      const st = _activeHitRateState;
+      const outEl = document.getElementById('hr-output');
+      if (!st || !outEl) return;
+      const statSel = document.getElementById('hr-stat');
+      const ouSel = document.getElementById('hr-ou');
+      const lineEl = document.getElementById('hr-line');
+      const key = statSel ? statSel.value : st.metrics[0].key;
+      const metric = st.metrics.find(m => m.key === key) || st.metrics[0];
+      const ou = (ouSel && ouSel.value) || 'Over';
+      let line = parseFloat(lineEl && lineEl.value);
+      const vals = metric.vals;
+      const avg10 = vals.reduce((a, b) => a + b.val, 0) / Math.max(1, vals.length);
+      if (!Number.isFinite(line) || line < 0) {
+        line = Math.max(0.5, Math.floor(avg10) + 0.5);
+        if (lineEl) lineEl.value = line;
+      }
+      const l5 = vals.slice(0, 5);
+      const avg5 = l5.reduce((a, b) => a + b.val, 0) / Math.max(1, l5.length);
+      const isClear = v => (ou === 'Under' ? (Number.isInteger(line) ? v <= line : v < line) : (v >= line));
+      const h10 = vals.filter(x => isClear(x.val)).length;
+      const h5 = l5.filter(x => isClear(x.val)).length;
+      const p10 = Math.round((h10 / Math.max(1, vals.length)) * 100);
+      const p5 = Math.round((h5 / Math.max(1, l5.length)) * 100);
+      const maxBar = Math.max(line * 1.15, ...vals.map(x => x.val), 1);
+
+      const barsHtml = [...vals].reverse().map(g => {
+        const ok = isClear(g.val);
+        const hPct = Math.max(6, Math.min(100, Math.round((g.val / maxBar) * 100)));
+        return `<div class="hr-bar-col" title="${g.date} vs ${g.opp}: ${g.val}">
+          <div class="hr-bar-val" style="color:${ok ? '#4ade80' : '#f87171'}">${g.val}</div>
+          <div class="hr-bar-fill" style="height:${hPct}%;background:${ok ? '#22c55e' : '#ef4444'}"></div>
+          <div class="hr-bar-opp">${g.opp}</div>
+        </div>`;
+      }).join('');
+
+      outEl.innerHTML = `<div class="hr-kpis">
+        <div class="hr-kpi"><div class="pc-stat-lbl">L${vals.length} Hit Rate</div><div class="pc-stat-val" style="color:${p10 >= 60 ? '#4ade80' : (p10 >= 40 ? '#facc15' : '#f87171')}">${h10}/${vals.length} (${p10}%)</div></div>
+        <div class="hr-kpi"><div class="pc-stat-lbl">L${l5.length} Hit Rate</div><div class="pc-stat-val" style="color:${p5 >= 60 ? '#4ade80' : (p5 >= 40 ? '#facc15' : '#f87171')}">${h5}/${l5.length} (${p5}%)</div></div>
+        <div class="hr-kpi"><div class="pc-stat-lbl">L${vals.length} Avg</div><div class="pc-stat-val" style="color:#38bdf8">${avg10.toFixed(1)}</div></div>
+        <div class="hr-kpi"><div class="pc-stat-lbl">L${l5.length} Avg</div><div class="pc-stat-val" style="color:#cbd5e1">${avg5.toFixed(1)}</div></div>
+      </div>
+      <div style="font-size:11px;color:#94a3b8;font-weight:700">Oldest → Most Recent (${ou} ${line} ${metric.label})</div>
+      <div class="hr-bars">${barsHtml}</div>`;
+    }
+
+    function onHrStatChange() {
+      const st = _activeHitRateState;
+      const statSel = document.getElementById('hr-stat');
+      const lineEl = document.getElementById('hr-line');
+      if (st && statSel && lineEl) {
+        const m = st.metrics.find(x => x.key === statSel.value);
+        if (m && m.vals.length) {
+          const avg = m.vals.reduce((a, b) => a + b.val, 0) / m.vals.length;
+          lineEl.value = Math.max(0.5, Math.floor(avg) + 0.5);
+        }
+      }
+      updatePlayerHitRate();
+    }
+
+    async function openPlayerCard(lg, pid, name, prefill = null) {
       document.getElementById('pc-title').textContent = `${lg} • ${name}`;
       document.getElementById('pc-body').innerHTML = '<p style="color:var(--muted)">Loading season stats & game log...</p>';
       document.getElementById('player-modal').classList.add('open');
@@ -4156,6 +4347,31 @@
             `</div>`;
         }
 
+        const metrics = extractGamelogMetrics(lg, d.gamelog);
+        if (metrics.length) {
+          _activeHitRateState = { lg, metrics };
+          const prefStat = prefill && prefill.stat && metrics.find(m => m.key === prefill.stat) ? prefill.stat : metrics[0].key;
+          const initM = metrics.find(m => m.key === prefStat) || metrics[0];
+          const initAvg = initM.vals.reduce((a, b) => a + b.val, 0) / Math.max(1, initM.vals.length);
+          const initLine = (prefill && Number.isFinite(parseFloat(prefill.target)) && parseFloat(prefill.target) > 0)
+            ? parseFloat(prefill.target)
+            : Math.max(0.5, Math.floor(initAvg) + 0.5);
+          const initOu = (prefill && prefill.ou === 'Under') ? 'Under' : 'Over';
+          html += `<div class="hr-box">
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+              <strong style="font-family:'Barlow Condensed',sans-serif;font-size:16px;letter-spacing:0.05em;text-transform:uppercase;color:#38bdf8">Last 5 / Last 10 Prop Hit Rate</strong>
+              <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+                <select id="hr-stat" onchange="onHrStatChange()" style="padding:5px 8px;font-size:12.5px;font-weight:700">${metrics.map(m => `<option value="${m.key}" ${m.key === prefStat ? 'selected' : ''}>${m.label}</option>`).join('')}</select>
+                <select id="hr-ou" onchange="updatePlayerHitRate()" style="padding:5px 8px;font-size:12.5px;font-weight:700"><option value="Over" ${initOu === 'Over' ? 'selected' : ''}>Over</option><option value="Under" ${initOu === 'Under' ? 'selected' : ''}>Under</option></select>
+                <input id="hr-line" type="number" step="0.5" value="${initLine}" oninput="updatePlayerHitRate()" style="width:76px;padding:5px 8px;font-size:12.5px;font-weight:800">
+              </div>
+            </div>
+            <div id="hr-output"></div>
+          </div>`;
+        } else {
+          _activeHitRateState = null;
+        }
+
         if (d.gamelog && d.gamelog.games && d.gamelog.games.length) {
           const hdrs = (d.gamelog.labels || []).map(l => `<th>${l}</th>`).join('');
           const rows = d.gamelog.games.map(g => {
@@ -4169,9 +4385,258 @@
           html += `<p style="color:var(--muted)">No recent game log entries found for this season yet.</p>`;
         }
         document.getElementById('pc-body').innerHTML = html;
+        if (_activeHitRateState) updatePlayerHitRate();
       } catch (e) {
         document.getElementById('pc-body').innerHTML = `<p style="color:#f87171">Unable to load player card: ${e.message}</p>`;
       }
+    }
+
+    // =========================================================================
+    // 11. 1-TAP SHAREABLE CARD GRAPHIC EXPORTER & 1-LEG-AWAY HEDGE CALCULATOR
+    // =========================================================================
+    let _hedgeCtx = null;
+
+    function openHedgeModal(idx) {
+      const c = userCards[idx];
+      if (!c) return;
+      const evals = (c.legs || []).map(evalLeg);
+      const pending = evals.find(e => !e.hit && !e.miss) || evals[evals.length - 1];
+      const cost = parseFloat(String(c.cost ?? 0).replace(/[^0-9.-]/g, '')) || 0;
+      const payout = parseFloat(String(c.payout ?? 0).replace(/[^0-9.-]/g, '')) || 0;
+      const bk = String(c.book || 'Slip').replace(/\s+(?:Predictions?|Predicts)$/i, '').trim();
+      _hedgeCtx = { book: bk, cost, payout, pending };
+
+      const sumEl = document.getElementById('hedge-summary');
+      if (sumEl) {
+        sumEl.innerHTML = `<div class="hg-card" style="border-color:rgba(245,158,11,0.45)">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+            <span class="book-badge ${bookClass(bk)}">${bk}</span>
+            <span style="font-size:13px;font-weight:800;color:#f8fafc">Cost ${money(cost)} → Payout <span style="color:#4ade80">${money(payout)}</span></span>
+          </div>
+          ${pending ? `<div style="font-size:12.5px;color:#cbd5e1;font-weight:700">Remaining Leg: <strong style="color:#fbbf24">${pending.name} — ${pending.stat}</strong> (Live: ${pending.gained})</div>` : ''}
+        </div>`;
+      }
+      const oddsEl = document.getElementById('hg-odds');
+      if (oddsEl && !oddsEl.value) oddsEl.value = '-110';
+      const custEl = document.getElementById('hg-custom');
+      if (custEl) custEl.value = '';
+      document.getElementById('hedge-modal').classList.add('open');
+      recalcHedge();
+    }
+
+    function closeHedgeModal() {
+      document.getElementById('hedge-modal').classList.remove('open');
+      _hedgeCtx = null;
+    }
+
+    function setHedgeOdds(val) {
+      const el = document.getElementById('hg-odds');
+      if (el) el.value = String(val);
+      recalcHedge();
+    }
+
+    function recalcHedge() {
+      if (!_hedgeCtx) return;
+      const resEl = document.getElementById('hedge-results');
+      const custOut = document.getElementById('hg-custom-out');
+      const odds = parseFloat(document.getElementById('hg-odds').value);
+      const { cost, payout } = _hedgeCtx;
+      if (!Number.isFinite(odds) || (odds > -100 && odds < 100) || payout <= 0) {
+        if (resEl) resEl.innerHTML = '<p style="color:#f87171;font-size:13px">Enter valid American odds (e.g. -110 or +120).</p>';
+        return;
+      }
+      const dec = odds > 0 ? (1 + odds / 100) : (1 + 100 / Math.abs(odds));
+      const eqStake = payout / dec;
+      const eqProfit = payout - cost - eqStake;
+      const beStake = cost / Math.max(0.01, dec - 1);
+      const beOrigProfit = payout - cost - beStake;
+
+      if (resEl) {
+        resEl.innerHTML = `<div class="hg-card" style="border-color:rgba(34,197,94,0.5)">
+          <div style="font-size:11.5px;font-weight:800;color:#4ade80;text-transform:uppercase;margin-bottom:4px">Lock In Equal Profit (Recommended)</div>
+          <div style="font-size:14.5px;font-weight:800;color:#f8fafc">Bet <span style="color:#38bdf8">${money(eqStake)}</span> on the opposite side (${odds > 0 ? '+' + odds : odds})</div>
+          <div style="font-size:13px;font-weight:800;margin-top:4px;color:${eqProfit >= 0 ? '#4ade80' : '#f87171'}">Guaranteed Net Profit Either Way: ${eqProfit >= 0 ? '+' : '-'}${money(Math.abs(eqProfit))}</div>
+        </div>
+        <div class="hg-card">
+          <div style="font-size:11.5px;font-weight:800;color:#38bdf8;text-transform:uppercase;margin-bottom:4px">Free Roll (Break-Even Hedge)</div>
+          <div style="font-size:14px;font-weight:800;color:#f8fafc">Bet <span style="color:#38bdf8">${money(beStake)}</span> to risk $0 if original misses</div>
+          <div style="font-size:12.5px;font-weight:700;color:#cbd5e1;margin-top:4px">Original Wins: <strong style="color:#4ade80">${beOrigProfit >= 0 ? '+' : '-'}${money(Math.abs(beOrigProfit))}</strong> • Hedge Wins: <strong style="color:#cbd5e1">$0.00</strong></div>
+        </div>`;
+      }
+
+      const custStake = parseFloat(document.getElementById('hg-custom').value);
+      if (custOut) {
+        if (Number.isFinite(custStake) && custStake >= 0) {
+          const ifOrig = payout - cost - custStake;
+          const ifHedge = (custStake * dec) - cost - custStake;
+          custOut.innerHTML = `Orig Wins: <strong style="color:${ifOrig >= 0 ? '#4ade80' : '#f87171'}">${ifOrig >= 0 ? '+' : '-'}${money(Math.abs(ifOrig))}</strong><br>Hedge Wins: <strong style="color:${ifHedge >= 0 ? '#4ade80' : '#f87171'}">${ifHedge >= 0 ? '+' : '-'}${money(Math.abs(ifHedge))}</strong>`;
+        } else {
+          custOut.textContent = 'Test any stake to compare both outcomes.';
+        }
+      }
+    }
+
+    async function exportCardGraphic(idx) {
+      const c = userCards[idx];
+      if (!c) return;
+      const evals = (c.settled && Array.isArray(c.settledEvals) && c.settledEvals.length === (c.legs || []).length)
+        ? c.settledEvals
+        : (c.legs || []).map(evalLeg);
+      const allHit = (c.settled && c.settledResult === 'won') || (evals.length > 0 && evals.every(x => x.hit));
+      const anyMiss = (c.settled && c.settledResult === 'lost') || evals.some(x => x.miss);
+      const isOneAway = !c.settled && !anyMiss && evals.length >= 2 && evals.filter(x => x.hit).length === (evals.length - 1);
+      const cost = parseFloat(String(c.cost ?? 0).replace(/[^0-9.-]/g, '')) || 0;
+      const payout = parseFloat(String(c.payout ?? 0).replace(/[^0-9.-]/g, '')) || 0;
+      const bk = String(c.book || 'OmniStatPro').replace(/\s+(?:Predictions?|Predicts)$/i, '').trim().toUpperCase();
+
+      const W = 900, pad = 28, rowH = 82;
+      const H = 182 + (evals.length * rowH) + 64;
+      const canvas = document.createElement('canvas');
+      canvas.width = W; canvas.height = H;
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#060d1c');
+      bgGrad.addColorStop(1, '#02050c');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      const bdrClr = allHit ? '#22c55e' : (anyMiss ? '#ef4444' : (isOneAway ? '#f59e0b' : '#38bdf8'));
+
+      // Clip interior cleanly to rounded card shape
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(16, 16, W - 32, H - 32, 20);
+      ctx.clip();
+
+      // Header bar
+      ctx.fillStyle = '#0f172a';
+      ctx.fillRect(18, 18, W - 36, 68);
+      const bookClrs = { FANDUEL: '#38bdf8', DRAFTKINGS: '#4ade80', PRIZEPICKS: '#c084fc', UNDERDOG: '#facc15', KALSHI: '#2dd4bf' };
+      const bkClr = bookClrs[bk] || '#38bdf8';
+      ctx.font = '900 22px Inter, Arial, sans-serif';
+      const bkW = ctx.measureText(bk).width + 28;
+      ctx.fillStyle = 'rgba(56,189,248,0.16)';
+      ctx.strokeStyle = bkClr;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.roundRect(pad + 6, 33, bkW, 38, 10); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = bkClr;
+      ctx.fillText(bk, pad + 20, 59);
+
+      // Status pill
+      const statusLbl = allHit ? `WON +${money(Math.max(0, payout - cost))}` : (anyMiss ? 'LOST' : (isOneAway ? '1 LEG AWAY' : 'LIVE TRACKING'));
+      ctx.font = '900 20px Inter, Arial, sans-serif';
+      const stW = ctx.measureText(statusLbl).width + 26;
+      ctx.fillStyle = allHit ? 'rgba(34,197,94,0.22)' : (anyMiss ? 'rgba(239,68,68,0.22)' : (isOneAway ? 'rgba(245,158,11,0.22)' : 'rgba(56,189,248,0.16)'));
+      ctx.beginPath(); ctx.roundRect(W - pad - stW - 6, 34, stW, 36, 10); ctx.fill();
+      ctx.fillStyle = bdrClr;
+      ctx.fillText(statusLbl, W - pad - stW + 7, 59);
+
+      // Cost / Payout banner
+      const banGrad = ctx.createLinearGradient(18, 86, W - 18, 86);
+      if (allHit) { banGrad.addColorStop(0, '#15803d'); banGrad.addColorStop(1, '#16a34a'); }
+      else if (anyMiss) { banGrad.addColorStop(0, '#991b1b'); banGrad.addColorStop(1, '#dc2626'); }
+      else { banGrad.addColorStop(0, '#0b152c'); banGrad.addColorStop(1, '#172e63'); }
+      ctx.fillStyle = banGrad;
+      ctx.fillRect(18, 86, W - 36, 56);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '800 24px Inter, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(`Cost: ${money(cost)}`, W * 0.27, 122);
+      ctx.fillText(`Payout: ${money(payout)}`, W * 0.73, 122);
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(W / 2, 98); ctx.lineTo(W / 2, 130); ctx.stroke();
+
+      // Column headers
+      ctx.fillStyle = '#111b33';
+      ctx.fillRect(18, 142, W - 36, 40);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '800 16px Inter, Arial, sans-serif';
+      ctx.textAlign = 'left'; ctx.fillText('PICK', pad + 18, 168);
+      ctx.textAlign = 'center';
+      ctx.fillText('TARGET', 525, 168);
+      ctx.fillText('LIVE', 695, 168);
+      ctx.fillText('NEED', 810, 168);
+
+      // Leg rows
+      let y = 182;
+      evals.forEach(e => {
+        ctx.fillStyle = e.hit ? 'rgba(22,163,74,0.22)' : (e.miss ? 'rgba(220,38,38,0.22)' : '#0b1222');
+        ctx.fillRect(18, y, W - 36, rowH);
+        ctx.fillStyle = e.hit ? '#22c55e' : (e.miss ? '#ef4444' : (e.bg || '#38bdf8'));
+        ctx.fillRect(18, y, 8, rowH);
+        ctx.strokeStyle = 'rgba(56,189,248,0.16)';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.moveTo(18, y); ctx.lineTo(W - 18, y); ctx.stroke();
+
+        const txtClr = e.hit ? '#4ade80' : (e.miss ? '#f87171' : '#f8fafc');
+        ctx.fillStyle = txtClr;
+        ctx.textAlign = 'left';
+        ctx.font = '800 22px Inter, Arial, sans-serif';
+        ctx.fillText(String(e.name || '').slice(0, 26), pad + 18, y + 36);
+        if (e.statusTxt) {
+          ctx.fillStyle = e.isLive ? '#4ade80' : '#94a3b8';
+          ctx.font = '700 15px Inter, Arial, sans-serif';
+          ctx.fillText(String(e.statusTxt).slice(0, 32), pad + 18, y + 60);
+        }
+        ctx.fillStyle = txtClr;
+        ctx.textAlign = 'center';
+        ctx.font = '800 20px Inter, Arial, sans-serif';
+        ctx.fillText(String(e.stat || ''), 525, y + 46);
+        ctx.fillText(String(e.gained || '0'), 695, y + 46);
+        ctx.fillText(String(e.needed || ''), 810, y + 46);
+
+        // Progress bar at bottom of row
+        ctx.fillStyle = 'rgba(148,163,184,0.18)';
+        ctx.fillRect(26, y + rowH - 6, W - 44, 6);
+        ctx.fillStyle = e.miss ? '#ef4444' : '#22c55e';
+        const pw = Math.max(0, Math.min(1, (Number(e.pct) || 0) / 100)) * (W - 44);
+        ctx.fillRect(26, y + rowH - 6, pw, 6);
+        y += rowH;
+      });
+
+      // Footer watermark
+      ctx.fillStyle = '#070d1a';
+      ctx.fillRect(18, H - 64, W - 36, 48);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = '900 19px Inter, Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText('OMNISTATPRO.COM', pad + 14, H - 34);
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '700 15px Inter, Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText('ALL YOUR BETS. EVERY SPORTSBOOK. ONE LIVE SCREEN.', W - pad - 14, H - 35);
+
+      ctx.restore();
+
+      // Outer rounded card border drawn crisp on top
+      ctx.strokeStyle = bdrClr;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.roundRect(14, 14, W - 28, H - 28, 22);
+      ctx.stroke();
+
+      canvas.toBlob(async blob => {
+        if (!blob) return showToast('Could not generate card image');
+        const fname = `omnistatpro-${bk.toLowerCase().replace(/[^a-z0-9]+/g, '')}-card.png`;
+        try {
+          const file = new File([blob], fname, { type: 'image/png' });
+          if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({ files: [file], title: `OmniStatPro — ${bk} Slip`, text: 'Tracked live on OmniStatPro.com' });
+            return;
+          }
+        } catch (err) {
+          if (err && err.name === 'AbortError') return;
+        }
+        const a = document.createElement('a');
+        const u = URL.createObjectURL(blob);
+        a.href = u; a.download = fname;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(u), 2000);
+        showToast('Card image saved! Ready to share.');
+      }, 'image/png');
     }
 
     let pendingQuickProp = null;
