@@ -1173,11 +1173,14 @@
         mSortSel.innerHTML = cols.map(c => `<option value="${c}" ${c === sortCol ? 'selected' : ''}>${c}</option>`).join('');
       }
 
+      if (!q) {
+        list = list.filter(p => Number(p.stats && p.stats[sortCol]) !== 0);
+      }
       list = [...list].sort((a, b) => sortDir * (((b.stats && b.stats[sortCol]) || 0) - ((a.stats && a.stats[sortCol]) || 0)));
       const topList = list.slice(0, 120);
       const emptyMsg = allActive.length === 0
         ? `No ${curPlg} players have recorded stats yet.`
-        : `No matching ${curPlg} players with recorded stats.`;
+        : (!q ? `No ${curPlg} players have recorded ${sortCol} yet.` : `No matching ${curPlg} players with recorded stats.`);
 
       const hdr = `<tr><th style="width:48px">Team</th><th>Player</th><th>Team</th><th>Status</th>` + cols.map(c => `<th style="cursor:pointer" onclick="sortBy('${c}')">${c}${sortCol === c ? (sortDir === 1 ? ' ▼' : ' ▲') : ''}</th>`).join('') + `<th>Action</th></tr>`;
       const rows = topList.length
