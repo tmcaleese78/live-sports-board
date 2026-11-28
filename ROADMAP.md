@@ -65,3 +65,12 @@
 		• Publish Terms of Service (informational/entertainment only, no liability for stat delays/wagers, renewal/refund terms) and Privacy Policy (Supabase, Gemini Vision OCR image handling, Stripe, data deletion / CCPA).
 		• Add non-affiliation disclaimer (NFL/NBA/NCAA & sportsbooks), 18+/21+ signup age confirmation, and Responsible Gaming footer notice (1-800-GAMBLER); stay strictly tracking-only (no affiliate links without state vendor registration).
 		• Lock down Supabase RLS so only the server-side Stripe webhook (service-role key) can modify is_pro, and add server-side rate limiting on /api/parse-slip.
+3. Future Product & Growth Additions:
+	• Browser Notifications + "TV / Big-Screen Mode":
+		• Opt-in PWA browser notifications for "Leg Hit!" and "Slip Cashed!" when OmniStatPro is open in a background tab.
+		• 1-tap full-screen landscape TV / RedZone Mode optimized for laptops, tablets, and living-room TVs (larger fonts, high-contrast live cards, auto-rotating active games).
+	• Year-Round Sports Retention (MLB & NHL):
+		• Add MLB (Total Bases, Strikeouts, Hits, HRs, RBIs) and NHL (Shots on Goal, Points, Goals, Assists, Saves) live feeds, bet builder options, and slip OCR parsing before Spring to retain subscribers year-round after the Super Bowl.
+	• Early Growth Playbook & Organic Acquisition:
+		• Record a 15-second demo clip snapping a PrizePicks + Kalshi slip into the Cross-Book Rooting Guide (zero sportsbook passwords) and share for feedback in r/PrizePicks, r/UnderdogFantasy, r/Kalshi, and betting Discords.
+		• Build standalone dark-mode SEO utility pages (e.g., /hedge-calculator, /parlay-odds-calculator) to attract free Google search traffic into the OmniStatPro signup funnel.
