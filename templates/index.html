@@ -414,15 +414,18 @@
       border-radius: 9px; padding: 7px 8px; text-align: center;
     }
     .hr-bars {
-      display: flex; align-items: flex-end; gap: 5px; height: 92px; padding-top: 14px;
+      display: flex; align-items: flex-end; gap: 5px; height: 112px; padding-top: 8px;
       margin-top: 6px; border-bottom: 1px solid rgba(148, 163, 184, 0.2);
     }
     .hr-bar-col {
       flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%;
     }
+    .hr-bar-track {
+      width: 100%; flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+    }
     .hr-bar-fill { width: 100%; max-width: 32px; border-radius: 5px 5px 0 0; min-height: 4px; transition: height 0.25s ease; }
-    .hr-bar-val { font-size: 10px; font-weight: 800; color: #e2e8f0; margin-bottom: 2px; }
-    .hr-bar-opp { font-size: 9px; font-weight: 700; color: #94a3b8; margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+    .hr-bar-val { font-size: 10px; font-weight: 800; color: #e2e8f0; margin-bottom: 2px; line-height: 1.1; }
+    .hr-bar-opp { font-size: 9px; font-weight: 700; color: #94a3b8; margin-top: 4px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; flex-shrink: 0; }
     .hg-card {
       background: rgba(15, 23, 42, 0.92); border: 1px solid rgba(56, 189, 248, 0.24);
       border-radius: 12px; padding: 12px 14px; margin-bottom: 10px;
@@ -4192,7 +4195,7 @@
 
     let _activeHitRateState = null;
 
-    function extractGamelogMetrics(lg, gl) {
+    function extractGamelogMetrics(lg, gl, pos = '') {
       const labels = (gl && gl.labels || []).map(x => String(x || '').toUpperCase().trim());
       const games = (gl && gl.games || []);
       if (!labels.length || !games.length) return [];
@@ -4215,10 +4218,21 @@
         }
         return -1;
       };
+      const idxIn = (start, end, ...names) => {
+        for (let i = Math.max(0, start); i < Math.min(labels.length, end); i++) {
+          if (names.includes(labels[i])) return i;
+        }
+        return -1;
+      };
       const metrics = [];
+      const seenKeys = new Set();
       const addMetric = (key, label, fn) => {
+        if (seenKeys.has(key)) return;
         const vals = games.map(g => ({ opp: g.opp || g.date || '', date: g.date || '', val: fn(g.stats || []) }));
-        if (vals.some(x => x.val !== 0)) metrics.push({ key, label, vals });
+        if (vals.some(x => x.val !== 0)) {
+          seenKeys.add(key);
+          metrics.push({ key, label, vals });
+        }
       };
 
       if (String(lg || '').toUpperCase() === 'NBA') {
@@ -4234,26 +4248,70 @@
         if (iPts >= 0 && iAst >= 0) addMetric('PA', 'PA', r => numAt(r, iPts) + numAt(r, iAst));
         if (iReb >= 0 && iAst >= 0) addMetric('RA', 'RA', r => numAt(r, iReb) + numAt(r, iAst));
       } else {
-        const iYds = idxOf('YDS'), iTd = idxOf('TD'), iCmp = idxOf('CMP'), iAtt = idxOf('ATT'), iCA = idxOf('C/ATT');
+        // ESPN NFL gamelogs contain multiple stat groups in order (e.g. WR: REC..YDS..TD then CAR..YDS..TD; RB: CAR..YDS..TD then REC..YDS..TD; QB: CMP..YDS..TD then CAR..YDS..TD)
+        const iCmp = idxOf('CMP'), iCA = idxOf('C/ATT'), iAtt = idxOf('ATT');
         const iCar = idxOf('CAR'), iRec = idxOf('REC'), iTgts = idxOf('TGTS');
-        const isPasser = iCmp >= 0 || iCA >= 0 || (iAtt >= 0 && iCar < 0 && iRec < 0);
-        const isRusher = iCar >= 0;
-        const isReceiver = iRec >= 0 || iTgts >= 0;
-        if (iYds >= 0) {
-          const yKey = isPasser ? 'PASS YDS' : (isReceiver && !isRusher ? 'REC YDS' : 'RUSH YDS');
-          const yLbl = isPasser ? 'Pass Yds' : (isReceiver && !isRusher ? 'Rec Yds' : 'Rush Yds');
-          addMetric(yKey, yLbl, r => numAt(r, iYds));
+        const passStart = iCmp >= 0 ? iCmp : (iCA >= 0 ? iCA : (iAtt >= 0 && (iCar < 0 || iAtt < iCar) && (iRec < 0 || iAtt < iRec) ? iAtt : -1));
+        const rushStart = iCar;
+        const recStart = iRec >= 0 ? iRec : iTgts;
+
+        const sections = [];
+        if (passStart >= 0) sections.push({ type: 'pass', start: passStart });
+        if (rushStart >= 0) sections.push({ type: 'rush', start: rushStart });
+        if (recStart >= 0) sections.push({ type: 'rec', start: recStart });
+        sections.sort((a, b) => a.start - b.start);
+        sections.forEach((s, idx) => {
+          s.end = idx + 1 < sections.length ? sections[idx + 1].start : labels.length;
+        });
+
+        let iRushYds = -1, iRecYds = -1, iRushTd = -1, iRecTd = -1;
+        for (const s of sections) {
+          if (s.type === 'pass') {
+            const pYds = idxIn(s.start, s.end, 'YDS');
+            const pTd = idxIn(s.start, s.end, 'TD');
+            const pCmp = idxIn(s.start, s.end, 'CMP');
+            const pAtt = idxIn(s.start, s.end, 'ATT');
+            const pCA = idxIn(s.start, s.end, 'C/ATT');
+            if (pYds >= 0) addMetric('PASS YDS', 'Pass Yds', r => numAt(r, pYds));
+            if (pCmp >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, pCmp));
+            else if (pCA >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, pCA));
+            if (pAtt >= 0) addMetric('PASS ATT', 'Pass ATT', r => numAt(r, pAtt));
+            else if (pCA >= 0) addMetric('PASS ATT', 'Pass ATT', r => secondAt(r, pCA));
+            if (pTd >= 0) addMetric('PASS TD', 'Pass TD', r => numAt(r, pTd));
+          } else if (s.type === 'rec') {
+            iRecYds = idxIn(s.start, s.end, 'YDS');
+            iRecTd = idxIn(s.start, s.end, 'TD');
+            const rRec = idxIn(s.start, s.end, 'REC');
+            const rTgts = idxIn(s.start, s.end, 'TGTS');
+            if (iRecYds >= 0) addMetric('REC YDS', 'Rec Yds', r => numAt(r, iRecYds));
+            if (rRec >= 0) addMetric('REC', 'Receptions', r => numAt(r, rRec));
+            if (rTgts >= 0) addMetric('REC TGTS', 'Rec Targets', r => numAt(r, rTgts));
+            if (iRecTd >= 0) addMetric('REC TD', 'Rec TD', r => numAt(r, iRecTd));
+          } else if (s.type === 'rush') {
+            iRushYds = idxIn(s.start, s.end, 'YDS');
+            iRushTd = idxIn(s.start, s.end, 'TD');
+            const rCar = idxIn(s.start, s.end, 'CAR');
+            if (iRushYds >= 0) addMetric('RUSH YDS', 'Rush Yds', r => numAt(r, iRushYds));
+            if (rCar >= 0) addMetric('RUSH ATT', 'Rush ATT', r => numAt(r, rCar));
+            if (iRushTd >= 0) addMetric('RUSH TD', 'Rush TD', r => numAt(r, iRushTd));
+          }
         }
-        if (iCmp >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, iCmp));
-        else if (iCA >= 0) addMetric('COMP', 'Pass Comp', r => numAt(r, iCA));
-        if (isPasser && iAtt >= 0) addMetric('PASS ATT', 'Pass ATT', r => numAt(r, iAtt));
-        else if (iCA >= 0) addMetric('PASS ATT', 'Pass ATT', r => secondAt(r, iCA));
-        if (iCar >= 0) addMetric('RUSH ATT', 'Rush ATT', r => numAt(r, iCar));
-        if (iRec >= 0) addMetric('REC', 'Receptions', r => numAt(r, iRec));
-        if (iTgts >= 0) addMetric('REC TGTS', 'Rec Targets', r => numAt(r, iTgts));
-        if (iTd >= 0) {
-          const tdKey = isPasser ? 'PASS TD' : 'TD';
-          addMetric(tdKey, isPasser ? 'Pass TD' : 'Touchdowns', r => numAt(r, iTd));
+        if (iRushYds >= 0 && iRecYds >= 0) {
+          addMetric('SCRIM YDS', 'Scrim Yds', r => numAt(r, iRushYds) + numAt(r, iRecYds));
+        }
+        if (iRushTd >= 0 || iRecTd >= 0) {
+          addMetric('TD', 'Anytime TD', r => (iRushTd >= 0 ? numAt(r, iRushTd) : 0) + (iRecTd >= 0 ? numAt(r, iRecTd) : 0));
+        }
+        // Fallback if ESPN ever omits section headers
+        if (!metrics.length) {
+          const iYds = idxOf('YDS'), iTd = idxOf('TD');
+          const pUp = String(pos || '').toUpperCase();
+          if (iYds >= 0) {
+            const k = pUp === 'QB' ? 'PASS YDS' : ((pUp === 'WR' || pUp === 'TE') ? 'REC YDS' : 'RUSH YDS');
+            const l = pUp === 'QB' ? 'Pass Yds' : ((pUp === 'WR' || pUp === 'TE') ? 'Rec Yds' : 'Rush Yds');
+            addMetric(k, l, r => numAt(r, iYds));
+          }
+          if (iTd >= 0) addMetric(pUp === 'QB' ? 'PASS TD' : 'TD', pUp === 'QB' ? 'Pass TD' : 'Anytime TD', r => numAt(r, iTd));
         }
       }
       return metrics;
@@ -4287,10 +4345,12 @@
 
       const barsHtml = [...vals].reverse().map(g => {
         const ok = isClear(g.val);
-        const hPct = Math.max(6, Math.min(100, Math.round((g.val / maxBar) * 100)));
+        const hPct = Math.max(8, Math.min(84, Math.round((g.val / maxBar) * 84)));
         return `<div class="hr-bar-col" title="${g.date} vs ${g.opp}: ${g.val}">
-          <div class="hr-bar-val" style="color:${ok ? '#4ade80' : '#f87171'}">${g.val}</div>
-          <div class="hr-bar-fill" style="height:${hPct}%;background:${ok ? '#22c55e' : '#ef4444'}"></div>
+          <div class="hr-bar-track">
+            <div class="hr-bar-val" style="color:${ok ? '#4ade80' : '#f87171'}">${g.val}</div>
+            <div class="hr-bar-fill" style="height:${hPct}%;background:${ok ? '#22c55e' : '#ef4444'}"></div>
+          </div>
           <div class="hr-bar-opp">${g.opp}</div>
         </div>`;
       }).join('');
@@ -4347,7 +4407,7 @@
             `</div>`;
         }
 
-        const metrics = extractGamelogMetrics(lg, d.gamelog);
+        const metrics = extractGamelogMetrics(lg, d.gamelog, d.pos);
         if (metrics.length) {
           _activeHitRateState = { lg, metrics };
           const prefStat = prefill && prefill.stat && metrics.find(m => m.key === prefill.stat) ? prefill.stat : metrics[0].key;
