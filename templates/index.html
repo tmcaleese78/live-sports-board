@@ -452,6 +452,7 @@
     /* ==========================================================================
        7. MOBILE PORTRAIT UX & GPU PERFORMANCE OPTIMIZATIONS
        ========================================================================== */
+    .lbl-short { display: none; }
     @media (max-width: 768px) {
       .arena-beams { filter: none; opacity: 0.7; }
       .arena-orb, .arena-floor { display: none; }
@@ -461,13 +462,14 @@
     @media (max-width: 640px) {
       body { padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px)); }
       .hero-header { padding: 6px 12px; }
-      .nav-bar { padding: 8px 10px; }
+      .nav-bar { padding: 8px 8px; }
       .nav {
-        flex-wrap: nowrap; overflow-x: auto; gap: 6px;
-        -webkit-overflow-scrolling: touch; scrollbar-width: none;
+        display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 5px; overflow: visible;
       }
-      .nav::-webkit-scrollbar { display: none; }
-      .tab-btn { padding: 7px 13px; font-size: 12.5px; flex-shrink: 0; }
+      .tab-btn { padding: 8px 4px; font-size: 12px; width: 100%; text-align: center; }
+      .lbl-full { display: none; }
+      .lbl-short { display: inline; }
       .pill { padding: 7px 12px; font-size: 12px; }
       .main-wrap { padding: 6px 10px 0; }
       h2 { font-size: 17px; margin: 16px 0 10px; }
@@ -535,10 +537,10 @@
        ======================================================================== -->
   <div class="nav-bar">
     <div class="nav">
-      <button class="tab-btn active" data-t="cards" onclick="setTab('cards')">My Bet Cards (<span id="card-cnt">0</span>)</button>
-      <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build Bet Card</button>
-      <button class="tab-btn" data-t="scoreboard" onclick="setTab('scoreboard')">Live Scoreboard</button>
-      <button class="tab-btn" data-t="stats" onclick="setTab('stats')">Live Stats</button>
+      <button class="tab-btn active" data-t="cards" onclick="setTab('cards')"><span class="lbl-full">My Bet </span>Cards (<span id="card-cnt">0</span>)</button>
+      <button class="tab-btn" data-t="build" onclick="setTab('build')">+ Build<span class="lbl-full"> Bet Card</span></button>
+      <button class="tab-btn" data-t="scoreboard" onclick="setTab('scoreboard')"><span class="lbl-full">Live Scoreboard</span><span class="lbl-short">Scores</span></button>
+      <button class="tab-btn" data-t="stats" onclick="setTab('stats')"><span class="lbl-full">Live </span>Stats</button>
     </div>
   </div>
 
